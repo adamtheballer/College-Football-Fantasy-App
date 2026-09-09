@@ -4,7 +4,9 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from collegefootballfantasy_api.app.models.matchup import Matchup
+from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.services.league_weeks import calendar_cfb_week, current_cfb_week_state, resolve_current_week
+from collegefootballfantasy_api.app.services.league_roster_matchup import build_roster_tab_view, build_waivers_view
 from tests.api.scoring_helpers import create_scoring_fixture
 
 
@@ -61,6 +63,50 @@ def test_completed_matchup_stays_visible_through_tuesday_while_records_reset(db_
     assert resolve_default_matchup_week(db_session, league) == 1
     Clock.current = datetime(2026, 9, 9, 12, 0, tzinfo=timezone.utc)
     assert resolve_default_matchup_week(db_session, league) == 2
+
+
+def test_roster_default_week_stays_in_sync_with_matchup_display_week(db_session, monkeypatch):
+    """Auto roster requests follow the public workspace transition, not Week 1."""
+
+    from collegefootballfantasy_api.app.services import league_weeks
+
+    user = User(
+        email="workspace-week@example.com",
+        first_name="Workspace",
+        password_hash="test",
+        api_token="workspace-week-token",
+    )
+    db_session.add(user)
+    db_session.flush()
+    league, home, away, _players, matchup = create_scoring_fixture(db_session)
+    home.owner_user_id = user.id
+    matchup.status = "final"
+    db_session.add(
+        Matchup(
+            league_id=league.id,
+            season=2026,
+            week=2,
+            home_team_id=home.id,
+            away_team_id=away.id,
+            status="scheduled",
+        )
+    )
+    db_session.commit()
+
+    class Clock(datetime):
+        current = datetime(2026, 9, 8, 12, 0, tzinfo=timezone.utc)
+
+        @classmethod
+        def now(cls, tz=None):
+            return cls.current
+
+    monkeypatch.setattr(league_weeks, "datetime", Clock)
+    assert build_roster_tab_view(db_session, league, user).week == 1
+    assert build_waivers_view(db_session, league, user).week == 1
+
+    Clock.current = datetime(2026, 9, 9, 12, 0, tzinfo=timezone.utc)
+    assert build_roster_tab_view(db_session, league, user).week == 2
+    assert build_waivers_view(db_session, league, user).week == 2
 
 
 def test_records_and_standings_publish_at_the_same_reset(db_session, monkeypatch):

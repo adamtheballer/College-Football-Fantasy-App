@@ -254,11 +254,11 @@ export default function LeagueWaivers() {
     0,
     postDraft,
     playerBoardScope,
-    playerBoardScope === "all" ? 1 : undefined,
+    undefined,
     hotWindowHours,
   );
   const waiverData = waiverQuery.data;
-  const displayWeek = playerBoardScope === "all" ? 1 : waiverData?.current_period?.week ?? 1;
+  const displayWeek = waiverData?.week ?? waiverData?.current_period?.week ?? 1;
   const nextWaiverProcessAt = typeof waiverData?.waiver_rules.next_process_at === "string"
     ? waiverData.waiver_rules.next_process_at
     : null;
@@ -311,7 +311,7 @@ export default function LeagueWaivers() {
   const boardDescription = playerBoardScope === "hot"
     ? `Most added players in completed leagues over the last ${hotWindowHours === 24 ? "24 hours" : "7 days"}.`
     : playerBoardScope === "all"
-      ? "Every eligible player, ordered by Week 1 projection. Rostered players remain view-only for player research and watchlists."
+      ? `Every eligible player, ordered by Week ${displayWeek} projection. Rostered players remain view-only for player research and watchlists.`
       : `Players are instant adds before their own kickoff. After kickoff, claims process at ${formatProcessTime(nextWaiverProcessAt, waiverData?.waiver_rules.timezone)}.`;
 
   const handleWatchPlayer = async (playerId: number) => {

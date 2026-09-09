@@ -774,6 +774,10 @@ class LeagueWaiverPeriodRead(BaseModel):
 
 class LeagueWaiversRead(BaseModel):
     league_id: int
+    # The selected public workspace week that every player board was built
+    # against. This is intentionally separate from the operational waiver
+    # period, which can advance during Tuesday maintenance.
+    week: int
     fantasy_team_id: int | None = None
     waiver_priority: int | None = None
     faab_remaining: int | None = None

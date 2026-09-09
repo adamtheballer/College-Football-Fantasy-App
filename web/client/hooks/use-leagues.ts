@@ -337,6 +337,16 @@ export const normalizeHotWindowHours = (value: unknown): 24 | 168 => {
   return 168;
 };
 
+/**
+ * Waiver boards follow the server-resolved workspace week. Do not let a
+ * cached Week 1 board survive the Wednesday transition into Week 2.
+ */
+export const waiverWeekQueryOptions = {
+  staleTime: 0,
+  refetchOnMount: "always" as const,
+  refetchOnWindowFocus: "always" as const,
+};
+
 export function useLeagueWaiverTab(
   leagueId?: number,
   limit = 1000,
@@ -350,7 +360,7 @@ export function useLeagueWaiverTab(
   return useQuery({
     queryKey: ["league", leagueId, "waivers", limit, offset, scope, week ?? "current", normalizedHotWindowHours],
     enabled: enabled && typeof leagueId === "number" && !Number.isNaN(leagueId),
-    staleTime: 30_000,
+    ...waiverWeekQueryOptions,
     // Final box scores and scorer corrections can arrive while this board is
     // open. Refresh the read-only board so a completed game's blue actual
     // total replaces its pregame projection without requiring navigation.
