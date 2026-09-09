@@ -32,7 +32,8 @@
     --brand-primary: 207 90% 63%;
     --brand-primary-hover: 207 92% 72%;
     --accent-crimson: 342.659 71.37% 53.137%;
-    --accent-gold: 45 89% 60%;
+    /* CFFB's existing athletic accent, aligned to the approved warm gold. */
+    --accent-gold: 45 84% 59%;
     --accent-cyan: 192 91% 62%;
     --success: 157 59% 48%;
     --warning: 42 96% 58%;
@@ -109,7 +110,7 @@
     --brand-primary: 207 90% 63%;
     --brand-primary-hover: 207 92% 72%;
     --accent-crimson: 342.659 71.37% 53.137%;
-    --accent-gold: 45 89% 60%;
+    --accent-gold: 45 84% 59%;
     --accent-cyan: 213 84% 55%;
     --success: 157 59% 48%;
     --warning: 42 96% 58%;
@@ -357,12 +358,16 @@
 
   .cfb-yard-lines { background-image: none; }
 
+  /*
+   * The sign-in feature panel is the sole existing decorative surface that
+   * receives this treatment. The static, layered background adds a faint
+   * printed-paper character without creating a stacking context or changing
+   * layout, pointer behavior, focus rings, or content contrast.
+   */
   .cfb-playbook-pattern {
-    position: relative;
-  }
-
-  .cfb-playbook-pattern::before {
-    display: none;
+    background-image:
+      repeating-linear-gradient(0deg, hsl(45 84% 59% / 0.018) 0 1px, transparent 1px 5px),
+      repeating-linear-gradient(90deg, hsl(210 40% 96% / 0.012) 0 1px, transparent 1px 7px);
   }
 
   .cfb-school-grid {
