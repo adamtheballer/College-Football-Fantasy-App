@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeHotWindowHours, rosterWeekQueryOptions } from "./use-leagues";
+import { normalizeHotWindowHours, rosterWeekQueryOptions, waiverWeekQueryOptions } from "./use-leagues";
 
 describe("normalizeHotWindowHours", () => {
   it("sends only canonical hour counts while tolerating legacy native values", () => {
@@ -26,6 +26,16 @@ describe("rosterWeekQueryOptions", () => {
       staleTime: 30_000,
       refetchOnMount: true,
       refetchOnWindowFocus: true,
+    });
+  });
+});
+
+describe("waiverWeekQueryOptions", () => {
+  it("refetches the automatic player board at the weekly workspace transition", () => {
+    expect(waiverWeekQueryOptions).toEqual({
+      staleTime: 0,
+      refetchOnMount: "always",
+      refetchOnWindowFocus: "always",
     });
   });
 });

@@ -553,6 +553,8 @@ export interface LeagueWaiverDropCandidate {
 
 export interface LeagueWaiverTabResponse {
   league_id: number;
+  /** Public workspace week used for the displayed projections and player board. */
+  week: number;
   fantasy_team_id: number | null;
   waiver_priority: number | null;
   faab_remaining: number | null;

@@ -132,7 +132,10 @@ export function TeamRosterRail({
 export default function LeagueRoster() {
   const { leagueId } = useParams();
   const parsedLeagueId = Number(leagueId);
-  const [selectedWeek, setSelectedWeek] = useState<number | null>(1);
+  // Start in Auto so this page always follows the same public week as the
+  // home carousel and Matchup tab. A hard-coded Week 1 kept the roster stale
+  // after the weekly transition until a manager pressed Auto manually.
+  const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<number | null>(null);
   const [quickSwapPlayer, setQuickSwapPlayer] = useState<LeagueRosterPlayer | null>(null);
   const leagueQuery = useLeagueDetail(parsedLeagueId);

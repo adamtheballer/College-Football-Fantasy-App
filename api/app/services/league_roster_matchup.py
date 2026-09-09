@@ -1057,7 +1057,11 @@ def build_roster_tab_view(
     user: User,
     selected_week: int | None = None,
 ) -> LeagueRosterTabRead:
-    week = resolve_current_week(db, league, selected_week)
+    # The roster is a league-workspace surface, not an operational scoring
+    # endpoint. Keep its implicit week aligned with the Home and Matchup
+    # surfaces through the Tuesday review window; explicit historical-week
+    # requests still win through the resolver's selected-week override.
+    week = resolve_matchup_display_week(db, league, selected_week)
     team = _owned_team(db, league, user)
     slot_limits = _slot_limits(db, league)
     teams = (
@@ -1396,7 +1400,11 @@ def build_waivers_view(
     scope = scope.lower()
     if scope not in {"waiver", "all", "hot"}:
         raise ValueError("Waiver player scope must be 'waiver', 'all', or 'hot'.")
-    week = resolve_current_week(db, league, selected_week)
+    # Use the same public workspace week as Matchup and Roster. Waiver
+    # processing can advance operationally during Tuesday maintenance, but
+    # managers should see a single consistent set of player projections when
+    # the workspace advances on Wednesday.
+    week = resolve_matchup_display_week(db, league, selected_week)
     team = _owned_team(db, league, user)
     roster_rows = (
         db.query(RosterEntry.player_id, Team.name, Team.owner_name)
@@ -1602,6 +1610,7 @@ def build_waivers_view(
 
     return LeagueWaiversRead(
         league_id=league.id,
+        week=week,
         fantasy_team_id=team.id if team else None,
         waiver_priority=waiver_priority,
         faab_remaining=faab_remaining,
