@@ -299,7 +299,10 @@ export default function LeagueMatchup() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const weekParam = Number(searchParams.get("week"));
-  const selectedWeek = Number.isInteger(weekParam) && weekParam > 0 ? weekParam : 1;
+  // With no explicit historical week in the URL, defer to the server's
+  // display-week resolver. The home carousel already uses that resolver; a
+  // hard-coded Week 1 here made its click-through land on a stale final.
+  const selectedWeek = Number.isInteger(weekParam) && weekParam > 0 ? weekParam : undefined;
   const matchupParam = Number(searchParams.get("matchup"));
   const selectedMatchupId = Number.isInteger(matchupParam) && matchupParam > 0 ? matchupParam : undefined;
   const { setActiveLeagueId } = useActiveLeagueId();
@@ -312,7 +315,7 @@ export default function LeagueMatchup() {
   const data = matchupQuery.data;
   const myTeam = data?.my_team ?? data?.user_team ?? null;
   const opponentTeam = data?.opponent_team ?? null;
-  const displayWeek = data?.week ?? selectedWeek;
+  const displayWeek = data?.week ?? selectedWeek ?? 1;
   const [refreshClock, setRefreshClock] = useState(() => Date.now());
   useEffect(() => {
     if (Number.isInteger(parsedLeagueId) && parsedLeagueId > 0) setActiveLeagueId(parsedLeagueId);

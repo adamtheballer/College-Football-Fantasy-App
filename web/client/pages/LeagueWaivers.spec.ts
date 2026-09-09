@@ -23,17 +23,26 @@ describe("waiverProjectionLabel", () => {
 
 describe("waiverWeekPoints", () => {
   it("prefers a verified final total, including a scoreless final, over the forecast", () => {
-    expect(waiverWeekPoints(18.76, 12.34, "ACTIVE")).toEqual({ label: "18.8", isFinal: true });
-    expect(waiverWeekPoints(0, undefined, "UNAVAILABLE")).toEqual({ label: "0.0", isFinal: true });
+    expect(waiverWeekPoints(18.76, 12.34, "ACTIVE")).toEqual({ label: "18.8", isFinal: true, finalWeek: null });
+    expect(waiverWeekPoints(0, undefined, "UNAVAILABLE")).toEqual({ label: "0.0", isFinal: true, finalWeek: null });
   });
 
   it("retains the projection state when no verified final total exists", () => {
-    expect(waiverWeekPoints(null, undefined, "UNAVAILABLE")).toEqual({ label: "—", isFinal: false });
+    expect(waiverWeekPoints(null, undefined, "UNAVAILABLE")).toEqual({ label: "—", isFinal: false, finalWeek: null });
   });
 
   it("uses the blue actual-score treatment for verified final scores and does not color forecasts as completed", () => {
     expect(waiverWeekPointsClassName(waiverWeekPoints(18.76, 12.34, "ACTIVE"))).toBe("text-cfb-brand");
     expect(waiverWeekPointsClassName(waiverWeekPoints(null, 12.34, "ACTIVE"))).toBe("text-cfb-text-primary");
+  });
+
+  it("keeps the most recent verified score blue after a new waiver week begins", () => {
+    expect(waiverWeekPoints(null, 12.34, "ACTIVE", 18.76, 1)).toEqual({
+      label: "18.8",
+      isFinal: true,
+      finalWeek: 1,
+    });
+    expect(waiverWeekPointsClassName(waiverWeekPoints(null, 12.34, "ACTIVE", 18.76, 1))).toBe("text-cfb-brand");
   });
 });
 

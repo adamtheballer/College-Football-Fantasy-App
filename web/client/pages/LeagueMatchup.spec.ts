@@ -5,6 +5,7 @@ import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const routerMocks = vi.hoisted(() => ({ setSearchParams: vi.fn(), navigate: vi.fn() }));
+const hookMocks = vi.hoisted(() => ({ useLeagueMatchupTab: vi.fn() }));
 const matchupMocks = vi.hoisted(() => ({
   weekStarted: false,
   hasLiveRosteredPlayer: false,
@@ -37,7 +38,9 @@ vi.mock("@/hooks/use-leagues", () => ({
     isLoading: false,
     isError: false,
   }),
-  useLeagueMatchupTab: () => ({
+  useLeagueMatchupTab: (...args: unknown[]) => {
+    hookMocks.useLeagueMatchupTab(...args);
+    return ({
     data: {
       matchup_id: 1,
       week: 1,
@@ -50,7 +53,8 @@ vi.mock("@/hooks/use-leagues", () => ({
     isLoading: false,
     isError: false,
     refetch: vi.fn(),
-  }),
+    });
+  },
   useLeagueScoreboard: () => ({
     data: {
       data: [
@@ -78,6 +82,7 @@ afterEach(() => {
   cleanup();
   routerMocks.setSearchParams.mockClear();
   routerMocks.navigate.mockClear();
+  hookMocks.useLeagueMatchupTab.mockClear();
   matchupMocks.weekStarted = false;
   matchupMocks.hasLiveRosteredPlayer = false;
   matchupMocks.hasUpcomingKickoff = false;
@@ -179,6 +184,12 @@ describe("league matchup scoreboard", () => {
     expect(screen.queryByText("CFB Scores available once games begin")).toBeNull();
     expect(screen.getAllByAltText("Updated Adam profile picture").every((image) => image.getAttribute("src") === "https://images.example.com/my-team.jpg")).toBe(true);
     expect(screen.getAllByAltText("Taylor profile picture").every((image) => image.getAttribute("src") === "https://images.example.com/my-opponent.jpg")).toBe(true);
+  });
+
+  it("asks the server for its current display week when the tab URL has no historical week", () => {
+    render(createElement(LeagueMatchup));
+
+    expect(hookMocks.useLeagueMatchupTab).toHaveBeenCalledWith(42, undefined, undefined, true);
   });
 
   it("shows actual zero-point totals from the first kickoff while retaining projections and win chances", () => {
