@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeHotWindowHours } from "./use-leagues";
+import { normalizeHotWindowHours, rosterWeekQueryOptions } from "./use-leagues";
 
 describe("normalizeHotWindowHours", () => {
   it("sends only canonical hour counts while tolerating legacy native values", () => {
@@ -9,6 +9,24 @@ describe("normalizeHotWindowHours", () => {
     expect(normalizeHotWindowHours(168)).toBe(168);
     expect(normalizeHotWindowHours("7d")).toBe(168);
     expect(normalizeHotWindowHours("unexpected")).toBe(168);
+  });
+});
+
+describe("rosterWeekQueryOptions", () => {
+  it("refetches the automatic server-resolved week on roster entry", () => {
+    expect(rosterWeekQueryOptions()).toEqual({
+      staleTime: 0,
+      refetchOnMount: "always",
+      refetchOnWindowFocus: "always",
+    });
+  });
+
+  it("keeps explicitly selected historical weeks normally cached", () => {
+    expect(rosterWeekQueryOptions(1)).toEqual({
+      staleTime: 30_000,
+      refetchOnMount: true,
+      refetchOnWindowFocus: true,
+    });
   });
 });
 
