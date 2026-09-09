@@ -73,7 +73,10 @@ export const getShellNavItems = (
       badge: notificationUnreadCount > 99 ? "99+" : notificationUnreadCount > 0 ? String(notificationUnreadCount) : undefined,
     },
     ...(user?.isAdmin
-      ? [{ name: "ADMIN SCORING", path: "/admin/scoring", icon: Wrench, kind: "admin" as const }]
+      ? [
+          { name: "ADMIN SCORING", path: "/admin/scoring", icon: Wrench, kind: "admin" as const },
+          { name: "ADMIN SCHEDULES", path: "/admin/schedules", icon: Wrench, kind: "admin" as const },
+        ]
       : []),
     { name: "SETTINGS", path: "/settings", icon: Settings },
     { name: "SIGN OUT", path: "#", icon: LogOut, kind: "danger" },

@@ -41,6 +41,7 @@ const Chats = lazyWithRouteRecovery(() => import("./pages/Chats"));
 const InjuryCenter = lazyWithRouteRecovery(() => import("./pages/InjuryCenter"));
 const Trade = lazyWithRouteRecovery(() => import("./pages/Trade"));
 const AdminScoring = lazyWithRouteRecovery(() => import("./pages/AdminScoring"));
+const AdminSchedule = lazyWithRouteRecovery(() => import("./pages/AdminSchedule"));
 const ComingSoon = lazyWithRouteRecovery(() => import("./pages/ComingSoon"));
 const SaturdayPick6 = lazyWithRouteRecovery(() => import("./pages/SaturdayPick6"));
 const AdminSaturdayPick6 = lazyWithRouteRecovery(() => import("./pages/AdminSaturdayPick6"));
@@ -226,6 +227,7 @@ const ApplicationRoutes = () => (
                 <Route path="/coming-soon" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
                 <Route path="/saturday-pick-6" element={<ProtectedRoute><SaturdayPick6 /></ProtectedRoute>} />
                 <Route path="/admin/scoring" element={<ProtectedRoute><AdminScoring /></ProtectedRoute>} />
+                <Route path="/admin/schedules" element={<ProtectedRoute><AdminSchedule /></ProtectedRoute>} />
                 <Route path="/admin/saturday-pick-6" element={<ProtectedRoute><AdminSaturdayPick6 /></ProtectedRoute>} />
                 <Route path="/stats" element={<Navigate to="/leagues" replace />} />
                 <Route path="/stats/players" element={<Navigate to="/leagues" replace />} />
