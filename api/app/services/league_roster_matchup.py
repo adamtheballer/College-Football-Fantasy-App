@@ -1190,8 +1190,18 @@ def build_matchup_tab_view(
             .first()
         )
         matchup, postseason_node = matchup_result if matchup_result else (None, None)
-        primary_team = db.get(Team, matchup.home_team_id) if matchup else None
-        opponent = db.get(Team, matchup.away_team_id) if matchup else None
+        home_team = db.get(Team, matchup.home_team_id) if matchup else None
+        away_team = db.get(Team, matchup.away_team_id) if matchup else None
+        # Matchup browsing must not change the viewer's visual side when the
+        # selected matchup is their own. The carousel passes an explicit
+        # matchup ID after an arrow/swipe, so orient that response around the
+        # viewer rather than blindly rendering the schedule's home team left.
+        if viewer_team and matchup and viewer_team.id == matchup.away_team_id:
+            primary_team, opponent = viewer_team, home_team
+        elif viewer_team and matchup and viewer_team.id == matchup.home_team_id:
+            primary_team, opponent = viewer_team, away_team
+        else:
+            primary_team, opponent = home_team, away_team
     else:
         primary_team = viewer_team
         matchup_result = (
