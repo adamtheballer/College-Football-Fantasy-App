@@ -13,6 +13,7 @@ from collegefootballfantasy_api.app.services.schedule_time_sync import (
     run_due_schedule_sync,
     sync_remaining_schedule_times,
     sync_schedule_times,
+    team_key,
 )
 
 
@@ -141,6 +142,11 @@ def test_espn_schedule_prefers_full_location_over_abbreviated_short_name(monkeyp
 
     assert event.home_team == "Michigan State"
     assert event.away_team == "Prairie View A&M"
+
+
+def test_schedule_team_key_uses_explicit_aliases_without_collapsing_distinct_schools():
+    assert team_key("App State") == team_key("Appalachian State")
+    assert team_key("Texas College") != team_key("Texas")
 
 
 def test_espn_team_schedule_fallback_repairs_a_scoreboard_omission(db_session, monkeypatch):
