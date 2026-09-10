@@ -32,6 +32,7 @@ from collegefootballfantasy_api.app.services.provider_cache import get_or_create
 logger = logging.getLogger(__name__)
 ScheduleSource = Literal["espn", "sportsdata"]
 _FINAL_STATUSES = {"final", "post", "completed"}
+_SCHEDULE_MATCH_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -119,6 +120,26 @@ def _parse_datetime(value: object) -> datetime | None:
     return _utc(parsed)
 
 
+def _espn_school_name(competitor: object) -> str | None:
+    """Prefer ESPN's school-level name over its mascot-bearing display name.
+
+    ``TeamSchedule`` is keyed to a school (for example ``Miami``), while
+    ESPN's display name is commonly ``Miami Hurricanes``.  Matching the latter
+    makes otherwise identical games look unrelated.  ESPN's short display
+    name retains meaningful qualifiers such as ``Miami (OH)`` without adding
+    the mascot.
+    """
+
+    team = competitor.get("team") if isinstance(competitor, dict) else None
+    if not isinstance(team, dict):
+        return None
+    for key in ("shortDisplayName", "location", "displayName"):
+        value = team.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
 def _espn_events(*, season: int, week: int) -> list[ProviderScheduleGame]:
     observed_at = datetime.now(timezone.utc)
     with ESPNClient() as client:
@@ -134,8 +155,8 @@ def _espn_events(*, season: int, week: int) -> list[ProviderScheduleGame]:
             continue
         home = next((row for row in competitors if isinstance(row, dict) and row.get("homeAway") == "home"), None)
         away = next((row for row in competitors if isinstance(row, dict) and row.get("homeAway") == "away"), None)
-        home_team = ((home or {}).get("team") or {}).get("displayName") if isinstance((home or {}).get("team"), dict) else None
-        away_team = ((away or {}).get("team") or {}).get("displayName") if isinstance((away or {}).get("team"), dict) else None
+        home_team = _espn_school_name(home)
+        away_team = _espn_school_name(away)
         if not isinstance(home_team, str) or not isinstance(away_team, str):
             continue
         broadcasts = competition.get("broadcasts")
@@ -417,7 +438,14 @@ def run_due_schedule_sync(
     season_value = season or settings.current_season_year
     week = calendar_cfb_week(season_value, current)
     source = resolve_schedule_sync_source()
-    scope = {"season": season_value, "week": week, "date_et": eastern.date().isoformat()}
+    # A matcher revision gives a corrected identity algorithm one controlled
+    # retry without weakening the durable daily guard for normal operation.
+    scope = {
+        "season": season_value,
+        "week": week,
+        "date_et": eastern.date().isoformat(),
+        "schedule_match_version": _SCHEDULE_MATCH_VERSION,
+    }
     state = get_or_create_sync_state(db, source, "schedule_time_sync", scope_dict_to_key(scope))
     if state.status == "ready" and state.last_success_at is not None:
         return {"status": "already_completed", "season": season_value, "week": week, "source": source}

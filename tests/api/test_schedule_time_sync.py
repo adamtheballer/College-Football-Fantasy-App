@@ -8,6 +8,7 @@ from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.services.player_game_log import build_player_game_log
 from collegefootballfantasy_api.app.services.schedule_time_sync import (
     ProviderScheduleGame,
+    _espn_events,
     apply_manual_kickoff_override,
     run_due_schedule_sync,
     sync_schedule_times,
@@ -63,6 +64,36 @@ def test_tbd_is_replaced_in_canonical_schedule_and_linked_game(db_session):
     game = db_session.get(Game, home.game_id)
     assert game is not None and game.external_id == "401999001"
     assert _as_utc(game.start_date) == _as_utc(home.kickoff_at)
+
+
+def test_espn_schedule_uses_school_name_not_mascot_display_name(monkeypatch):
+    import collegefootballfantasy_api.app.services.schedule_time_sync as schedule_sync
+
+    class FakeESPNClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def get_scoreboard_events(self, **_kwargs):
+            return [{
+                "id": "401999001",
+                "competitions": [{
+                    "date": "2026-09-12T23:30:00Z",
+                    "competitors": [
+                        {"homeAway": "home", "team": {"shortDisplayName": "Miami", "displayName": "Miami Hurricanes"}},
+                        {"homeAway": "away", "team": {"shortDisplayName": "Florida State", "displayName": "Florida State Seminoles"}},
+                    ],
+                }],
+            }]
+
+    monkeypatch.setattr(schedule_sync, "ESPNClient", FakeESPNClient)
+
+    event = _espn_events(season=2026, week=2)[0]
+
+    assert event.home_team == "Miami"
+    assert event.away_team == "Florida State"
 
 
 def test_confirmed_time_is_never_downgraded_when_provider_time_is_missing(db_session):
