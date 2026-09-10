@@ -96,6 +96,39 @@ def test_espn_schedule_uses_school_name_not_mascot_display_name(monkeypatch):
     assert event.away_team == "Florida State"
 
 
+def test_espn_team_schedule_fallback_repairs_a_scoreboard_omission(db_session, monkeypatch):
+    """A valid team schedule must repair an otherwise omitted scoreboard game."""
+
+    import collegefootballfantasy_api.app.services.schedule_time_sync as schedule_sync
+
+    home, away = _rows(db_session)
+    monkeypatch.setattr(schedule_sync, "fetch_schedule_events", lambda **_kwargs: [])
+    observed_team_names: list[str] = []
+
+    def team_schedule_fallback(*, team_names, **_kwargs):
+        observed_team_names.extend(team_names)
+        return [_event()], 1
+
+    monkeypatch.setattr(schedule_sync, "_espn_team_schedule_events", team_schedule_fallback)
+
+    summary = sync_schedule_times(
+        db_session,
+        season=2026,
+        week=2,
+        source="espn",
+        force_current_week=True,
+    )
+    db_session.commit()
+
+    db_session.refresh(home)
+    db_session.refresh(away)
+    assert observed_team_names == ["Miami (FL)"]
+    assert summary.team_schedule_fallback_teams == 1
+    assert summary.team_schedule_fallback_games == 1
+    assert summary.games_updated == 2
+    assert _as_utc(home.kickoff_at) == _as_utc(away.kickoff_at)
+
+
 def test_confirmed_time_is_never_downgraded_when_provider_time_is_missing(db_session):
     kickoff = datetime(2026, 9, 12, 23, 30, tzinfo=timezone.utc)
     home, _away = _rows(db_session, kickoff_at=kickoff)
