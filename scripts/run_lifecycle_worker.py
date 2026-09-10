@@ -40,23 +40,33 @@ def parse_args() -> argparse.Namespace:
 
 def run_once() -> dict[str, dict[str, int | str]]:
     with SessionLocal() as db:
-        return {
-            "drafts": process_expired_draft_picks_once(db),
-            "saturday_pick_6": refresh_open_pick_contests(db),
-            "waivers": process_waiver_claims_once(db),
-            "expired_trades": expire_trade_offers_once(db),
-            "trades": process_trade_offers_once(db),
-            "postseason": advance_postseason_state(db),
-            "security_email": process_security_email_outbox_once(db),
-            # A daily 06:00 UTC reconciler. This uses the existing lifecycle
-            # worker wake-up; it never adds a client poll loop or a second
-            # scheduler process.
-            "player_popularity": run_due_player_popularity_snapshot(db, season=2026),
-            # The schedule-time job is internally due-gated and persisted, so
-            # this cheap call cannot create a second cron loop or provider
-            # fetch on every lifecycle tick.
-            "schedule_time_sync": run_due_schedule_sync(db),
-        }
+        try:
+            result = {
+                "drafts": process_expired_draft_picks_once(db),
+                "saturday_pick_6": refresh_open_pick_contests(db),
+                "waivers": process_waiver_claims_once(db),
+                "expired_trades": expire_trade_offers_once(db),
+                "trades": process_trade_offers_once(db),
+                "postseason": advance_postseason_state(db),
+                "security_email": process_security_email_outbox_once(db),
+                # A daily 06:00 UTC reconciler. This uses the existing lifecycle
+                # worker wake-up; it never adds a client poll loop or a second
+                # scheduler process.
+                "player_popularity": run_due_player_popularity_snapshot(db, season=2026),
+                # The schedule-time job is internally due-gated and persisted, so
+                # this cheap call cannot create a second cron loop or provider
+                # fetch on every lifecycle tick.
+                "schedule_time_sync": run_due_schedule_sync(db),
+            }
+            # Most lifecycle services commit their own durable work. The
+            # schedule synchronizer deliberately leaves its provider-state
+            # transaction to its caller; commit the shared worker unit so its
+            # daily guard survives the next five-second tick.
+            db.commit()
+            return result
+        except Exception:
+            db.rollback()
+            raise
 
 
 def main() -> None:
