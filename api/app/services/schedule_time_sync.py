@@ -25,7 +25,7 @@ from collegefootballfantasy_api.app.models.provider_sync_state import ProviderSy
 from collegefootballfantasy_api.app.models.schedule_sync_issue import ScheduleSyncIssue
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.services.league_weeks import calendar_cfb_week
-from collegefootballfantasy_api.app.services.power4 import canonical_school_name, normalize_school
+from collegefootballfantasy_api.app.services.power4 import NORMALIZED_TO_CANONICAL, normalize_school
 from collegefootballfantasy_api.app.services.provider_identity import audit_identity_event
 from collegefootballfantasy_api.app.services.provider_cache import get_or_create_sync_state, scope_dict_to_key
 
@@ -33,7 +33,7 @@ from collegefootballfantasy_api.app.services.provider_cache import get_or_create
 logger = logging.getLogger(__name__)
 ScheduleSource = Literal["espn", "sportsdata"]
 _FINAL_STATUSES = {"final", "post", "completed"}
-_SCHEDULE_MATCH_VERSION = 5
+_SCHEDULE_MATCH_VERSION = 6
 
 
 @dataclass(frozen=True)
@@ -97,13 +97,20 @@ def _utc(value: datetime | None) -> datetime | None:
 
 
 def team_key(value: str | None) -> str:
-    """Canonicalize supported aliases, then safely normalize any opponent."""
+    """Canonicalize explicit aliases, then safely normalize any opponent.
 
-    canonical = canonical_school_name(value or "")
+    Do not use the general purpose school resolver here: it deliberately
+    removes institutional suffixes for player-pool filtering, which would
+    incorrectly make ``Texas College`` indistinguishable from ``Texas`` in a
+    provider schedule lookup.
+    """
+
+    ascii_value = unicodedata.normalize("NFKD", value or "").encode("ascii", "ignore").decode("ascii")
+    normalized = normalize_school(ascii_value)
+    canonical = NORMALIZED_TO_CANONICAL.get(normalized)
     if canonical:
         return normalize_school(canonical)
-    ascii_value = unicodedata.normalize("NFKD", value or "").encode("ascii", "ignore").decode("ascii")
-    return normalize_school(ascii_value)
+    return normalized
 
 
 def _provider_status(event: dict) -> str:

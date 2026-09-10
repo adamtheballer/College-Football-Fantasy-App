@@ -141,6 +141,9 @@ SCHOOL_ALIASES: dict[str, str] = {
     "BC": "Boston College",
     "Notre Dame Fighting Irish": "Notre Dame",
     "ND": "Notre Dame",
+    # ESPN's football schedule endpoint abbreviates the Mountaineers to this
+    # school label, while the imported schedule uses Appalachian State.
+    "App State": "Appalachian State",
 }
 
 NORMALIZED_TO_CONFERENCE: dict[str, str] = {}
