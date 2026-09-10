@@ -97,6 +97,52 @@ def test_espn_schedule_uses_school_name_not_mascot_display_name(monkeypatch):
     assert event.away_team == "Florida State"
 
 
+def test_espn_schedule_prefers_full_location_over_abbreviated_short_name(monkeypatch):
+    """ESPN abbreviations must not prevent canonical schedule rows matching."""
+
+    import collegefootballfantasy_api.app.services.schedule_time_sync as schedule_sync
+
+    class FakeESPNClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def get_scoreboard_events(self, **_kwargs):
+            return [{
+                "id": "401999002",
+                "competitions": [{
+                    "date": "2026-09-12T19:30:00Z",
+                    "competitors": [
+                        {
+                            "homeAway": "home",
+                            "team": {
+                                "location": "Michigan State",
+                                "shortDisplayName": "Michigan St",
+                                "displayName": "Michigan State Spartans",
+                            },
+                        },
+                        {
+                            "homeAway": "away",
+                            "team": {
+                                "location": "Prairie View A&M",
+                                "shortDisplayName": "Prairie View",
+                                "displayName": "Prairie View A&M Panthers",
+                            },
+                        },
+                    ],
+                }],
+            }]
+
+    monkeypatch.setattr(schedule_sync, "ESPNClient", FakeESPNClient)
+
+    event = _espn_events(season=2026, week=2)[0]
+
+    assert event.home_team == "Michigan State"
+    assert event.away_team == "Prairie View A&M"
+
+
 def test_espn_team_schedule_fallback_repairs_a_scoreboard_omission(db_session, monkeypatch):
     """A valid team schedule must repair an otherwise omitted scoreboard game."""
 

@@ -33,7 +33,7 @@ from collegefootballfantasy_api.app.services.provider_cache import get_or_create
 logger = logging.getLogger(__name__)
 ScheduleSource = Literal["espn", "sportsdata"]
 _FINAL_STATUSES = {"final", "post", "completed"}
-_SCHEDULE_MATCH_VERSION = 4
+_SCHEDULE_MATCH_VERSION = 5
 
 
 @dataclass(frozen=True)
@@ -128,15 +128,17 @@ def _espn_school_name(competitor: object) -> str | None:
 
     ``TeamSchedule`` is keyed to a school (for example ``Miami``), while
     ESPN's display name is commonly ``Miami Hurricanes``.  Matching the latter
-    makes otherwise identical games look unrelated.  ESPN's short display
-    name retains meaningful qualifiers such as ``Miami (OH)`` without adding
-    the mascot.
+    makes otherwise identical games look unrelated. ESPN's location label is
+    its authoritative school name and retains qualifiers such as ``Miami
+    (OH)`` without adding the mascot. The short display label is only a
+    fallback because it abbreviates ``Michigan State`` to ``Michigan St``
+    and ``Prairie View A&M`` to ``Prairie View``.
     """
 
     team = competitor.get("team") if isinstance(competitor, dict) else None
     if not isinstance(team, dict):
         return None
-    for key in ("shortDisplayName", "location", "displayName"):
+    for key in ("location", "shortDisplayName", "displayName"):
         value = team.get(key)
         if isinstance(value, str) and value.strip():
             return value.strip()
