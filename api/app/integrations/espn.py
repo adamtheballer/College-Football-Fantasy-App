@@ -133,6 +133,53 @@ class ESPNClient:
             return []
         return [event for event in events if isinstance(event, dict)]
 
+    def get_teams(self, *, limit: int = 1000) -> list[dict[str, Any]]:
+        """Return ESPN's college-football team directory.
+
+        The weekly scoreboard is intentionally not treated as a complete
+        schedule source: ESPN omits a number of otherwise valid games from
+        that feed.  Schedule reconciliation uses this directory only to find
+        the stable provider team ID for a targeted per-team schedule lookup.
+        """
+
+        payload = self._request(
+            "teams",
+            params={"limit": limit},
+            base_url=self.SITE_BASE_URL,
+        )
+        sports = payload.get("sports")
+        if not isinstance(sports, list) or not sports or not isinstance(sports[0], dict):
+            return []
+        leagues = sports[0].get("leagues")
+        if not isinstance(leagues, list) or not leagues or not isinstance(leagues[0], dict):
+            return []
+        teams = leagues[0].get("teams")
+        if not isinstance(teams, list):
+            return []
+        result: list[dict[str, Any]] = []
+        for item in teams:
+            team = item.get("team") if isinstance(item, dict) else None
+            if isinstance(team, dict):
+                result.append(team)
+        return result
+
+    def get_team_schedule_events(self, espn_team_id: str | int, *, season: int) -> list[dict[str, Any]]:
+        """Return one team's verified season schedule from ESPN.
+
+        This is deliberately a finite fallback for unmatched canonical rows,
+        not a polling path for live scoring.
+        """
+
+        payload = self._request(
+            f"teams/{espn_team_id}/schedule",
+            params={"dates": season},
+            base_url=self.SITE_BASE_URL,
+        )
+        events = payload.get("events")
+        if not isinstance(events, list):
+            return []
+        return [event for event in events if isinstance(event, dict)]
+
     def get_summary(self, event_id: str | int) -> dict[str, Any]:
         return self.get_summary_response(event_id).payload
 

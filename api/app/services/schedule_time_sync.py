@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import unicodedata
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Iterable, Literal
@@ -32,7 +33,7 @@ from collegefootballfantasy_api.app.services.provider_cache import get_or_create
 logger = logging.getLogger(__name__)
 ScheduleSource = Literal["espn", "sportsdata"]
 _FINAL_STATUSES = {"final", "post", "completed"}
-_SCHEDULE_MATCH_VERSION = 2
+_SCHEDULE_MATCH_VERSION = 4
 
 
 @dataclass(frozen=True)
@@ -55,6 +56,8 @@ class ScheduleSyncSummary:
     week: int
     source: str
     games_fetched: int = 0
+    team_schedule_fallback_teams: int = 0
+    team_schedule_fallback_games: int = 0
     games_matched: int = 0
     games_updated: int = 0
     tbd_games_unchanged: int = 0
@@ -140,42 +143,154 @@ def _espn_school_name(competitor: object) -> str | None:
     return None
 
 
+def _espn_provider_game(
+    event: dict,
+    *,
+    season: int,
+    week: int,
+    observed_at: datetime,
+) -> ProviderScheduleGame | None:
+    """Translate one ESPN schedule event only when its participants are known."""
+
+    event_id = str(event.get("id") or "").strip()
+    competition = next((value for value in event.get("competitions", []) if isinstance(value, dict)), None)
+    if not event_id or competition is None:
+        return None
+    competitors = competition.get("competitors")
+    if not isinstance(competitors, list):
+        return None
+    home = next((row for row in competitors if isinstance(row, dict) and row.get("homeAway") == "home"), None)
+    away = next((row for row in competitors if isinstance(row, dict) and row.get("homeAway") == "away"), None)
+    home_team = _espn_school_name(home)
+    away_team = _espn_school_name(away)
+    if not isinstance(home_team, str) or not isinstance(away_team, str):
+        return None
+    broadcasts = competition.get("broadcasts")
+    broadcast = next((item for item in broadcasts if isinstance(item, dict)), {}) if isinstance(broadcasts, list) else {}
+    names = broadcast.get("names") if isinstance(broadcast, dict) else None
+    if not isinstance(names, list) and isinstance(broadcast, dict):
+        media = broadcast.get("media")
+        names = [media.get("shortName")] if isinstance(media, dict) and media.get("shortName") else None
+    venue_payload = competition.get("venue") if isinstance(competition.get("venue"), dict) else {}
+    return ProviderScheduleGame(
+        external_game_id=event_id,
+        season=season,
+        week=week,
+        home_team=home_team,
+        away_team=away_team,
+        kickoff_at=_parse_datetime(competition.get("date") or event.get("date")),
+        status=_provider_status(event),
+        venue=str(venue_payload.get("fullName")).strip() if venue_payload.get("fullName") else None,
+        network=str(names[0]).strip() if isinstance(names, list) and names and names[0] else None,
+        source_updated_at=observed_at,
+    )
+
+
 def _espn_events(*, season: int, week: int) -> list[ProviderScheduleGame]:
     observed_at = datetime.now(timezone.utc)
     with ESPNClient() as client:
         raw_events = client.get_scoreboard_events(season=season, week=week)
-    result: list[ProviderScheduleGame] = []
-    for event in raw_events:
-        event_id = str(event.get("id") or "").strip()
-        competition = next((value for value in event.get("competitions", []) if isinstance(value, dict)), None)
-        if not event_id or competition is None:
-            continue
-        competitors = competition.get("competitors")
-        if not isinstance(competitors, list):
-            continue
-        home = next((row for row in competitors if isinstance(row, dict) and row.get("homeAway") == "home"), None)
-        away = next((row for row in competitors if isinstance(row, dict) and row.get("homeAway") == "away"), None)
-        home_team = _espn_school_name(home)
-        away_team = _espn_school_name(away)
-        if not isinstance(home_team, str) or not isinstance(away_team, str):
-            continue
-        broadcasts = competition.get("broadcasts")
-        broadcast = next((item for item in broadcasts if isinstance(item, dict)), {}) if isinstance(broadcasts, list) else {}
-        names = broadcast.get("names") if isinstance(broadcast, dict) else None
-        venue_payload = competition.get("venue") if isinstance(competition.get("venue"), dict) else {}
-        result.append(ProviderScheduleGame(
-            external_game_id=event_id,
-            season=season,
-            week=week,
-            home_team=home_team,
-            away_team=away_team,
-            kickoff_at=_parse_datetime(competition.get("date") or event.get("date")),
-            status=_provider_status(event),
-            venue=str(venue_payload.get("fullName")).strip() if venue_payload.get("fullName") else None,
-            network=str(names[0]).strip() if isinstance(names, list) and names and names[0] else None,
-            source_updated_at=observed_at,
-        ))
-    return result
+    return [
+        provider_game
+        for event in raw_events
+        if (provider_game := _espn_provider_game(event, season=season, week=week, observed_at=observed_at)) is not None
+    ]
+
+
+def _espn_team_schedule_events(
+    *,
+    season: int,
+    week: int,
+    team_names: Iterable[str],
+) -> tuple[list[ProviderScheduleGame], int]:
+    return _espn_team_schedule_events_for_weeks(
+        season=season,
+        weeks={week},
+        team_names=team_names,
+    )
+
+
+def _espn_team_schedule_events_for_weeks(
+    *,
+    season: int,
+    weeks: set[int],
+    team_names: Iterable[str],
+) -> tuple[list[ProviderScheduleGame], int]:
+    """Fetch exact-team ESPN schedules for scoreboard omissions.
+
+    ESPN's weekly scoreboard does not expose every valid college game.  Each
+    fallback request is restricted to a canonical non-bye schedule row that
+    did not match the scoreboard.  We retain only events whose provider week
+    and season exactly match the requested fantasy weeks.
+    """
+
+    requested_keys = {team_key(name) for name in team_names if team_key(name)}
+    requested_weeks = {int(value) for value in weeks if int(value) > 0}
+    if not requested_keys or not requested_weeks:
+        return [], 0
+    observed_at = datetime.now(timezone.utc)
+    with ESPNClient() as client:
+        team_ids: dict[str, str] = {}
+        for team in client.get_teams():
+            team_id = str(team.get("id") or "").strip()
+            if not team_id:
+                continue
+            for name in (team.get("location"), team.get("shortDisplayName"), team.get("displayName")):
+                name_key = team_key(str(name or ""))
+                if name_key in requested_keys:
+                    team_ids.setdefault(name_key, team_id)
+
+        requested_team_ids: dict[str, str] = {}
+        for name_key in sorted(requested_keys):
+            team_id = team_ids.get(name_key)
+            if not team_id:
+                logger.warning("schedule_team_directory_missing team=%s season=%s weeks=%s", name_key, season, sorted(requested_weeks))
+                continue
+            requested_team_ids[name_key] = team_id
+
+        # This path runs only for scoreboard omissions.  Bounded concurrency
+        # keeps a broad weekly repair fast without turning the lifecycle loop
+        # into a request storm.
+        schedules_by_team: dict[str, list[dict]] = {}
+        with ThreadPoolExecutor(max_workers=min(8, len(requested_team_ids) or 1)) as executor:
+            futures = {
+                executor.submit(client.get_team_schedule_events, team_id, season=season): name_key
+                for name_key, team_id in requested_team_ids.items()
+            }
+            for future in as_completed(futures):
+                name_key = futures[future]
+                try:
+                    schedules_by_team[name_key] = future.result()
+                except Exception:
+                    logger.warning(
+                        "schedule_team_lookup_failed team=%s season=%s weeks=%s",
+                        name_key,
+                        season,
+                        sorted(requested_weeks),
+                        exc_info=True,
+                    )
+
+        result: dict[str, ProviderScheduleGame] = {}
+        for events in schedules_by_team.values():
+            for event in events:
+                event_season = event.get("season") if isinstance(event.get("season"), dict) else {}
+                event_week = event.get("week") if isinstance(event.get("week"), dict) else {}
+                try:
+                    event_season_value = int(event_season.get("year"))
+                    event_week_value = int(event_week.get("number"))
+                except (TypeError, ValueError):
+                    continue
+                if event_season_value != season or event_week_value not in requested_weeks:
+                    continue
+                provider_game = _espn_provider_game(
+                    event,
+                    season=season,
+                    week=event_week_value,
+                    observed_at=observed_at,
+                )
+                if provider_game is not None:
+                    result.setdefault(provider_game.external_game_id, provider_game)
+    return list(result.values()), len(team_ids)
 
 
 def _sportsdata_events(*, season: int, week: int) -> list[ProviderScheduleGame]:
@@ -264,9 +379,35 @@ def _same_participants(game: Game, event: ProviderScheduleGame) -> bool:
 
 
 def _event_matches_schedule(event: ProviderScheduleGame, row: TeamSchedule) -> bool:
-    if not row.opponent_name:
+    participants = {team_key(event.home_team), team_key(event.away_team)}
+    if team_key(row.team_name) not in participants:
         return False
-    return {team_key(row.team_name), team_key(row.opponent_name)} == {team_key(event.home_team), team_key(event.away_team)}
+    if not row.opponent_name:
+        # A schedule row without an opponent can only be repaired if the
+        # caller also proves there is exactly one event for this team/week.
+        return True
+    return {team_key(row.team_name), team_key(row.opponent_name)} == participants
+
+
+def _unmatched_schedule_team_names(
+    schedule_rows: Iterable[TeamSchedule],
+    events: Iterable[ProviderScheduleGame],
+) -> list[str]:
+    """Choose one verified-team lookup per unresolved participant pair."""
+
+    known_events = list(events)
+    seen_pairs: set[tuple[int, str, str]] = set()
+    result: list[str] = []
+    for row in schedule_rows:
+        if any(_event_matches_schedule(event, row) for event in known_events):
+            continue
+        pair = (row.week, *sorted((team_key(row.team_name), team_key(row.opponent_name))))
+        if pair in seen_pairs:
+            continue
+        seen_pairs.add(pair)
+        if row.team_name:
+            result.append(row.team_name)
+    return result
 
 
 def _canonical_event_game(db: Session, *, row: TeamSchedule, event: ProviderScheduleGame) -> Game | None:
@@ -302,6 +443,7 @@ def sync_schedule_times(
     source: ScheduleSource = "espn",
     force_current_week: bool = False,
     provider_events: Iterable[ProviderScheduleGame] | None = None,
+    schedule_rows: Iterable[TeamSchedule] | None = None,
     now: datetime | None = None,
     actor_user_id: int | None = None,
 ) -> ScheduleSyncSummary:
@@ -317,16 +459,39 @@ def sync_schedule_times(
         summary.errors.append("refusing non-current week without force_current_week")
         return summary.finish()
 
+    if schedule_rows is None:
+        rows = list(db.scalars(select(TeamSchedule).where(
+            TeamSchedule.season == season,
+            TeamSchedule.week == week,
+            TeamSchedule.is_bye.is_(False),
+        )))
+    else:
+        rows = [
+            row
+            for row in schedule_rows
+            if row.season == season and row.week == week and not row.is_bye
+        ]
     events = list(provider_events) if provider_events is not None else fetch_schedule_events(source=source, season=season, week=week)
     events = [event for event in events if event.season == season and event.week == week]
+    if provider_events is None and source == "espn":
+        # ESPN's group scoreboard is useful but incomplete.  Do one targeted
+        # schedule lookup per unresolved matchup pair, never a blanket fetch
+        # across every college program and never from the live-score loop.
+        fallback_team_names = _unmatched_schedule_team_names(rows, events)
+        fallback_events, fallback_teams = _espn_team_schedule_events(
+            season=season,
+            week=week,
+            team_names=fallback_team_names,
+        )
+        summary.team_schedule_fallback_teams = fallback_teams
+        summary.team_schedule_fallback_games = len(fallback_events)
+        events_by_id = {event.external_game_id: event for event in events}
+        for event in fallback_events:
+            events_by_id.setdefault(event.external_game_id, event)
+        events = list(events_by_id.values())
     summary.games_fetched = len(events)
-    schedule_rows = list(db.scalars(select(TeamSchedule).where(
-        TeamSchedule.season == season,
-        TeamSchedule.week == week,
-        TeamSchedule.is_bye.is_(False),
-    )))
 
-    for row in schedule_rows:
+    for row in rows:
         if row.manual_override:
             summary.skipped_manual_override += 1
             _issue(db, summary, row=row, issue_type="manual_override_skipped", current_value=row.kickoff_at.isoformat() if row.kickoff_at else None, provider_value=None, confidence=None, notes=row.manual_override_reason)
@@ -407,6 +572,77 @@ def sync_schedule_times(
     return summary
 
 
+def sync_remaining_schedule_times(
+    db: Session,
+    *,
+    season: int,
+    start_week: int,
+    source: ScheduleSource = "espn",
+    now: datetime | None = None,
+) -> list[ScheduleSyncSummary]:
+    """Hydrate every remaining non-bye season row from verified provider data.
+
+    ESPN's per-team endpoint returns a whole season at once.  Querying each
+    unresolved team once is both more complete and safer than treating the
+    sparse weekly scoreboard as a season authority.  Existing confirmed rows
+    are intentionally excluded: this is a repair for missing opponent/time
+    data, not a bulk rewrite of schedule decisions.
+    """
+
+    rows = list(db.scalars(select(TeamSchedule).where(
+        TeamSchedule.season == season,
+        TeamSchedule.week >= start_week,
+        TeamSchedule.is_bye.is_(False),
+        (TeamSchedule.kickoff_at.is_(None) | TeamSchedule.opponent_name.is_(None)),
+    )))
+    if not rows:
+        return []
+    weeks = {row.week for row in rows}
+    current = _utc(now) or datetime.now(timezone.utc)
+    if source == "espn":
+        team_names = _unmatched_schedule_team_names(rows, [])
+        events, fallback_teams = _espn_team_schedule_events_for_weeks(
+            season=season,
+            weeks=weeks,
+            team_names=team_names,
+        )
+        events_by_week: dict[int, list[ProviderScheduleGame]] = {}
+        for event in events:
+            events_by_week.setdefault(event.week, []).append(event)
+        summaries: list[ScheduleSyncSummary] = []
+        for week in sorted(weeks):
+            week_rows = [row for row in rows if row.week == week]
+            summary = sync_schedule_times(
+                db,
+                season=season,
+                week=week,
+                source=source,
+                force_current_week=True,
+                provider_events=events_by_week.get(week, []),
+                schedule_rows=week_rows,
+                now=current,
+            )
+            summary.team_schedule_fallback_teams = fallback_teams
+            summary.team_schedule_fallback_games = len(events)
+            summaries.append(summary)
+        return summaries
+
+    # SportsData already exposes a complete season schedule.  Keep this path
+    # compatible without adding a second source-specific reconciliation flow.
+    return [
+        sync_schedule_times(
+            db,
+            season=season,
+            week=week,
+            source=source,
+            force_current_week=True,
+            schedule_rows=[row for row in rows if row.week == week],
+            now=current,
+        )
+        for week in sorted(weeks)
+    ]
+
+
 def resolve_schedule_sync_source() -> ScheduleSource:
     configured = settings.schedule_sync_source
     if configured == "auto":
@@ -463,13 +699,27 @@ def run_due_schedule_sync(
         summary = sync_schedule_times(
             db, season=season_value, week=week, source=source, force_current_week=True, now=current,
         )
+        future_summaries = sync_remaining_schedule_times(
+            db,
+            season=season_value,
+            start_week=week + 1,
+            source=source,
+            now=current,
+        )
         state.status = "ready"
         state.last_success_at = summary.completed_at
         state.error_message = None
         state.consecutive_failures = 0
-        state.meta = summary.as_dict()
+        state.meta = {
+            "current_week": summary.as_dict(),
+            "remaining_weeks": [item.as_dict() for item in future_summaries],
+        }
         db.flush()
-        return {"status": "completed", **summary.as_dict()}
+        return {
+            "status": "completed",
+            **summary.as_dict(),
+            "remaining_weeks": [item.as_dict() for item in future_summaries],
+        }
     except Exception as exc:
         state.status = "failed"
         state.error_message = str(exc)[:500]

@@ -11,6 +11,7 @@ from collegefootballfantasy_api.app.services.schedule_time_sync import (
     _espn_events,
     apply_manual_kickoff_override,
     run_due_schedule_sync,
+    sync_remaining_schedule_times,
     sync_schedule_times,
 )
 
@@ -94,6 +95,81 @@ def test_espn_schedule_uses_school_name_not_mascot_display_name(monkeypatch):
 
     assert event.home_team == "Miami"
     assert event.away_team == "Florida State"
+
+
+def test_espn_team_schedule_fallback_repairs_a_scoreboard_omission(db_session, monkeypatch):
+    """A valid team schedule must repair an otherwise omitted scoreboard game."""
+
+    import collegefootballfantasy_api.app.services.schedule_time_sync as schedule_sync
+
+    home, away = _rows(db_session)
+    monkeypatch.setattr(schedule_sync, "fetch_schedule_events", lambda **_kwargs: [])
+    observed_team_names: list[str] = []
+
+    def team_schedule_fallback(*, team_names, **_kwargs):
+        observed_team_names.extend(team_names)
+        return [_event()], 1
+
+    monkeypatch.setattr(schedule_sync, "_espn_team_schedule_events", team_schedule_fallback)
+
+    summary = sync_schedule_times(
+        db_session,
+        season=2026,
+        week=2,
+        source="espn",
+        force_current_week=True,
+    )
+    db_session.commit()
+
+    db_session.refresh(home)
+    db_session.refresh(away)
+    assert observed_team_names == ["Miami (FL)"]
+    assert summary.team_schedule_fallback_teams == 1
+    assert summary.team_schedule_fallback_games == 1
+    assert summary.games_updated == 2
+    assert _as_utc(home.kickoff_at) == _as_utc(away.kickoff_at)
+
+
+def test_remaining_season_sync_hydrates_each_future_nonbye_week(db_session, monkeypatch):
+    """Future matchup pages are populated before their week becomes active."""
+
+    import collegefootballfantasy_api.app.services.schedule_time_sync as schedule_sync
+
+    home = TeamSchedule(team_name="Miami (FL)", season=2026, week=3, opponent_name="Florida State", location="home", is_bye=False)
+    away = TeamSchedule(team_name="Florida State", season=2026, week=3, opponent_name="Miami", location="away", is_bye=False)
+    db_session.add_all([home, away])
+    db_session.commit()
+    future_event = ProviderScheduleGame(
+        external_game_id="401999003",
+        season=2026,
+        week=3,
+        home_team="Miami",
+        away_team="Florida State",
+        kickoff_at=datetime(2026, 9, 19, 23, 30, tzinfo=timezone.utc),
+    )
+    calls: list[tuple[set[int], list[str]]] = []
+
+    def season_fallback(*, weeks, team_names, **_kwargs):
+        calls.append((weeks, list(team_names)))
+        return [future_event], 1
+
+    monkeypatch.setattr(schedule_sync, "_espn_team_schedule_events_for_weeks", season_fallback)
+
+    summaries = sync_remaining_schedule_times(
+        db_session,
+        season=2026,
+        start_week=2,
+        source="espn",
+    )
+    db_session.commit()
+
+    db_session.refresh(home)
+    db_session.refresh(away)
+    assert calls == [({3}, ["Miami (FL)"])]
+    assert len(summaries) == 1
+    assert summaries[0].games_updated == 2
+    assert _as_utc(home.kickoff_at) == datetime(2026, 9, 19, 23, 30, tzinfo=timezone.utc)
+    assert _as_utc(away.kickoff_at) == _as_utc(home.kickoff_at)
 
 
 def test_confirmed_time_is_never_downgraded_when_provider_time_is_missing(db_session):
