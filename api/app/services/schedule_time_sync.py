@@ -71,7 +71,19 @@ class ScheduleSyncSummary:
         return self
 
     def as_dict(self) -> dict:
-        return asdict(self)
+        """Return a JSON-safe audit payload for ``ProviderSyncState.meta``.
+
+        The lifecycle worker persists this summary in a JSON column.  Keep the
+        in-memory summary typed as datetimes, but serialize its timestamps at
+        the persistence boundary so a successful provider fetch cannot be
+        rolled back by the audit write itself.
+        """
+
+        payload = asdict(self)
+        for field_name in ("started_at", "completed_at"):
+            value = payload[field_name]
+            payload[field_name] = value.isoformat() if value is not None else None
+        return payload
 
 
 def _utc(value: datetime | None) -> datetime | None:
@@ -369,8 +381,9 @@ def sync_schedule_times(
         from collegefootballfantasy_api.app.services.notification_service import rebuild_matchup_start_notifications_for_schedule
 
         rebuild_matchup_start_notifications_for_schedule(db, season=season, weeks={week})
+    summary.finish()
     logger.info("schedule_time_sync_complete %s", summary.as_dict())
-    return summary.finish()
+    return summary
 
 
 def resolve_schedule_sync_source() -> ScheduleSource:
