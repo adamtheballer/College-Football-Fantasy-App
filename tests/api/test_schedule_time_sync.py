@@ -192,3 +192,22 @@ def test_due_sync_records_provider_failure_without_crashing_the_worker(db_sessio
         now=datetime(2026, 9, 8, 13, 5, tzinfo=timezone.utc),
     )
     assert retry["status"] == "retry_backoff"
+
+
+def test_due_sync_persists_json_safe_timestamp_audit_metadata(db_session, monkeypatch):
+    import collegefootballfantasy_api.app.services.schedule_time_sync as schedule_sync
+
+    monkeypatch.setattr(settings, "schedule_sync_enabled", True)
+    monkeypatch.setattr(settings, "schedule_sync_source", "espn")
+    monkeypatch.setattr(settings, "schedule_sync_hour_et", 7)
+    monkeypatch.setattr(schedule_sync, "fetch_schedule_events", lambda **_kwargs: [])
+
+    result = run_due_schedule_sync(
+        db_session,
+        season=2026,
+        now=datetime(2026, 9, 8, 13, 0, tzinfo=timezone.utc),  # Tuesday, 9:00 AM Eastern
+    )
+
+    assert result["status"] == "completed"
+    assert isinstance(result["started_at"], str)
+    assert isinstance(result["completed_at"], str)
