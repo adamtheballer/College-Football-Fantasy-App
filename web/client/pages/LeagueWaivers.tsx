@@ -171,6 +171,22 @@ export const waiverWeekPoints = (
   if (typeof finalPoints === "number" && Number.isFinite(finalPoints)) {
     return { label: finalPoints.toFixed(1), isFinal: true, finalWeek: latestFinalWeek ?? null };
   }
+  // After the Wednesday workspace transition, waiver decisions must be based
+  // on the active week's forecast. A previous final is a fallback only when
+  // no active-week projection or availability state exists.
+  const normalizedStatus = projectionStatus?.trim().toUpperCase();
+  const hasCurrentWeekForecast =
+    (typeof projectedPoints === "number" && Number.isFinite(projectedPoints))
+    || normalizedStatus === "BYE"
+    || normalizedStatus === "OUT"
+    || normalizedStatus === "IR";
+  if (hasCurrentWeekForecast) {
+    return {
+      label: waiverProjectionLabel(projectedPoints, projectionStatus),
+      isFinal: false,
+      finalWeek: null,
+    };
+  }
   if (typeof latestFinalPoints === "number" && Number.isFinite(latestFinalPoints)) {
     return { label: latestFinalPoints.toFixed(1), isFinal: true, finalWeek: latestFinalWeek ?? null };
   }
@@ -189,7 +205,7 @@ export const waiverWeekPointsClassName = (weekPoints: ReturnType<typeof waiverWe
       ? "text-amber-200"
       : weekPoints.label === "OUT"
         ? "text-rose-200"
-        : "text-cfb-text-primary"
+        : "text-white"
 );
 
 export const waiverOpponentLabel = (opponent: string | null | undefined) => opponent?.trim() || "—";
@@ -835,7 +851,7 @@ export default function LeagueWaivers() {
                   <th className="w-44 px-4 py-3">Opponent</th>
                   <th className="w-24 px-4 py-3">POS</th>
                   <th className={`w-40 px-4 py-3 ${playerBoardScope === "all" ? "text-left" : "text-right"}`}>
-                    {playerBoardScope === "all" ? `Week ${displayWeek} Pts` : "Latest Pts"}
+                    Week {displayWeek} Pts
                   </th>
                   <th className="w-56 px-5 py-3 text-right">Action</th>
                 </tr>
