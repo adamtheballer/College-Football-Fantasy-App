@@ -13,7 +13,7 @@ Install full Xcode (not only Command Line Tools), then run:
 cd web
 npm ci
 npm run ios:sync
-npm run ios:open
+npx cap open ios
 ```
 
 The iOS bundle identifier is `org.collegefantasyfootball.app`. Do not register
@@ -24,7 +24,7 @@ explicit product decision: a published bundle identifier is permanent.
 
 1. In Apple Developer, register `org.collegefantasyfootball.app` under the
    correct team and enable **Push Notifications**.
-2. Open `web/ios/App/App.xcworkspace` in Xcode, select the App target, choose
+2. Open `web/ios/App/App.xcodeproj` in Xcode, select the App target, choose
    the Apple signing team, and add **Push Notifications** plus **Background
    Modes → Remote notifications**.
 3. Add the Apple APNs `.p8` key, key ID, and Apple team ID to the existing
