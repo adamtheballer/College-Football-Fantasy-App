@@ -102,6 +102,7 @@ describe("api client", () => {
           message: "Manager name changes are temporarily unavailable.",
           field: "first_name",
           retry_at: "2026-09-09T18:30:00+00:00",
+          last_successful_change_at: "2026-09-02T18:30:00+00:00",
         },
       }), { status: 429, headers: { "Content-Type": "application/json" } }),
     );
@@ -111,6 +112,7 @@ describe("api client", () => {
       code: "manager_name_cooldown",
       field: "first_name",
       retryAt: "2026-09-09T18:30:00+00:00",
+      lastSuccessfulChangeAt: "2026-09-02T18:30:00+00:00",
       message: "Manager name changes are temporarily unavailable.",
     });
   });

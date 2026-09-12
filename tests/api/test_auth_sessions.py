@@ -293,6 +293,10 @@ def test_profile_name_change_cooldown_is_server_enforced(client, db_session):
 
     assert first_change.status_code == 200
     assert first_change.json()["manager_name_change_available_at"] is not None
+    first_changed_at = first_change.json()["manager_name_changed_at"]
+    assert first_changed_at is not None
+    persisted_change_at = db_session.get(User, user_id).manager_name_changed_at
+    assert persisted_change_at is not None
 
     blocked_change = client.patch("/auth/me", json={"first_name": "Second Updated Manager"}, headers=headers)
 
@@ -301,9 +305,19 @@ def test_profile_name_change_cooldown_is_server_enforced(client, db_session):
     assert detail["code"] == "manager_name_cooldown"
     assert detail["field"] == "first_name"
     assert detail["retry_at"] == first_change.json()["manager_name_change_available_at"]
-    assert detail["message"] == "Manager name changes are temporarily unavailable."
+    assert detail["message"] == "Your manager name is still in its seven-day change window. Unsuccessful attempts do not restart the wait."
+    assert detail["last_successful_change_at"] == first_changed_at
     assert int(blocked_change.headers["retry-after"]) > 0
     assert db_session.get(User, user_id).first_name == "First Updated Manager"
+
+    # A rejected retry must not move the durable timer forward. This is the
+    # production regression: a manager should unlock seven days after the last
+    # successful change, not seven days after their most recent attempt.
+    blocked_retry = client.patch("/auth/me", json={"first_name": "Third Updated Manager"}, headers=headers)
+    assert blocked_retry.status_code == 429
+    assert blocked_retry.json()["detail"]["retry_at"] == first_change.json()["manager_name_change_available_at"]
+    assert blocked_retry.json()["detail"]["last_successful_change_at"] == first_changed_at
+    assert db_session.get(User, user_id).manager_name_changed_at == persisted_change_at
 
     user = db_session.get(User, user_id)
     assert user is not None
