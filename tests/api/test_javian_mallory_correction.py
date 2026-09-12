@@ -21,6 +21,7 @@ def _profile():
             "displayName": "Javian Mallory",
             "displayHeight": "5' 11\"",
             "displayWeight": "210 lbs",
+            "displayExperience": "Freshman",
             "jersey": "21",
             "birthPlace": {"city": "Fort Lauderdale", "state": "FL", "country": "USA"},
             "team": {"location": "Miami", "displayName": "Miami Hurricanes"},
@@ -94,6 +95,7 @@ def test_javian_mallory_correction_adds_verified_miami_rb3_and_retires_old_rb3(d
     assert mallory.espn_height == "5' 11\""
     assert mallory.espn_weight == "210 lbs"
     assert mallory.espn_birthplace == "Fort Lauderdale, FL, USA"
+    assert mallory.player_class == "Freshman"
     assert (mallory.depth_chart_position, mallory.depth_order) == ("RB3", 3)
     assert mallory.sheet_projected_season_points and mallory.sheet_projected_season_points > 0
     assert db_session.scalar(

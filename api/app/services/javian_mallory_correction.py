@@ -201,6 +201,13 @@ def apply_javian_mallory_miami_correction(
     mallory.external_id = f"espn:{JAVIAN_MALLORY_ESPN_ID}"
     mallory.espn_source_url = ESPN_PROFILE_URL
     persist_espn_player_profile(mallory, profile)
+    athlete = profile.get("athlete") if isinstance(profile, dict) else None
+    if isinstance(athlete, dict):
+        # ESPN labels this field ``displayExperience`` rather than a player
+        # class. Store it explicitly so a freshman's card is not blank.
+        player_class = str(athlete.get("displayExperience") or "").strip()
+        if player_class:
+            mallory.player_class = player_class
     upsert_player_provider_mapping(
         db,
         player_id=mallory.id,
