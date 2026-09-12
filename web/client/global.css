@@ -370,6 +370,45 @@
       repeating-linear-gradient(90deg, hsl(210 40% 96% / 0.012) 0 1px, transparent 1px 7px);
   }
 
+  /*
+   * A single, opt-in printed-fiber recipe for editorial artwork only. The
+   * layers stay beneath content and use a 1--2% effective opacity so player
+   * names, numbers, faces, controls, and data tables remain completely crisp.
+   */
+  .cfb-matte-grain-layer,
+  .cfb-matte-surface::before {
+    background-image:
+      radial-gradient(circle at 18% 20%, hsl(45 84% 59% / 0.72) 0 0.55px, transparent 0.8px),
+      radial-gradient(circle at 72% 68%, hsl(210 40% 96% / 0.55) 0 0.45px, transparent 0.7px),
+      repeating-linear-gradient(116deg, hsl(45 84% 59% / 0.28) 0 0.45px, transparent 0.7px 11px);
+    background-size: 11px 11px, 17px 17px, 19px 19px;
+    mix-blend-mode: soft-light;
+    opacity: 0.02;
+  }
+
+  .cfb-matte-surface {
+    isolation: isolate;
+  }
+
+  .cfb-matte-surface::before {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+  }
+
+  .cfb-matte-surface > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* A shallow warm inset edge hints at printed player-card material without
+   * changing the existing headshot frame's dimensions or crop. */
+  .cfb-player-sticker-frame {
+    box-shadow: inset 0 0 0 1px hsl(45 84% 86% / 0.22), 0 2px 7px rgb(2 6 23 / 0.18);
+  }
+
   .cfb-school-grid {
     background-image: none;
   }

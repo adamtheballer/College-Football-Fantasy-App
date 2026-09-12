@@ -127,7 +127,7 @@ function GuestHome() {
           <p className="text-sm text-cfb-text-muted">Invite your managers, draft your team, and own every Saturday.</p>
         </div>
 
-        <SurfaceCard variant="scoreboard" padding="default" className="space-y-5">
+        <SurfaceCard variant="scoreboard" padding="default" className="cfb-matte-surface space-y-5">
           <div className="flex items-center justify-between gap-4 border-b border-cfb-border-subtle pb-4">
             <div>
               <p className="cfb-micro-label text-cfb-brand">Matchup preview</p>
