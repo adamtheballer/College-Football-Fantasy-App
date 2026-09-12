@@ -13,7 +13,7 @@ type PageHeaderProps = {
 /** A compact, repeatable page introduction for data-heavy fantasy routes. */
 export function PageHeader({ eyebrow, title, description, actions, className }: PageHeaderProps) {
   return (
-    <header className={cn("flex flex-col gap-4 border-b border-cfb-border-subtle pb-5 sm:flex-row sm:items-end sm:justify-between", className)}>
+    <header className={cn("cfb-page-header flex flex-col gap-4 border-b border-cfb-border-subtle pb-5 sm:flex-row sm:items-end sm:justify-between", className)}>
       <div className="min-w-0">
         {eyebrow ? <p className="cfb-micro-label mb-2 text-cfb-brand">{eyebrow}</p> : null}
         <h1 className="cfb-section-title text-2xl sm:text-3xl">{title}</h1>

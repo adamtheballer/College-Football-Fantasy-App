@@ -52,7 +52,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut, guidedN
       <nav
         aria-label="Primary mobile navigation"
         className={cn(
-          "relative z-[170] mt-2 shrink-0 border-x-0 border-b-0 border-t border-cfb-border-subtle bg-cfb-sidebar px-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-1 transition-opacity lg:hidden",
+          "cfb-shell-mobile-nav relative z-[170] mt-2 shrink-0 border-x-0 border-b-0 border-t border-cfb-border-subtle bg-cfb-sidebar px-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-1 transition-opacity lg:hidden",
           isMoreOpen && "pointer-events-none opacity-0",
           guidedNavItem && "z-[1205] pointer-events-none",
         )}

@@ -2,6 +2,7 @@ import * as React from "react";
 import { Capacitor } from "@capacitor/core";
 
 import { FloatingQuickActions } from "@/components/FloatingQuickActions";
+import { BackgroundEffects } from "@/components/BackgroundEffects";
 import type { User } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
 import { DesktopSidebar } from "./DesktopSidebar";
@@ -63,9 +64,10 @@ export function AppShell({
       data-app-viewport="true"
       data-native-shell={isNativeShell ? "true" : undefined}
       className={cn(
-        "cfb-app-viewport isolate relative flex h-[100dvh] min-h-0 w-full max-w-full flex-col overflow-clip bg-cfb-canvas font-sans text-cfb-text-primary selection:bg-cfb-brand/20 selection:text-cfb-text-primary lg:h-screen lg:flex-row lg:pt-0",
+        "cfb-app-viewport cfb-app-shell isolate relative flex h-[100dvh] min-h-0 w-full max-w-full flex-col overflow-clip bg-cfb-canvas font-sans text-cfb-text-primary selection:bg-cfb-brand/20 selection:text-cfb-text-primary lg:h-screen lg:flex-row lg:pt-0",
       )}
     >
+      <BackgroundEffects />
       {!hideFloatingActions ? <FloatingQuickActions /> : null}
 
       {!hideChrome ? (

@@ -1,7 +1,7 @@
 import { cva } from "class-variance-authority";
 
 export const surfaceCardVariants = cva(
-  "relative overflow-hidden border text-cfb-text-primary transition-colors duration-150",
+  "cfb-surface-card relative overflow-hidden border text-cfb-text-primary transition-colors duration-150",
   {
     variants: {
       variant: {

@@ -118,9 +118,9 @@ export function PlayerCardHeader({
       </button>
 
       <header className={cn("relative shrink-0 overflow-hidden bg-gradient-to-br px-4 py-5 pr-14 sm:px-8 sm:py-7 sm:pr-24", palette.headerBase)}>
-        <div className="absolute inset-0 opacity-60 mix-blend-screen" style={headerStreakStyle} />
+        <div className="absolute inset-0 opacity-50 mix-blend-screen" style={headerStreakStyle} />
         <div className="absolute inset-0 bg-[linear-gradient(112deg,rgba(4,8,18,0.14)_0%,transparent_44%,rgba(2,6,23,0.42)_100%)]" />
-        <div aria-hidden="true" className="cfb-matte-grain-layer pointer-events-none absolute inset-0" />
+        <div aria-hidden="true" className="cfb-player-card-grain-layer pointer-events-none absolute inset-0" />
         <div
           className="pointer-events-none absolute inset-0 hidden text-white/20 [mask-image:linear-gradient(to_right,black_0%,black_58%,transparent_74%)] lg:block"
           aria-hidden="true"
@@ -141,6 +141,7 @@ export function PlayerCardHeader({
             </span>
           ))}
         </div>
+        <div aria-hidden="true" className="cfb-player-card-ink-edge pointer-events-none absolute inset-x-0 bottom-0 z-20 h-px" />
         <div className="relative z-10 min-w-0">
           <p className="hidden text-[10px] font-black uppercase tracking-[0.28em] text-white/65 sm:block">{title}</p>
           <div className="flex min-w-0 items-center gap-3 sm:mt-4 sm:gap-5">
@@ -168,9 +169,7 @@ export function PlayerCardHeader({
                   </span>
                 </PlayerAvailabilityIndicator>
                 {card?.about.jersey ? <span className="text-white/70">#{card.about.jersey}</span> : null}
-                {seasonRank ? (
-                  <span className="text-white/70">Rank {formatPlayerCardPositionRank(seasonRank)}</span>
-                ) : currentValue !== null && currentValue !== undefined ? (
+                {!seasonRank && currentValue !== null && currentValue !== undefined ? (
                   <span className="text-white/70">Value {formatCurrentValueRating(currentValue)}</span>
                 ) : null}
               </div>

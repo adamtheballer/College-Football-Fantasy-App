@@ -75,7 +75,7 @@ export const isUpcomingDraft = (league: LeagueDetail, now = Date.now()) => {
 
 export function SaturdayPick6HomeFeature() {
   return (
-    <SurfaceCard variant="default" padding="default" className="border-cfb-gold/35 bg-cfb-surface-raised">
+    <SurfaceCard variant="default" padding="default" className="cfb-feature-surface border-cfb-gold/35 bg-cfb-surface-raised">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cfb-gold/45 bg-cfb-canvas text-cfb-gold">
@@ -127,7 +127,7 @@ function GuestHome() {
           <p className="text-sm text-cfb-text-muted">Invite your managers, draft your team, and own every Saturday.</p>
         </div>
 
-        <SurfaceCard variant="scoreboard" padding="default" className="cfb-matte-surface space-y-5">
+        <SurfaceCard variant="scoreboard" padding="default" className="cfb-feature-surface cfb-matte-surface space-y-5">
           <div className="flex items-center justify-between gap-4 border-b border-cfb-border-subtle pb-4">
             <div>
               <p className="cfb-micro-label text-cfb-brand">Matchup preview</p>

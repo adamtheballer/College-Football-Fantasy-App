@@ -767,16 +767,16 @@ export function PlayerCardModal({
                 ) : null}
                 {shouldShowGameLogSchedule && selectedGameLogData.games.length ? (
                 <>
-                <div className="mt-5 hidden overflow-x-auto rounded-sm border border-cfb-border-subtle bg-cfb-surface md:block">
-                  <table className="min-w-full w-full border-collapse text-left">
+                <div className="mt-5 overflow-x-auto rounded-sm border border-cfb-border-subtle bg-cfb-surface" data-testid="player-game-log-table">
+                  <table className="min-w-[44rem] w-full border-collapse text-left">
                     <thead className="bg-white/[0.055] text-[9px] font-black uppercase tracking-[0.16em] text-white/45">
                       <tr>
-                        <th className="min-w-[4.5rem] whitespace-nowrap px-4 py-3">Week</th>
-                        <th className="min-w-[15rem] whitespace-nowrap px-4 py-3">Opponent</th>
-                        <th className="min-w-[8rem] whitespace-nowrap px-4 py-3">Location</th>
-                        <th className="min-w-[5.5rem] whitespace-nowrap px-4 py-3">Result</th>
+                        <th className="min-w-[4rem] whitespace-nowrap px-3 py-2.5 sm:px-4 sm:py-3">Week</th>
+                        <th className="min-w-[13rem] whitespace-nowrap px-3 py-2.5 sm:min-w-[15rem] sm:px-4 sm:py-3">Opponent</th>
+                        <th className="min-w-[6.5rem] whitespace-nowrap px-3 py-2.5 sm:min-w-[8rem] sm:px-4 sm:py-3">Location</th>
+                        <th className="min-w-[5rem] whitespace-nowrap px-3 py-2.5 sm:min-w-[5.5rem] sm:px-4 sm:py-3">Result</th>
                         {selectedGameLogColumns.map(([label]) => (
-                          <th key={label} className="whitespace-nowrap px-4 py-3 text-right">{label}</th>
+                          <th key={label} className="whitespace-nowrap px-3 py-2.5 text-right sm:px-4 sm:py-3">{label}</th>
                         ))}
                       </tr>
                     </thead>
@@ -784,18 +784,21 @@ export function PlayerCardModal({
                       {selectedGameLogData.games.map((row) => {
                         const stats = row.stats ? { ...row.stats.stats, fantasy_points: row.stats.fantasy_points } : undefined;
                         return (
-                          <tr key={row.schedule_id} className="text-sm font-bold text-white/75">
-                            <td className="px-4 py-4 font-black tabular-nums text-white">{row.week}</td>
-                            <td className="px-4 py-4">
+                          <tr key={row.schedule_id} className="text-xs font-bold text-white/75 sm:text-sm">
+                            <td className="px-3 py-3.5 font-black tabular-nums text-white sm:px-4 sm:py-4">{row.week}</td>
+                            <td className="px-3 py-3.5 sm:px-4 sm:py-4">
                               <p className="font-black text-white">{gameLogOpponentLabel(row)}</p>
-                              <p className="mt-1 text-[10px] font-bold text-white/40">{formatGameLogDate(row.date, row.kickoff_at)}</p>
+                              <p className="mt-1 text-[10px] font-bold text-white/40 sm:hidden">
+                                {formatGameLogDate(row.date, row.kickoff_at)} • {row.location_label}
+                              </p>
+                              <p className="mt-1 hidden text-[10px] font-bold text-white/40 sm:block">{formatGameLogDate(row.date, row.kickoff_at)}</p>
                             </td>
-                            <td className="whitespace-nowrap px-4 py-4 text-[10px] font-black uppercase tracking-[0.16em] text-white/55">{row.location_label}</td>
-                            <td className="whitespace-nowrap px-4 py-4 text-xs font-black tabular-nums text-white/70">{gameLogResultLabel(row)}</td>
+                            <td className="whitespace-nowrap px-3 py-3.5 text-[9px] font-black uppercase tracking-[0.13em] text-white/55 sm:px-4 sm:py-4 sm:text-[10px] sm:tracking-[0.16em]">{row.location_label}</td>
+                            <td className="whitespace-nowrap px-3 py-3.5 text-[11px] font-black tabular-nums text-white/70 sm:px-4 sm:py-4 sm:text-xs">{gameLogResultLabel(row)}</td>
                             {selectedGameLogColumns.map(([label, keys]) => {
                               const value = row.location === "bye" ? null : gameLogStatValue(stats, keys);
                               return (
-                                <td key={label} className="whitespace-nowrap px-4 py-4 text-right font-black tabular-nums text-white">
+                                <td key={label} className="whitespace-nowrap px-3 py-3.5 text-right font-black tabular-nums text-white sm:px-4 sm:py-4">
                                   {formatPlayerCardValue(value)}
                                 </td>
                               );
@@ -805,40 +808,6 @@ export function PlayerCardModal({
                       })}
                     </tbody>
                   </table>
-                </div>
-                <div className="mt-5 space-y-3 md:hidden">
-                  {selectedGameLogData.games.map((row) => {
-                    const stats = row.stats ? { ...row.stats.stats, fantasy_points: row.stats.fantasy_points } : undefined;
-                    return (
-                      <article key={row.schedule_id} className="border-b border-cfb-border-subtle bg-cfb-surface p-4 last:border-b-0">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-white/45">Week {row.week}</p>
-                            <p className="mt-1 truncate font-black text-white">{gameLogOpponentLabel(row)}</p>
-                            <p className="mt-1 text-xs font-bold text-white/45">{formatGameLogDate(row.date, row.kickoff_at)} • {row.location_label}</p>
-                          </div>
-                          <p className="shrink-0 text-right text-xs font-black tabular-nums text-white/70">{gameLogResultLabel(row)}</p>
-                        </div>
-                        {selectedGameLogColumns.length ? (
-                          <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
-                            {selectedGameLogColumns.map(([label, keys]) => {
-                              const value = row.location === "bye" ? null : gameLogStatValue(stats, keys);
-                              return (
-                              <div key={label} className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 text-xs">
-                                <span className="min-w-0 truncate font-black uppercase tracking-[0.12em] text-white/45" title={label}>{label}</span>
-                                <span className="shrink-0 whitespace-nowrap font-black tabular-nums text-white">{formatPlayerCardValue(value)}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : row.game_status === "final" ? (
-                          <p className="mt-4 text-xs font-semibold text-white/55">
-                            Verified player statistics are not available for this game.
-                          </p>
-                        ) : null}
-                      </article>
-                    );
-                  })}
                 </div>
                 </>
               ) : null}

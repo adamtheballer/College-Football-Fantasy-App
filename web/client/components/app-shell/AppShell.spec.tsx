@@ -45,15 +45,17 @@ function renderShell({
 }
 
 describe("AppShell scroll ownership", () => {
-  it("uses a quiet app canvas without decorative background effects", () => {
+  it("layers the static collegiate canvas behind the app without affecting the shell frame", () => {
     const { container } = renderShell({
       compactContent: false,
       fixedViewport: false,
     });
 
     const effects = container.querySelector("[data-bg-effects='true']");
-    expect(effects).toBeNull();
+    expect(effects?.className).toContain("pointer-events-none");
+    expect(effects?.className).toContain("fixed");
     expect(container.firstElementChild?.className).toContain("bg-cfb-canvas");
+    expect(container.firstElementChild?.className).toContain("cfb-app-shell");
   });
 
   it("keeps standard pages on the single app-page scroller", () => {
