@@ -150,7 +150,12 @@ describe("Settings beta preferences", () => {
       429,
       "Manager name changes are temporarily unavailable.",
       undefined,
-      { code: "manager_name_cooldown", field: "first_name", retryAt },
+      {
+        code: "manager_name_cooldown",
+        field: "first_name",
+        retryAt,
+        lastSuccessfulChangeAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      },
     ));
     render(<MemoryRouter><Settings /></MemoryRouter>);
 
@@ -159,7 +164,7 @@ describe("Settings beta preferences", () => {
     fireEvent.click(screen.getByRole("button", { name: /confirm name change/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole("alert").textContent).toMatch(/Need to wait until .* before changing your manager name\./);
+      expect(screen.getByRole("alert").textContent).toMatch(/This attempt did not change your name or restart the seven-day wait\./);
     });
     expect(screen.getByLabelText("Manager Name").getAttribute("disabled")).not.toBeNull();
   });

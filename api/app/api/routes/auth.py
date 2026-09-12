@@ -275,6 +275,7 @@ def update_current_user_profile(
             now = utcnow()
             available_at = current_user.manager_name_change_available_at
             if available_at is not None and ensure_aware(available_at) > now:
+                last_successful_change_at = ensure_aware(current_user.manager_name_changed_at)
                 seconds_remaining = max(1, int((ensure_aware(available_at) - now).total_seconds()))
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -283,8 +284,13 @@ def update_current_user_profile(
                     # than degrading it into a generic server error.
                     detail={
                         "code": "manager_name_cooldown",
-                        "message": "Manager name changes are temporarily unavailable.",
+                        "message": "Your manager name is still in its seven-day change window. Unsuccessful attempts do not restart the wait.",
                         "field": "first_name",
+                        # This is intentionally the durable, successful
+                        # change timestamp rather than this failed request's
+                        # timestamp. A client can make the cooldown behavior
+                        # transparent instead of looking like it has reset.
+                        "last_successful_change_at": last_successful_change_at.isoformat() if last_successful_change_at else None,
                         # Preserve the same serialization the profile
                         # response uses, so clients can persist this value
                         # verbatim and compare it without timezone churn.

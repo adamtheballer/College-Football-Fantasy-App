@@ -125,6 +125,7 @@ export default function Settings() {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileErrorField, setProfileErrorField] = useState<"first_name" | "avatar_url" | null>(null);
   const [managerNameCooldownOverride, setManagerNameCooldownOverride] = useState<string | null>(null);
+  const [managerNameLastChangedOverride, setManagerNameLastChangedOverride] = useState<string | null>(null);
   const [managerNameCooldownNow, setManagerNameCooldownNow] = useState(() => Date.now());
   const [pendingNameChange, setPendingNameChange] = useState<{ name: string; avatarUrl: string | null } | null>(null);
   const [securityMessage, setSecurityMessage] = useState<string | null>(null);
@@ -153,9 +154,11 @@ export default function Settings() {
     setProfileError(null);
     setProfileErrorField(null);
     setManagerNameCooldownOverride(null);
+    setManagerNameLastChangedOverride(null);
   }, [user]);
 
   const managerNameChangeAvailableAt = managerNameCooldownOverride ?? user?.managerNameChangeAvailableAt ?? null;
+  const managerNameLastChangedAt = managerNameLastChangedOverride ?? user?.managerNameChangedAt ?? null;
   useEffect(() => {
     const availableAt = managerNameChangeAvailableAt ? Date.parse(managerNameChangeAvailableAt) : Number.NaN;
     if (!Number.isFinite(availableAt) || availableAt <= Date.now()) return undefined;
@@ -175,6 +178,11 @@ export default function Settings() {
       month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
     }).format(new Date(managerNameChangeAvailableAt))
     : null;
+  const managerNameLastChangedDateTime = managerNameLastChangedAt
+    ? new Intl.DateTimeFormat(undefined, {
+      month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
+    }).format(new Date(managerNameLastChangedAt))
+    : null;
 
   const showProfileError = (error: unknown, fallback: string, preferredField: "first_name" | "avatar_url" | null = null) => {
     const apiError = error instanceof ApiError ? error : null;
@@ -183,10 +191,11 @@ export default function Settings() {
       : preferredField;
     if (apiError?.retryAt && field === "first_name") {
       setManagerNameCooldownOverride(apiError.retryAt);
+      setManagerNameLastChangedOverride(apiError.lastSuccessfulChangeAt ?? null);
       const retryAt = new Date(apiError.retryAt);
       const message = Number.isNaN(retryAt.getTime())
         ? "Need to wait before changing your manager name."
-        : `Need to wait until ${new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }).format(retryAt)} before changing your manager name.`;
+        : `Your previous manager-name change is still locked until ${new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }).format(retryAt)}. This attempt did not change your name or restart the seven-day wait.`;
       setProfileError(message);
     } else {
       setProfileError(error instanceof Error && error.message ? error.message : fallback);
@@ -211,6 +220,7 @@ export default function Settings() {
       setManagerName(updatedUser.firstName);
       setAvatarUrl(updatedUser.avatarUrl ?? "");
       setManagerNameCooldownOverride(updatedUser.managerNameChangeAvailableAt ?? null);
+      setManagerNameLastChangedOverride(updatedUser.managerNameChangedAt ?? null);
       setSaveState("saved");
       if (saveStateResetTimeoutRef.current) {
         clearTimeout(saveStateResetTimeoutRef.current);
@@ -496,7 +506,10 @@ export default function Settings() {
                 </p>
               ) : null}
               {managerNameCooldownActive ? (
-                <p className="text-xs font-medium text-muted-foreground">Name changes are available again on {managerNameAvailableDate}.</p>
+                <p className="text-xs font-medium text-muted-foreground">
+                  {managerNameLastChangedDateTime ? `Your last successful manager-name change was ${managerNameLastChangedDateTime}. ` : ""}
+                  Name changes are available again on {managerNameAvailableDate}. Attempts while locked do not reset this date.
+                </p>
               ) : (
                 <p className="text-xs font-medium text-muted-foreground">You can change your manager name once every 7 days.</p>
               )}
