@@ -14,7 +14,7 @@ const displayNavName = (name: string) => name.toLowerCase().replace(/\b\w/g, (le
 
 export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarProps) {
   return (
-    <aside className="relative z-10 hidden h-screen w-64 shrink-0 overflow-hidden border-r border-cfb-border-subtle bg-cfb-sidebar lg:sticky lg:top-0 lg:flex lg:flex-col">
+    <aside className="cfb-shell-sidebar relative z-10 hidden h-screen w-64 shrink-0 overflow-hidden border-r border-cfb-border-subtle bg-cfb-sidebar lg:sticky lg:top-0 lg:flex lg:flex-col">
 
       <div className="relative z-10 border-b border-cfb-border-subtle p-6">
         <Link

@@ -221,6 +221,17 @@ export const waiverPositionRankLabel = (player: Pick<AvailablePlayerRow, "positi
     : "—"
 );
 
+/** Position filtering stays independent from the board's selected ordering. */
+export const filterWaiverPlayersByPosition = <T extends Pick<AvailablePlayerRow, "position">>(
+  players: readonly T[],
+  selectedPosition: string,
+) => {
+  const normalizedPosition = selectedPosition.toUpperCase();
+  return normalizedPosition === "ALL"
+    ? [...players]
+    : players.filter((player) => (player.position ?? "").toUpperCase() === normalizedPosition);
+};
+
 /** Sort only by published same-position ranks; unranked players follow the ranked pool. */
 export const sortWaiverPlayersByPositionRank = <T extends Pick<AvailablePlayerRow, "name" | "id" | "season_positional_rank" | "rank">>(
   players: readonly T[],
@@ -275,7 +286,6 @@ export default function LeagueWaivers() {
   const [position, setPosition] = useState<(typeof positions)[number]>("ALL");
   const [playerBoardScope, setPlayerBoardScope] = useState<PlayerBoardScope>("waiver");
   const [sortMode, setSortMode] = useState<WaiverSortMode>("projection");
-  const [rankPosition, setRankPosition] = useState<(typeof positions)[number]>("ALL");
   const [hotWindowHours, setHotWindowHours] = useState<24 | 168>(168);
   const [selectedPlayer, setSelectedPlayer] = useState<AvailablePlayerRow | null>(null);
   const [claimPlayer, setClaimPlayer] = useState<AvailablePlayerRow | null>(null);
@@ -332,13 +342,11 @@ export default function LeagueWaivers() {
   );
   const filteredPlayers = useMemo(() => {
     const query = search.trim().toLowerCase();
-    const activePosition = sortMode === "positional-rank" ? rankPosition : position;
-    const matches = players
-      .filter((player) => activePosition === "ALL" || (player.position ?? "").toUpperCase() === activePosition)
+    const matches = filterWaiverPlayersByPosition(players, position)
       .filter((player) => waiverSearchMatches(player, query));
     const searched = rankWaiverSearchResults(matches, query);
     return sortMode === "positional-rank" ? sortWaiverPlayersByPositionRank(searched) : searched;
-  }, [players, position, rankPosition, search, sortMode]);
+  }, [players, position, search, sortMode]);
 
   const topProjection = players.reduce<number | null>((top, player) => {
     const projection = player.weekly_projected_fantasy_points;
@@ -735,7 +743,7 @@ export default function LeagueWaivers() {
               ) : null}
               {playerBoardScope !== "hot" ? (
                 <div className="flex w-full flex-col gap-1.5 sm:w-[176px]">
-                  <span className="text-[9px] font-black uppercase tracking-[0.12em] text-cfb-text-muted">Sort</span>
+                  <span className="text-[9px] font-black uppercase tracking-[0.12em] text-cfb-text-muted">Order by</span>
                   <Select value={sortMode} onValueChange={(value: WaiverSortMode) => setSortMode(value)}>
                     <SelectTrigger aria-label="Waiver player sort" className="h-10 rounded-md border-cfb-border-subtle bg-cfb-canvas px-3 text-[10px] font-black uppercase tracking-[0.08em] text-cfb-text-primary">
                       <SelectValue />
@@ -743,19 +751,6 @@ export default function LeagueWaivers() {
                     <SelectContent>
                       <SelectItem value="projection">Week {displayWeek} projection</SelectItem>
                       <SelectItem value="positional-rank">Positional rank</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : null}
-              {playerBoardScope !== "hot" && sortMode === "positional-rank" ? (
-                <div className="flex w-full flex-col gap-1.5 sm:w-[156px]">
-                  <span className="text-[9px] font-black uppercase tracking-[0.12em] text-cfb-text-muted">Rank position</span>
-                  <Select value={rankPosition} onValueChange={(value: (typeof positions)[number]) => setRankPosition(value)}>
-                    <SelectTrigger aria-label="Positional rank position" className="h-10 rounded-md border-cfb-border-subtle bg-cfb-canvas px-3 text-[10px] font-black uppercase tracking-[0.08em] text-cfb-text-primary">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {positions.map((item) => <SelectItem key={item} value={item}>{item === "ALL" ? "All positions" : item}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -771,16 +766,13 @@ export default function LeagueWaivers() {
               </div>
               <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {positions.map((item) => {
-                  const active = (sortMode === "positional-rank" ? rankPosition : position) === item;
+                  const active = position === item;
                   const tone = positionTone(item === "ALL" ? null : item);
                   return (
                     <button
                       key={item}
                       type="button"
-                      onClick={() => {
-                        if (sortMode === "positional-rank") setRankPosition(item);
-                        else setPosition(item);
-                      }}
+                      onClick={() => setPosition(item)}
                       className={[
                         "h-10 shrink-0 rounded-md border px-3 text-[10px] font-black uppercase tracking-[0.12em] transition-colors",
                         active
@@ -856,11 +848,6 @@ export default function LeagueWaivers() {
                       <span className={`inline-flex shrink-0 rounded-md border px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.1em] ${tone.border} ${tone.bg} ${tone.text}`}>
                         {player.position ?? "-"}
                       </span>
-                      {player.season_positional_rank ? (
-                        <span className="shrink-0 text-[9px] font-black uppercase tracking-[0.08em] text-cfb-text-secondary" title={`Finalized through Week ${player.season_rank_through_week ?? "—"}`}>
-                          {waiverPositionRankLabel(player)}
-                        </span>
-                      ) : null}
                     </div>
                     <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-[0.1em] text-cfb-text-muted">
                       {`${player.school ?? "School unavailable"} · ${player.opponent ? `vs ${player.opponent}` : "Opponent unavailable"}`}

@@ -18,7 +18,7 @@ export const StatCard = React.forwardRef<HTMLDivElement, StatCardProps>(
       <div
         ref={ref}
         className={cn(
-          "relative overflow-hidden rounded-md border p-4",
+          "cfb-stat-card relative overflow-hidden rounded-md border p-4",
           toneClasses.frame,
           className,
         )}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  filterWaiverPlayersByPosition,
   rankWaiverSearchResults,
   waiverBoardLoadMessage,
   waiverOpponentLabel,
@@ -85,6 +86,17 @@ describe("positional-rank waiver sorting", () => {
     expect(sortWaiverPlayersByPositionRank(players).map((player) => player.id)).toEqual([1, 2, 3]);
     expect(waiverPositionRankLabel({ position: "WR", season_positional_rank: 1 })).toBe("WR 1");
     expect(waiverPositionRankLabel({ position: "WR", season_positional_rank: null })).toBe("—");
+  });
+
+  it("keeps position filtering independent from positional-rank ordering", () => {
+    const players = [
+      { id: 1, name: "QB Two", position: "QB", rank: 1, season_positional_rank: 2 },
+      { id: 2, name: "RB One", position: "RB", rank: 2, season_positional_rank: 1 },
+      { id: 3, name: "QB One", position: "QB", rank: 3, season_positional_rank: 1 },
+    ];
+
+    expect(filterWaiverPlayersByPosition(players, "QB").map((player) => player.id)).toEqual([1, 3]);
+    expect(sortWaiverPlayersByPositionRank(filterWaiverPlayersByPosition(players, "QB")).map((player) => player.id)).toEqual([3, 1]);
   });
 });
 

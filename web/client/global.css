@@ -279,10 +279,133 @@
 @layer components {
   .cfb-panel {
     @apply rounded-md border border-cfb-border-subtle bg-cfb-surface text-card-foreground;
+    background-image:
+      linear-gradient(135deg, hsl(210 40% 96% / 0.018), transparent 42%),
+      linear-gradient(180deg, hsl(207 90% 63% / 0.018), transparent 58%);
+    box-shadow:
+      inset 0 1px 0 hsl(210 40% 96% / 0.035),
+      0 12px 30px rgb(2 6 23 / 0.12);
   }
 
   .cfb-panel-strong {
     @apply rounded-md border border-cfb-border-subtle bg-cfb-surface-raised text-card-foreground;
+    background-image:
+      linear-gradient(135deg, hsl(210 40% 96% / 0.024), transparent 44%),
+      linear-gradient(180deg, hsl(207 90% 63% / 0.022), transparent 60%);
+    box-shadow:
+      inset 0 1px 0 hsl(210 40% 96% / 0.045),
+      0 14px 34px rgb(2 6 23 / 0.16);
+  }
+
+  /* Shared visual hierarchy: app navigation stays matte, data cards get a
+   * barely-there printed edge, and only editorial/featured surfaces receive
+   * the more expressive field-note artwork. */
+  .cfb-shell-sidebar,
+  .cfb-shell-topbar,
+  .cfb-shell-mobile-nav {
+    background-image:
+      linear-gradient(180deg, hsl(210 40% 96% / 0.018), transparent 36%),
+      repeating-linear-gradient(108deg, hsl(45 84% 59% / 0.014) 0 1px, transparent 1px 26px);
+    box-shadow: inset 0 1px 0 hsl(210 40% 96% / 0.035);
+  }
+
+  .cfb-shell-sidebar {
+    box-shadow:
+      inset -1px 0 0 hsl(45 84% 59% / 0.10),
+      inset 0 1px 0 hsl(210 40% 96% / 0.035);
+  }
+
+  .cfb-surface-card {
+    isolation: isolate;
+    box-shadow:
+      inset 0 1px 0 hsl(210 40% 96% / 0.04),
+      0 10px 24px rgb(2 6 23 / 0.12);
+  }
+
+  .cfb-surface-card::before {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background-image:
+      linear-gradient(135deg, hsl(210 40% 96% / 0.018), transparent 36%),
+      repeating-linear-gradient(116deg, hsl(45 84% 59% / 0.018) 0 0.5px, transparent 0.5px 17px);
+  }
+
+  .cfb-surface-card > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .cfb-feature-surface {
+    isolation: isolate;
+    background-image:
+      radial-gradient(ellipse 72% 130% at 0% 0%, hsl(207 90% 63% / 0.15), transparent 62%),
+      linear-gradient(120deg, hsl(45 84% 59% / 0.08), transparent 30% 72%, hsl(207 90% 63% / 0.08));
+    box-shadow:
+      inset 0 1px 0 hsl(45 84% 86% / 0.24),
+      0 18px 42px rgb(2 6 23 / 0.22);
+  }
+
+  .cfb-feature-surface::after {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background-image:
+      repeating-linear-gradient(113deg, hsl(45 84% 86% / 0.12) 0 0.6px, transparent 0.7px 16px),
+      linear-gradient(90deg, transparent 0 5%, hsl(45 84% 59% / 0.11) 5% 5.2%, transparent 5.2% 100%);
+    mix-blend-mode: soft-light;
+    opacity: 0.55;
+  }
+
+  .cfb-feature-surface > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .cfb-league-matchup-card {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+  }
+
+  .cfb-league-matchup-card::before {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    background:
+      linear-gradient(105deg, hsl(207 90% 63% / 0.09), transparent 42%),
+      repeating-linear-gradient(116deg, hsl(45 84% 59% / 0.025) 0 0.6px, transparent 0.7px 22px);
+  }
+
+  .cfb-league-matchup-card > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .cfb-page-header {
+    position: relative;
+  }
+
+  .cfb-page-header::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: -1px;
+    left: 0;
+    height: 1px;
+    background: linear-gradient(90deg, hsl(45 84% 59% / 0.72), hsl(207 90% 63% / 0.42) 34%, transparent 72%);
+  }
+
+  .cfb-stat-card {
+    box-shadow:
+      inset 0 1px 0 hsl(210 40% 96% / 0.045),
+      0 8px 18px rgb(2 6 23 / 0.10);
   }
 
   .cfb-control {
@@ -403,10 +526,51 @@
     z-index: 1;
   }
 
-  /* A shallow warm inset edge hints at printed player-card material without
-   * changing the existing headshot frame's dimensions or crop. */
+  /* The player-card artwork uses one stronger, static printed-ink recipe.
+   * It stays behind content, remains position-color agnostic, and is limited
+   * to the card header so working data surfaces stay clean. */
+  .cfb-player-card-grain-layer {
+    background-image:
+      radial-gradient(ellipse at 18% 24%, hsl(45 84% 82% / 0.8) 0 0.45px, transparent 0.9px),
+      radial-gradient(ellipse at 72% 64%, hsl(222 44% 5% / 0.88) 0 0.65px, transparent 1px),
+      repeating-linear-gradient(104deg, hsl(45 84% 86% / 0.34) 0 0.5px, transparent 0.75px 13px),
+      repeating-linear-gradient(8deg, hsl(222 44% 5% / 0.28) 0 0.6px, transparent 0.85px 17px);
+    background-size: 13px 13px, 19px 19px, 23px 23px, 31px 31px;
+    mix-blend-mode: soft-light;
+    opacity: 0.075;
+  }
+
+  /* A one-pixel, slightly broken print edge separates the illustrated header
+   * from the metric rail without changing either surface's dimensions. */
+  .cfb-player-card-ink-edge {
+    background-image:
+      repeating-linear-gradient(90deg, hsl(45 84% 84% / 0.45) 0 4px, transparent 4px 7px, hsl(222 44% 5% / 0.5) 7px 13px),
+      linear-gradient(90deg, hsl(45 84% 84% / 0.18), hsl(210 40% 96% / 0.42) 52%, hsl(222 44% 5% / 0.5));
+    background-blend-mode: soft-light;
+    opacity: 0.8;
+  }
+
+  /* A warm nested edge and shallow paper layer make the existing player image
+   * feel applied to the artwork without touching its crop or outer size. */
   .cfb-player-sticker-frame {
-    box-shadow: inset 0 0 0 1px hsl(45 84% 86% / 0.22), 0 2px 7px rgb(2 6 23 / 0.18);
+    isolation: isolate;
+    position: relative;
+    box-shadow:
+      0 0 0 1px hsl(45 84% 86% / 0.34),
+      0 3px 0 -1px hsl(45 66% 76% / 0.18),
+      0 7px 13px rgb(2 6 23 / 0.24),
+      inset 0 0 0 1px hsl(45 84% 94% / 0.34);
+  }
+
+  .cfb-player-sticker-frame::after {
+    content: "";
+    pointer-events: none;
+    position: absolute;
+    inset: 2px;
+    z-index: 1;
+    border: 1px solid hsl(45 84% 91% / 0.24);
+    border-radius: inherit;
+    box-shadow: inset 0 0 10px rgb(255 250 234 / 0.07);
   }
 
   .cfb-school-grid {

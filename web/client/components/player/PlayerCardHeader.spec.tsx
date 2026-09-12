@@ -81,9 +81,8 @@ describe("PlayerCardHeader injury status", () => {
       />,
     );
 
-    expect(screen.getAllByText("Rank")).toHaveLength(2);
     expect(screen.getAllByText("WR 1")).toHaveLength(1);
-    expect(screen.getByText("Rank WR 1")).toBeTruthy();
+    expect(screen.queryByText("Rank WR 1")).toBeNull();
     expect(screen.queryByText("Current Value Rating")).toBeNull();
     expect(formatPlayerCardPositionRank({ position: "WR", rank: 1, fantasy_points: 42.6, through_week: 1 })).toBe("WR 1");
   });
