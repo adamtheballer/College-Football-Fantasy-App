@@ -11,6 +11,7 @@ import {
   waiverWeekPointsClassName,
   waiverWeekPoints,
 } from "./LeagueWaivers";
+import { playerAvailabilityBadge } from "@/lib/playerAvailability";
 
 describe("waiverProjectionLabel", () => {
   it("uses the backend projection status instead of presenting a bye as a missing projection", () => {
@@ -18,6 +19,13 @@ describe("waiverProjectionLabel", () => {
     expect(waiverProjectionLabel(0, "OUT")).toBe("OUT");
     expect(waiverProjectionLabel(12.34, "ACTIVE")).toBe("12.3");
     expect(waiverProjectionLabel(undefined, "UNAVAILABLE")).toBe("—");
+  });
+});
+
+describe("waiver availability indicators", () => {
+  it("uses the shared red out and yellow questionable badges for waiver rows", () => {
+    expect(playerAvailabilityBadge("OUT")).toMatchObject({ code: "O", label: "Out" });
+    expect(playerAvailabilityBadge("QUESTIONABLE")).toMatchObject({ code: "Q", label: "Questionable" });
   });
 });
 

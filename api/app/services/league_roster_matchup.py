@@ -1443,6 +1443,12 @@ def build_waivers_view(
         .all()
     }
     projection_by_player = _projection_map(db, league.season_year, week, player_ids)
+    injury_status_by_player = _injury_status_by_player(
+        db,
+        season=league.season_year,
+        week=week,
+        player_ids=player_ids,
+    )
     player_positions = {player.id: player.position for player in eligible_players}
     player_schools = {player.id: player.school for player in eligible_players}
     game_starts_by_player, opponent_by_player, _locations_by_player = game_context_for_players(
@@ -1636,6 +1642,7 @@ def build_waivers_view(
                     else None
                 ),
                 projection_status=projection_for_player(player.id)[1],
+                injury_status=injury_status_by_player.get(player.id),
                 rostered_by_team_name=rostered_by_player.get(player.id),
                 availability_state=availability_for_player(player.id)[0],
                 available_at=availability_for_player(player.id)[1],

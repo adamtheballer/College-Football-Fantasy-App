@@ -493,6 +493,8 @@ export interface LeagueWaiverPlayer {
   latest_final_fantasy_points: number | null;
   latest_final_week: number | null;
   projection_status: string;
+  /** Current reviewed availability for the same week as the waiver projection. */
+  injury_status: string | null;
   /** Present in the All Players research view when the player is rostered in this league. */
   rostered_by_team_name: string | null;
   availability_state: string;

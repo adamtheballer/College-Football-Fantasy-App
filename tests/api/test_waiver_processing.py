@@ -16,6 +16,7 @@ from collegefootballfantasy_api.app.models.player_waiver_availability import Pla
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.game import Game
+from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.waiver_claim import WaiverClaim
 from collegefootballfantasy_api.app.models.waiver_period import WaiverPeriod
@@ -574,6 +575,25 @@ def test_waiver_pool_retains_last_verified_score_after_the_operational_week_adva
     assert row.final_fantasy_points is None
     assert row.latest_final_fantasy_points == 18.3
     assert row.latest_final_week == 1
+
+
+def test_waiver_pool_exposes_the_current_week_reviewed_injury_status(db_session):
+    user = User(email="injury-waiver-owner@example.com", first_name="Injury", password_hash="test", api_token="injury-waiver-owner-token")
+    db_session.add(user)
+    db_session.flush()
+    league = League(name="Injury Waiver League", season_year=2026, commissioner_user_id=user.id, max_teams=1)
+    player = canonical_player("Questionable Waiver RB", "RB", "Miami")
+    db_session.add_all((league, Team(league=league, name="Injury Waiver Team", owner_user_id=user.id, owner_name="Injury"), player))
+    db_session.flush()
+    db_session.add_all((
+        WeeklyProjection(player_id=player.id, season=2026, week=2, is_published=True, fantasy_points=14.5),
+        Injury(player_id=player.id, season=2026, week=2, status="questionable"),
+    ))
+    db_session.commit()
+
+    waiver_view = build_waivers_view(db_session, league, user, selected_week=2)
+
+    assert waiver_view.available_players[0].injury_status == "QUESTIONABLE"
 
 
 def test_waiver_view_resolves_instant_adds_from_each_players_kickoff(db_session):

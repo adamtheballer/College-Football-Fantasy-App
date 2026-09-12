@@ -751,6 +751,9 @@ class LeagueWaiverPlayerRead(BaseModel):
     latest_final_fantasy_points: float | None = None
     latest_final_week: int | None = None
     projection_status: str = "UNAVAILABLE"
+    # Current reviewed availability for the same public workspace week as the
+    # projection. Discovery boards show this as an explicit O/Q marker.
+    injury_status: str | None = None
     # The All Players research view includes league-rostered players.  They
     # remain visible for trade research and watchlists but can never be added
     # through the waiver workflow.

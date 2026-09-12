@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import { UserRound, X } from "lucide-react";
 
 import type { PlayerCardResponse } from "@/hooks/use-players";
-import { playerAvailabilityDotClass } from "@/lib/playerAvailability";
+import { PlayerAvailabilityIndicator, playerAvailabilityDotClass } from "@/lib/playerAvailability";
 import { cn } from "@/lib/utils";
 
 import type { PlayerCardModalPlayer } from "./PlayerCardModal";
@@ -160,10 +160,12 @@ export function PlayerCardHeader({
                 {[position || player.position, card?.about.team ?? player.school].filter(Boolean).join("  |  ")}
               </p>
               <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[9px] font-bold sm:mt-3 sm:text-[11px]">
-                <span className="inline-flex items-center gap-1.5 text-emerald-100">
-                  <span data-testid="player-card-status-dot" className={cn("h-1.5 w-1.5 rounded-full", playerAvailabilityDotClass(statusSource))} />
-                  {playerStatus}
-                </span>
+                <PlayerAvailabilityIndicator status={statusSource}>
+                  <span className="inline-flex items-center gap-1.5 text-emerald-100">
+                    <span data-testid="player-card-status-dot" className={cn("h-1.5 w-1.5 rounded-full", playerAvailabilityDotClass(statusSource))} />
+                    {playerStatus}
+                  </span>
+                </PlayerAvailabilityIndicator>
                 {card?.about.jersey ? <span className="text-white/70">#{card.about.jersey}</span> : null}
                 {seasonRank ? (
                   <span className="text-white/70">Rank {formatPlayerCardPositionRank(seasonRank)}</span>

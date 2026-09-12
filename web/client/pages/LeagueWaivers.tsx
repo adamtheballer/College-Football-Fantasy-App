@@ -32,6 +32,7 @@ import {
   useWatchlists,
 } from "@/hooks/use-watchlists";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
+import { PlayerAvailabilityIndicator } from "@/lib/playerAvailability";
 import { formatProjectionDisplay } from "@/lib/projection-display";
 import type { PlayerStats } from "@/types/player";
 
@@ -47,6 +48,7 @@ type AvailablePlayerRow = {
   latest_final_fantasy_points: number | null;
   latest_final_week: number | null;
   projection_status: string;
+  injury_status: string | null;
   rostered_by_team_name: string | null;
   availability_state: string;
   available_at: string | null;
@@ -391,6 +393,7 @@ export default function LeagueWaivers() {
       latest_final_fantasy_points: null,
       latest_final_week: null,
       projection_status: "UNAVAILABLE",
+      injury_status: null,
       availability_state: "waivers",
       available_at: null,
       rostered_by_team_name: null,
@@ -787,7 +790,9 @@ export default function LeagueWaivers() {
                   </span>
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-2">
-                      <p className="truncate text-sm font-bold text-cfb-text-primary">{player.name}</p>
+                      <PlayerAvailabilityIndicator status={player.injury_status}>
+                        <p className="truncate text-sm font-bold text-cfb-text-primary">{player.name}</p>
+                      </PlayerAvailabilityIndicator>
                       <span className={`inline-flex shrink-0 rounded-md border px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.1em] ${tone.border} ${tone.bg} ${tone.text}`}>
                         {player.position ?? "-"}
                       </span>
@@ -891,9 +896,11 @@ export default function LeagueWaivers() {
                       </td>
                       <td className="px-4 py-3 align-middle">
                         <div className="min-w-0">
-                          <p className="truncate text-base font-bold text-cfb-text-primary transition-colors">
-                            {player.name}
-                          </p>
+                          <PlayerAvailabilityIndicator status={player.injury_status}>
+                            <p className="truncate text-base font-bold text-cfb-text-primary transition-colors">
+                              {player.name}
+                            </p>
+                          </PlayerAvailabilityIndicator>
                           <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-cfb-text-muted">
                             {player.rostered_by_team_name
                               ? `Rostered by ${player.rostered_by_team_name}`
