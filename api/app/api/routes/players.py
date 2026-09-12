@@ -56,6 +56,7 @@ from collegefootballfantasy_api.app.services.injury_status import (
     is_current_injury_designation,
     normalize_injury_status,
 )
+from collegefootballfantasy_api.app.services.league_weeks import calendar_cfb_week
 from collegefootballfantasy_api.app.services.player_pool_filters import is_retired_canonical_preseason_player
 
 router = APIRouter()
@@ -320,7 +321,7 @@ def get_player_card_endpoint(
     request: Request,
     refresh: bool = False,
     injury_season: int | None = Query(default=None, ge=2020, le=2100),
-    injury_week: int = Query(default=1, ge=1, le=30),
+    injury_week: int | None = Query(default=None, ge=1, le=30),
     db: Session = Depends(get_db),
     current_user: User | None = Depends(get_optional_current_user),
 ) -> PlayerCardRead:
@@ -366,12 +367,17 @@ def get_player_card_endpoint(
         profile_message = None
 
     current_injury_season = injury_season or datetime.now(timezone.utc).year
+    # A card without an explicit historical week is a live surface.  Resolve
+    # its injury against the same Tuesday 08:00 ET fantasy-week calendar used
+    # by roster, matchup, waiver, and scoring flows instead of pinning every
+    # player to Week 1 for the entire season.
+    current_injury_week = injury_week or calendar_cfb_week(current_injury_season)
     current_injury_row = (
         db.query(Injury)
         .filter(
             Injury.player_id == player.id,
             Injury.season == current_injury_season,
-            Injury.week == injury_week,
+            Injury.week == current_injury_week,
         )
         .order_by(Injury.updated_at.desc(), Injury.id.desc())
         .first()

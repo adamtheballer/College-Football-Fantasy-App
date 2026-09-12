@@ -14,7 +14,10 @@ from collegefootballfantasy_api.app.models.player_availability_event import Play
 from collegefootballfantasy_api.app.models.player_news_event import PlayerNewsEvent
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
-from collegefootballfantasy_api.app.services.availability_corrections import MANUAL_VERIFIED_SOURCE
+from collegefootballfantasy_api.app.services.availability_corrections import (
+    MANUAL_CORROBORATED_SOURCE,
+    MANUAL_VERIFIED_SOURCE,
+)
 from collegefootballfantasy_api.app.services.sportsdata_sync import (
     _availability_multiplier,
     _official_availability_status,
@@ -292,6 +295,37 @@ def test_reviewed_manual_override_blocks_stale_official_healthy_status_only_in_i
 
     assert changes["overrides_preserved"] == 1
     assert db_session.query(Injury).filter_by(player_id=player.id, season=2026, week=1).one().status == "OUT"
+
+
+def test_reviewed_corroborated_override_also_blocks_a_stale_official_healthy_status(db_session):
+    player = Player(name="Corroborated Override", school="Auburn", position="RB")
+    db_session.add(player)
+    db_session.flush()
+    db_session.add_all(
+        [
+            Injury(player_id=player.id, season=2026, week=2, status="OUT", injury="Hamstring"),
+            PlayerAvailabilityEvent(
+                player_id=player.id, season=2026, week=2, status="OUT",
+                probability_active=0.0, availability_multiplier=0.0,
+                source=MANUAL_CORROBORATED_SOURCE,
+                source_url="https://example.test/primary", source_reliability=1.0,
+                effective_from_week=2, effective_until_week=2, reviewed=True,
+                notes="Corroborated by 2 independent public reports.",
+            ),
+        ]
+    )
+    db_session.commit()
+    healthy_row = {
+        "player_name": "Corroborated Override", "team_name": "Auburn", "position": "RB",
+        "status": "Available", "injury": None, "return_timeline": None,
+        "practice_level": "Full", "notes": "Stale report", "conference": "SEC",
+        "source_url": "https://www.secsports.com/fbreports",
+    }
+
+    changes = _upsert_official_availability_rows(db_session, season=2026, week=2, rows=[healthy_row])
+
+    assert changes["overrides_preserved"] == 1
+    assert db_session.query(Injury).filter_by(player_id=player.id, season=2026, week=2).one().status == "OUT"
 
 
 def test_player_card_exposes_official_availability_news(client, db_session):
