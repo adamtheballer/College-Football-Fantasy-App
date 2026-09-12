@@ -7,9 +7,11 @@ import {
   waiverPlayerCanBeTraded,
   waiverPlayerCanBeClaimed,
   waiverProjectionLabel,
+  waiverPositionRankLabel,
   waiverSearchMatches,
   waiverWeekPointsClassName,
   waiverWeekPoints,
+  sortWaiverPlayersByPositionRank,
 } from "./LeagueWaivers";
 import { playerAvailabilityBadge } from "@/lib/playerAvailability";
 
@@ -69,6 +71,20 @@ describe("waiverOpponentLabel", () => {
   it("shows the scheduled opponent and does not invent one when schedule data is unavailable", () => {
     expect(waiverOpponentLabel("Oklahoma")).toBe("Oklahoma");
     expect(waiverOpponentLabel(null)).toBe("—");
+  });
+});
+
+describe("positional-rank waiver sorting", () => {
+  it("sorts the selected position by finalized cumulative rank and leaves unranked players last", () => {
+    const players = [
+      { id: 2, name: "Second", rank: 2, season_positional_rank: 2 },
+      { id: 3, name: "Unranked", rank: 1, season_positional_rank: null },
+      { id: 1, name: "First", rank: 3, season_positional_rank: 1 },
+    ];
+
+    expect(sortWaiverPlayersByPositionRank(players).map((player) => player.id)).toEqual([1, 2, 3]);
+    expect(waiverPositionRankLabel({ position: "WR", season_positional_rank: 1 })).toBe("WR 1");
+    expect(waiverPositionRankLabel({ position: "WR", season_positional_rank: null })).toBe("—");
   });
 });
 

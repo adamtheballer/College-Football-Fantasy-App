@@ -495,6 +495,9 @@ export interface LeagueWaiverPlayer {
   projection_status: string;
   /** Current reviewed availability for the same week as the waiver projection. */
   injury_status: string | null;
+  /** Finalized cumulative fantasy rank inside this player's position. */
+  season_positional_rank: number | null;
+  season_rank_through_week: number | null;
   /** Present in the All Players research view when the player is rostered in this league. */
   rostered_by_team_name: string | null;
   availability_state: string;
