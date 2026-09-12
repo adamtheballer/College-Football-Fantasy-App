@@ -50,6 +50,7 @@ describe("PlayerCardHeader injury status", () => {
     expect(screen.queryByText("Active")).toBeNull();
     expect(screen.getByText("Current Value Rating")).toBeTruthy();
     expect(screen.getByTestId("player-card-status-dot").className).toContain("bg-red-400");
+    expect(screen.getByLabelText("Out").textContent).toBe("O");
   });
 
   it("replaces value with a finalized cumulative positional rank", () => {

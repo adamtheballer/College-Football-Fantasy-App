@@ -32,10 +32,12 @@ import {
   useWatchlists,
 } from "@/hooks/use-watchlists";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
+import { PlayerAvailabilityIndicator } from "@/lib/playerAvailability";
 import { formatProjectionDisplay } from "@/lib/projection-display";
 import type { PlayerStats } from "@/types/player";
 
 const positions = ["ALL", "QB", "RB", "WR", "TE", "K"] as const;
+type WaiverSortMode = "projection" | "positional-rank";
 type AvailablePlayerRow = {
   id: number;
   name: string;
@@ -47,6 +49,9 @@ type AvailablePlayerRow = {
   latest_final_fantasy_points: number | null;
   latest_final_week: number | null;
   projection_status: string;
+  injury_status: string | null;
+  season_positional_rank: number | null;
+  season_rank_through_week: number | null;
   rostered_by_team_name: string | null;
   availability_state: string;
   available_at: string | null;
@@ -210,6 +215,24 @@ export const waiverWeekPointsClassName = (weekPoints: ReturnType<typeof waiverWe
 
 export const waiverOpponentLabel = (opponent: string | null | undefined) => opponent?.trim() || "—";
 
+export const waiverPositionRankLabel = (player: Pick<AvailablePlayerRow, "position" | "season_positional_rank">) => (
+  typeof player.season_positional_rank === "number" && player.season_positional_rank > 0
+    ? `${player.position?.toUpperCase() ?? "POS"} ${player.season_positional_rank}`
+    : "—"
+);
+
+/** Sort only by published same-position ranks; unranked players follow the ranked pool. */
+export const sortWaiverPlayersByPositionRank = <T extends Pick<AvailablePlayerRow, "name" | "id" | "season_positional_rank" | "rank">>(
+  players: readonly T[],
+) => [...players].sort((left, right) => {
+  const leftRank = left.season_positional_rank ?? Number.POSITIVE_INFINITY;
+  const rightRank = right.season_positional_rank ?? Number.POSITIVE_INFINITY;
+  return leftRank - rightRank
+    || left.rank - right.rank
+    || left.name.localeCompare(right.name)
+    || left.id - right.id;
+});
+
 /** Search only the player's own identity; a scheduled opponent is display-only. */
 export const waiverSearchMatches = (
   player: { name: string; school: string | null | undefined },
@@ -251,6 +274,8 @@ export default function LeagueWaivers() {
   const [search, setSearch] = useState("");
   const [position, setPosition] = useState<(typeof positions)[number]>("ALL");
   const [playerBoardScope, setPlayerBoardScope] = useState<PlayerBoardScope>("waiver");
+  const [sortMode, setSortMode] = useState<WaiverSortMode>("projection");
+  const [rankPosition, setRankPosition] = useState<(typeof positions)[number]>("ALL");
   const [hotWindowHours, setHotWindowHours] = useState<24 | 168>(168);
   const [selectedPlayer, setSelectedPlayer] = useState<AvailablePlayerRow | null>(null);
   const [claimPlayer, setClaimPlayer] = useState<AvailablePlayerRow | null>(null);
@@ -307,11 +332,13 @@ export default function LeagueWaivers() {
   );
   const filteredPlayers = useMemo(() => {
     const query = search.trim().toLowerCase();
+    const activePosition = sortMode === "positional-rank" ? rankPosition : position;
     const matches = players
-      .filter((player) => position === "ALL" || (player.position ?? "").toUpperCase() === position)
+      .filter((player) => activePosition === "ALL" || (player.position ?? "").toUpperCase() === activePosition)
       .filter((player) => waiverSearchMatches(player, query));
-    return rankWaiverSearchResults(matches, query);
-  }, [players, position, search]);
+    const searched = rankWaiverSearchResults(matches, query);
+    return sortMode === "positional-rank" ? sortWaiverPlayersByPositionRank(searched) : searched;
+  }, [players, position, rankPosition, search, sortMode]);
 
   const topProjection = players.reduce<number | null>((top, player) => {
     const projection = player.weekly_projected_fantasy_points;
@@ -391,6 +418,9 @@ export default function LeagueWaivers() {
       latest_final_fantasy_points: null,
       latest_final_week: null,
       projection_status: "UNAVAILABLE",
+      injury_status: null,
+      season_positional_rank: null,
+      season_rank_through_week: null,
       availability_state: "waivers",
       available_at: null,
       rostered_by_team_name: null,
@@ -673,7 +703,10 @@ export default function LeagueWaivers() {
                     type="button"
                     role="tab"
                     aria-selected={playerBoardScope === scope}
-                    onClick={() => setPlayerBoardScope(scope)}
+                    onClick={() => {
+                      setPlayerBoardScope(scope);
+                      if (scope === "hot") setSortMode("projection");
+                    }}
                     className={[
                       "flex min-h-10 min-w-0 items-center justify-center rounded px-2 py-2 text-center text-[9px] font-black uppercase leading-4 tracking-[0.08em] transition-colors",
                       playerBoardScope === scope ? "bg-cfb-brand text-cfb-canvas" : "text-cfb-text-secondary hover:text-cfb-text-primary",
@@ -700,6 +733,33 @@ export default function LeagueWaivers() {
                   ))}
                 </div>
               ) : null}
+              {playerBoardScope !== "hot" ? (
+                <div className="flex w-full flex-col gap-1.5 sm:w-[176px]">
+                  <span className="text-[9px] font-black uppercase tracking-[0.12em] text-cfb-text-muted">Sort</span>
+                  <Select value={sortMode} onValueChange={(value: WaiverSortMode) => setSortMode(value)}>
+                    <SelectTrigger aria-label="Waiver player sort" className="h-10 rounded-md border-cfb-border-subtle bg-cfb-canvas px-3 text-[10px] font-black uppercase tracking-[0.08em] text-cfb-text-primary">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="projection">Week {displayWeek} projection</SelectItem>
+                      <SelectItem value="positional-rank">Positional rank</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
+              {playerBoardScope !== "hot" && sortMode === "positional-rank" ? (
+                <div className="flex w-full flex-col gap-1.5 sm:w-[156px]">
+                  <span className="text-[9px] font-black uppercase tracking-[0.12em] text-cfb-text-muted">Rank position</span>
+                  <Select value={rankPosition} onValueChange={(value: (typeof positions)[number]) => setRankPosition(value)}>
+                    <SelectTrigger aria-label="Positional rank position" className="h-10 rounded-md border-cfb-border-subtle bg-cfb-canvas px-3 text-[10px] font-black uppercase tracking-[0.08em] text-cfb-text-primary">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {positions.map((item) => <SelectItem key={item} value={item}>{item === "ALL" ? "All positions" : item}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
               <div className="relative w-full sm:min-w-[280px]">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" />
                 <Input
@@ -711,13 +771,16 @@ export default function LeagueWaivers() {
               </div>
               <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {positions.map((item) => {
-                  const active = position === item;
+                  const active = (sortMode === "positional-rank" ? rankPosition : position) === item;
                   const tone = positionTone(item === "ALL" ? null : item);
                   return (
                     <button
                       key={item}
                       type="button"
-                      onClick={() => setPosition(item)}
+                      onClick={() => {
+                        if (sortMode === "positional-rank") setRankPosition(item);
+                        else setPosition(item);
+                      }}
                       className={[
                         "h-10 shrink-0 rounded-md border px-3 text-[10px] font-black uppercase tracking-[0.12em] transition-colors",
                         active
@@ -787,10 +850,17 @@ export default function LeagueWaivers() {
                   </span>
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-2">
-                      <p className="truncate text-sm font-bold text-cfb-text-primary">{player.name}</p>
+                      <PlayerAvailabilityIndicator status={player.injury_status}>
+                        <p className="truncate text-sm font-bold text-cfb-text-primary">{player.name}</p>
+                      </PlayerAvailabilityIndicator>
                       <span className={`inline-flex shrink-0 rounded-md border px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.1em] ${tone.border} ${tone.bg} ${tone.text}`}>
                         {player.position ?? "-"}
                       </span>
+                      {player.season_positional_rank ? (
+                        <span className="shrink-0 text-[9px] font-black uppercase tracking-[0.08em] text-cfb-text-secondary" title={`Finalized through Week ${player.season_rank_through_week ?? "—"}`}>
+                          {waiverPositionRankLabel(player)}
+                        </span>
+                      ) : null}
                     </div>
                     <p className="mt-1 truncate text-[10px] font-bold uppercase tracking-[0.1em] text-cfb-text-muted">
                       {`${player.school ?? "School unavailable"} · ${player.opponent ? `vs ${player.opponent}` : "Opponent unavailable"}`}
@@ -842,7 +912,7 @@ export default function LeagueWaivers() {
             })}
             </div>
             <div className="hidden overflow-x-auto sm:block">
-            <table className="min-w-[1100px] w-full table-fixed text-left">
+            <table className="min-w-[1200px] w-full table-fixed text-left">
               <thead className="border-b border-cfb-border-subtle bg-cfb-surface-raised">
                 <tr className="text-[10px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">
                   <th className="w-[7rem] min-w-[7rem] whitespace-nowrap px-5 py-3 text-right">RK</th>
@@ -850,6 +920,7 @@ export default function LeagueWaivers() {
                   <th className="w-44 px-4 py-3">School</th>
                   <th className="w-44 px-4 py-3">Opponent</th>
                   <th className="w-24 px-4 py-3">POS</th>
+                  <th className="w-28 px-4 py-3">POS RK</th>
                   <th className={`w-40 px-4 py-3 ${playerBoardScope === "all" ? "text-left" : "text-right"}`}>
                     Week {displayWeek} Pts
                   </th>
@@ -891,9 +962,11 @@ export default function LeagueWaivers() {
                       </td>
                       <td className="px-4 py-3 align-middle">
                         <div className="min-w-0">
-                          <p className="truncate text-base font-bold text-cfb-text-primary transition-colors">
-                            {player.name}
-                          </p>
+                          <PlayerAvailabilityIndicator status={player.injury_status}>
+                            <p className="truncate text-base font-bold text-cfb-text-primary transition-colors">
+                              {player.name}
+                            </p>
+                          </PlayerAvailabilityIndicator>
                           <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.12em] text-cfb-text-muted">
                             {player.rostered_by_team_name
                               ? `Rostered by ${player.rostered_by_team_name}`
@@ -915,6 +988,11 @@ export default function LeagueWaivers() {
                           className={`inline-flex min-w-12 items-center justify-center rounded-md border px-2.5 py-1.5 text-[10px] font-black uppercase tracking-[0.1em] ${tone.border} ${tone.bg} ${tone.text}`}
                         >
                           {player.position ?? "-"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 align-middle text-sm font-black tabular-nums text-cfb-text-primary">
+                        <span title={player.season_rank_through_week ? `Finalized through Week ${player.season_rank_through_week}` : "No finalized positional rank yet"}>
+                          {waiverPositionRankLabel(player)}
                         </span>
                       </td>
                       <td className={`w-40 px-4 py-3 align-middle ${playerBoardScope === "all" ? "text-left" : "text-right"}`}>

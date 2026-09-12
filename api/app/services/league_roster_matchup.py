@@ -79,6 +79,7 @@ from collegefootballfantasy_api.app.services.matchup_probability import (
 )
 from collegefootballfantasy_api.app.services.player_lock_service import as_utc, game_context_for_players
 from collegefootballfantasy_api.app.services.player_pool_filters import canonical_fantasy_player_filter
+from collegefootballfantasy_api.app.services.player_season_rank import season_positional_ranks
 from collegefootballfantasy_api.app.services.power4 import canonical_school_name, normalize_school
 from collegefootballfantasy_api.app.services.roster_slots import CanonicalRosterSlot, build_team_roster_slots
 from collegefootballfantasy_api.app.services.waiver_service import (
@@ -1443,7 +1444,30 @@ def build_waivers_view(
         .all()
     }
     projection_by_player = _projection_map(db, league.season_year, week, player_ids)
+    injury_status_by_player = _injury_status_by_player(
+        db,
+        season=league.season_year,
+        week=week,
+        player_ids=player_ids,
+    )
     player_positions = {player.id: player.position for player in eligible_players}
+    # Use the exact same finalized, cumulative rank displayed on player cards.
+    # Calculating once per position keeps the waiver board internally
+    # consistent without treating current live results as finalized ranks.
+    season_ranks_by_player = (
+        {
+            player_id: rank
+            for position in {value for value in player_positions.values() if value}
+            for player_id, rank in season_positional_ranks(
+                db,
+                season=league.season_year,
+                position=position,
+            ).items()
+            if player_id in player_ids
+        }
+        if scope in {"waiver", "all"}
+        else {}
+    )
     player_schools = {player.id: player.school for player in eligible_players}
     game_starts_by_player, opponent_by_player, _locations_by_player = game_context_for_players(
         db,
@@ -1636,6 +1660,17 @@ def build_waivers_view(
                     else None
                 ),
                 projection_status=projection_for_player(player.id)[1],
+                injury_status=injury_status_by_player.get(player.id),
+                season_positional_rank=(
+                    season_ranks_by_player[player.id].rank
+                    if player.id in season_ranks_by_player
+                    else None
+                ),
+                season_rank_through_week=(
+                    season_ranks_by_player[player.id].through_week
+                    if player.id in season_ranks_by_player
+                    else None
+                ),
                 rostered_by_team_name=rostered_by_player.get(player.id),
                 availability_state=availability_for_player(player.id)[0],
                 available_at=availability_for_player(player.id)[1],

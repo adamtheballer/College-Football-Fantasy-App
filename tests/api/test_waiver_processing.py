@@ -16,6 +16,7 @@ from collegefootballfantasy_api.app.models.player_waiver_availability import Pla
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.game import Game
+from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.models.waiver_claim import WaiverClaim
 from collegefootballfantasy_api.app.models.waiver_period import WaiverPeriod
@@ -23,6 +24,7 @@ from collegefootballfantasy_api.app.models.waiver_priority import WaiverPriority
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.schemas.league_flow import LeagueSettingsInput, LeagueSettingsUpdate
 from collegefootballfantasy_api.app.services.league_roster_matchup import build_waivers_view
+from collegefootballfantasy_api.app.services.player_season_rank import PlayerSeasonPositionalRank
 from collegefootballfantasy_api.app.services.league_weeks import current_cfb_week_state
 from collegefootballfantasy_api.app.schemas.waiver import FreeAgentAdd
 from collegefootballfantasy_api.app.services.waiver_service import (
@@ -33,6 +35,7 @@ from collegefootballfantasy_api.app.services.waiver_service import (
     record_player_dropped_for_waivers,
 )
 import collegefootballfantasy_api.app.services.waiver_service as waiver_service
+import collegefootballfantasy_api.app.services.league_roster_matchup as league_roster_matchup
 
 
 def canonical_player(name: str, position: str, school: str) -> Player:
@@ -574,6 +577,53 @@ def test_waiver_pool_retains_last_verified_score_after_the_operational_week_adva
     assert row.final_fantasy_points is None
     assert row.latest_final_fantasy_points == 18.3
     assert row.latest_final_week == 1
+
+
+def test_waiver_pool_exposes_the_current_week_reviewed_injury_status(db_session):
+    user = User(email="injury-waiver-owner@example.com", first_name="Injury", password_hash="test", api_token="injury-waiver-owner-token")
+    db_session.add(user)
+    db_session.flush()
+    league = League(name="Injury Waiver League", season_year=2026, commissioner_user_id=user.id, max_teams=1)
+    player = canonical_player("Questionable Waiver RB", "RB", "Miami")
+    db_session.add_all((league, Team(league=league, name="Injury Waiver Team", owner_user_id=user.id, owner_name="Injury"), player))
+    db_session.flush()
+    db_session.add_all((
+        WeeklyProjection(player_id=player.id, season=2026, week=2, is_published=True, fantasy_points=14.5),
+        Injury(player_id=player.id, season=2026, week=2, status="questionable"),
+    ))
+    db_session.commit()
+
+    waiver_view = build_waivers_view(db_session, league, user, selected_week=2)
+
+    assert waiver_view.available_players[0].injury_status == "QUESTIONABLE"
+
+
+def test_waiver_and_all_players_expose_finalized_positional_ranks(db_session, monkeypatch):
+    user = User(email="rank-waiver-owner@example.com", first_name="Rank", password_hash="test", api_token="rank-waiver-owner-token")
+    db_session.add(user)
+    db_session.flush()
+    league = League(name="Rank Waiver League", season_year=2026, commissioner_user_id=user.id, max_teams=1)
+    top_receiver = canonical_player("Top Ranked Receiver", "WR", "Miami")
+    second_receiver = canonical_player("Second Ranked Receiver", "WR", "USC")
+    db_session.add_all((league, Team(league=league, name="Rank Waiver Team", owner_user_id=user.id, owner_name="Rank"), top_receiver, second_receiver))
+    db_session.flush()
+
+    def ranks_for_position(_db, *, season, position):
+        assert season == 2026
+        assert position == "WR"
+        return {
+            top_receiver.id: PlayerSeasonPositionalRank(position="WR", rank=1, fantasy_points=42.5, through_week=1),
+            second_receiver.id: PlayerSeasonPositionalRank(position="WR", rank=2, fantasy_points=31.0, through_week=1),
+        }
+
+    monkeypatch.setattr(league_roster_matchup, "season_positional_ranks", ranks_for_position)
+
+    for scope in ("waiver", "all"):
+        view = build_waivers_view(db_session, league, user, selected_week=2, scope=scope)
+        rows = {row.id: row for row in view.available_players}
+        assert rows[top_receiver.id].season_positional_rank == 1
+        assert rows[top_receiver.id].season_rank_through_week == 1
+        assert rows[second_receiver.id].season_positional_rank == 2
 
 
 def test_waiver_view_resolves_instant_adds_from_each_players_kickoff(db_session):
