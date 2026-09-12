@@ -53,12 +53,13 @@ export class ApiError extends Error {
   code?: string;
   field?: string;
   retryAt?: string;
+  lastSuccessfulChangeAt?: string;
 
   constructor(
     status: number,
     message: string,
     detail?: unknown,
-    metadata?: { code?: string; field?: string; retryAt?: string },
+    metadata?: { code?: string; field?: string; retryAt?: string; lastSuccessfulChangeAt?: string },
   ) {
     super(message);
     this.name = "ApiError";
@@ -67,6 +68,7 @@ export class ApiError extends Error {
     this.code = metadata?.code;
     this.field = metadata?.field;
     this.retryAt = metadata?.retryAt;
+    this.lastSuccessfulChangeAt = metadata?.lastSuccessfulChangeAt;
   }
 }
 
@@ -244,6 +246,7 @@ type ActionableErrorDetail = {
   message?: string;
   field?: string;
   retry_at?: string;
+  last_successful_change_at?: string | null;
 };
 
 const parseActionableErrorDetail = (detail: unknown): ActionableErrorDetail | null => {
@@ -255,6 +258,9 @@ const parseActionableErrorDetail = (detail: unknown): ActionableErrorDetail | nu
     message: record.message,
     field: typeof record.field === "string" ? record.field : undefined,
     retry_at: typeof record.retry_at === "string" ? record.retry_at : undefined,
+    last_successful_change_at: typeof record.last_successful_change_at === "string"
+      ? record.last_successful_change_at
+      : undefined,
   };
 };
 
@@ -291,6 +297,7 @@ const buildError = async (res: Response) => {
         code: actionable.code,
         field: actionable.field,
         retryAt: actionable.retry_at,
+        lastSuccessfulChangeAt: actionable.last_successful_change_at,
       });
     }
   }

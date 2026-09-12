@@ -1,11 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timezone
 import re
 from typing import Optional
 import base64
 import binascii
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator, model_validator
 
 
 PASSWORD_POLICY_MESSAGE = (
@@ -176,10 +176,28 @@ class UserRead(BaseModel):
     is_admin: bool = False
     created_at: datetime
     email_verified_at: datetime | None = None
+    # This timestamp is set only after a manager-name update commits. Clients
+    # use it to explain the seven-day cooldown without implying that failed
+    # attempts restart the waiting period.
+    manager_name_changed_at: datetime | None = None
     manager_name_change_available_at: datetime | None = None
     # A redeemed Early Access code is stored on the user and can be honored by
     # the alpha subscription system without storing the raw code.
     early_access_pro_eligible: bool = False
+
+    @field_serializer("manager_name_changed_at", "manager_name_change_available_at")
+    def serialize_manager_name_cooldown_time(self, value: datetime | None) -> str | None:
+        """Serialize durable cooldown timestamps as explicit UTC instants.
+
+        PostgreSQL drivers can hand SQLAlchemy a naive ``datetime`` for a
+        ``DateTime(timezone=True)`` column. Treat that stored value as UTC so
+        the profile response and 429 response describe the same deadline.
+        """
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.isoformat()
 
 
 class AuthResponse(BaseModel):
