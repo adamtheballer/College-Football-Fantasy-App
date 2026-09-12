@@ -320,7 +320,12 @@ describe("SideBySideMatchup", () => {
     expect(desktopStarters.querySelectorAll('[data-desktop-slot-column="true"]')).toHaveLength(1);
     expect(desktopStarters.querySelectorAll("[data-roster-slot-swap]")).toHaveLength(0);
     expect(within(desktopStarters).getAllByText("QB")).toHaveLength(1);
-    expect(within(desktopStarters).getByText("L. Name Quarterback").parentElement?.className).toContain("text-[16px]");
+    const desktopPlayerButton = within(desktopStarters).getByRole("button", { name: "Open L. Name Quarterback player card" });
+    expect(desktopPlayerButton.getAttribute("data-matchup-player-button")).not.toBeNull();
+    expect(desktopPlayerButton.className).toContain("h-full");
+    expect(desktopPlayerButton.className).toContain("self-stretch");
+    expect(within(desktopStarters).getByText("L. Name Quarterback").parentElement?.className).toContain("text-[17px]");
+    expect(within(desktopStarters).getByText("24.1").parentElement?.className).toContain("text-[13px]");
     expect(within(screen.getByTestId("mobile-starting-lineup")).getByText("L. Name Quarterback").parentElement?.className).toContain("text-[12px]");
   });
 

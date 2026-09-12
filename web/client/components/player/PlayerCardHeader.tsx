@@ -120,6 +120,7 @@ export function PlayerCardHeader({
       <header className={cn("relative shrink-0 overflow-hidden bg-gradient-to-br px-4 py-5 pr-14 sm:px-8 sm:py-7 sm:pr-24", palette.headerBase)}>
         <div className="absolute inset-0 opacity-60 mix-blend-screen" style={headerStreakStyle} />
         <div className="absolute inset-0 bg-[linear-gradient(112deg,rgba(4,8,18,0.14)_0%,transparent_44%,rgba(2,6,23,0.42)_100%)]" />
+        <div aria-hidden="true" className="cfb-matte-grain-layer pointer-events-none absolute inset-0" />
         <div
           className="pointer-events-none absolute inset-0 hidden text-white/20 [mask-image:linear-gradient(to_right,black_0%,black_58%,transparent_74%)] lg:block"
           aria-hidden="true"
@@ -143,7 +144,7 @@ export function PlayerCardHeader({
         <div className="relative z-10 min-w-0">
           <p className="hidden text-[10px] font-black uppercase tracking-[0.28em] text-white/65 sm:block">{title}</p>
           <div className="flex min-w-0 items-center gap-3 sm:mt-4 sm:gap-5">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/25 bg-white/10 sm:h-[5.75rem] sm:w-[5.75rem]">
+            <div className="cfb-player-sticker-frame flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/25 bg-white/10 sm:h-[5.75rem] sm:w-[5.75rem]">
                 {card?.about.headshot_url ? (
                   <img src={card.about.headshot_url} alt={player.name} className="h-full w-full object-cover" />
                 ) : (

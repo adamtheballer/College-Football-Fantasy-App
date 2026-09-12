@@ -114,9 +114,10 @@ function CompactMatchupPlayer({
     if (player && onSelect) onSelect(player);
   };
   const interactiveClassName = interactive
-    ? "w-full rounded-md text-left transition-colors hover:bg-white/[0.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70"
+    ? "h-full w-full self-stretch rounded-md text-left transition-colors hover:bg-white/[0.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70"
     : "";
-  const playerNameClassName = desktop ? "text-[16px] leading-5" : "text-[12px] leading-4";
+  const playerNameClassName = desktop ? "text-[17px] leading-5" : "text-[12px] leading-4";
+  const playerPointsClassName = desktop ? "text-[13px] leading-4" : "text-[11px]";
 
   // A flex row that is justified to the right moves the player name whenever
   // the projection or name changes width. Keep a fixed projection rail on
@@ -125,7 +126,7 @@ function CompactMatchupPlayer({
   if (align === "right") {
     const content = (
       <>
-        <span className={`self-center text-left text-[11px] font-black tabular-nums ${hasActualPoints ? "text-cfb-brand" : "text-cfb-text-primary"}`}>
+        <span className={`self-center text-left font-black tabular-nums ${playerPointsClassName} ${hasActualPoints ? "text-cfb-brand" : "text-cfb-text-primary"}`}>
           {isLiveGame ? <Lock data-lineup-lock aria-label="Game in progress — lineup locked" className="mb-0.5 h-2.5 w-2.5 text-cfb-text-muted" /> : null}
           <span className="block">{points}</span>
           {liveDetail ? <span data-player-final-status={isFinalGame ? "true" : undefined} className={`block ${isFinalGame ? "text-[9px] font-black text-cfb-brand" : "text-[8px] font-semibold text-cfb-text-muted"}`}>{liveDetail}</span> : null}
@@ -155,7 +156,7 @@ function CompactMatchupPlayer({
     );
     return (
       interactive ? (
-        <button type="button" data-mobile-matchup-player="right" data-live-game-state={isLiveGame ? "live" : "unavailable"} data-has-possession={hasPossession ? "true" : "false"} aria-label={`Open ${playerName} player card`} onClick={openPlayerCard} className={`grid min-w-0 grid-cols-[2.75rem_minmax(0,1fr)] gap-x-1.5 ${interactiveClassName}`}>
+        <button type="button" data-mobile-matchup-player="right" data-matchup-player-button data-live-game-state={isLiveGame ? "live" : "unavailable"} data-has-possession={hasPossession ? "true" : "false"} aria-label={`Open ${playerName} player card`} onClick={openPlayerCard} className={`grid min-w-0 grid-cols-[2.75rem_minmax(0,1fr)] items-center gap-x-1.5 ${desktop ? "py-3" : "py-2"} ${interactiveClassName}`}>
           {content}
         </button>
       ) : (
@@ -188,7 +189,7 @@ function CompactMatchupPlayer({
           <p data-player-game-stat-line data-player-final-stat-line={isFinalGame ? "true" : undefined} title={gameStatLine} className="truncate text-[8px] font-semibold leading-3 text-cfb-text-muted">{gameStatLine}</p>
         ) : null}
       </div>
-      <span className={`self-center text-right text-[11px] font-black tabular-nums ${hasActualPoints ? "text-cfb-brand" : "text-cfb-text-primary"}`}>
+      <span className={`self-center text-right font-black tabular-nums ${playerPointsClassName} ${hasActualPoints ? "text-cfb-brand" : "text-cfb-text-primary"}`}>
         {isLiveGame ? <Lock data-lineup-lock aria-label="Game in progress — lineup locked" className="mb-0.5 h-2.5 w-2.5 text-cfb-text-muted" /> : null}
         <span className="block">{points}</span>
         {liveDetail ? <span data-player-final-status={isFinalGame ? "true" : undefined} className={`block ${isFinalGame ? "text-[9px] font-black text-cfb-brand" : "text-[8px] font-semibold text-cfb-text-muted"}`}>{liveDetail}</span> : null}
@@ -199,7 +200,7 @@ function CompactMatchupPlayer({
 
   return (
     interactive ? (
-      <button type="button" data-mobile-matchup-player="left" data-live-game-state={isLiveGame ? "live" : "unavailable"} data-has-possession={hasPossession ? "true" : "false"} aria-label={`Open ${playerName} player card`} onClick={openPlayerCard} className={`grid min-w-0 grid-cols-[minmax(0,1fr)_2.75rem] gap-x-1.5 ${interactiveClassName}`}>
+      <button type="button" data-mobile-matchup-player="left" data-matchup-player-button data-live-game-state={isLiveGame ? "live" : "unavailable"} data-has-possession={hasPossession ? "true" : "false"} aria-label={`Open ${playerName} player card`} onClick={openPlayerCard} className={`grid min-w-0 grid-cols-[minmax(0,1fr)_2.75rem] items-center gap-x-1.5 ${desktop ? "py-3" : "py-2"} ${interactiveClassName}`}>
         {content}
       </button>
     ) : (
@@ -241,7 +242,9 @@ function CompactMatchupLineup({
   const rowClassName = desktop
     ? "relative z-10 grid min-h-[92px] grid-cols-[minmax(0,1fr)_5rem_minmax(0,1fr)] items-stretch px-5"
     : "relative z-10 grid min-h-[72px] grid-cols-[minmax(0,1fr)_3.5rem_minmax(0,1fr)] items-stretch px-3";
-  const playerCellClassName = desktop ? "py-3" : "py-2";
+  // The player card trigger fills the cell instead of sitting inside padded
+  // chrome. Its hover/focus state now covers the full visual player box.
+  const playerCellClassName = "py-0";
   const slotCellClassName = desktop ? "min-h-[92px]" : "min-h-[72px]";
 
   return (

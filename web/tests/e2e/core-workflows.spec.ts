@@ -1785,7 +1785,7 @@ test.describe("critical browser workflows", () => {
     await expect(desktopStartingLineup.getByText("Emily's Team Starters")).toHaveClass(/text-cfb-text-primary/);
     await expect(desktopStartingLineup.getByText("Adam 2's Team Starters")).toHaveClass(/text-cfb-text-primary/);
     await expect(desktopStartingLineup.getByText("A. Manning", { exact: true }).locator(".."))
-      .toHaveClass(/text-\[16px\]/);
+      .toHaveClass(/text-\[17px\]/);
     await expect(desktopStartingLineup.getByRole("button", { name: "Open A. Manning player card" })).toBeVisible();
     await expect(desktopStartingLineup.getByRole("button", { name: "Open R. QB player card" })).toBeVisible();
     await expect(desktopStartingLineup.locator('[data-desktop-slot-rail="true"]')).toHaveCount(1);
