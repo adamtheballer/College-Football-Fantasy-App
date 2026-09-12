@@ -250,6 +250,24 @@ class CachedESPNReference:
         events = payload.get("events") if isinstance(payload, dict) else []
         return [event for event in events if isinstance(event, dict)] if isinstance(events, list) else []
 
+    def event_summary(self, event_id: str) -> dict[str, Any]:
+        """Return the canonical header for one already-known ESPN event.
+
+        ESPN's week scoreboard is a discovery feed, not a complete schedule
+        authority: it may paginate/truncate events even with a high ``limit``.
+        A numeric event ID already attached to an internal schedule therefore
+        gets independently re-verified through its exact summary before it is
+        used by this importer.
+        """
+
+        payload = self._load_or_fetch("event-summaries", event_id, lambda: self.client.get_summary(event_id))
+        header = payload.get("header") if isinstance(payload, dict) else None
+        if not isinstance(header, dict):
+            return {}
+        event = dict(header)
+        event.setdefault("id", event_id)
+        return event
+
     def roster(self, team_id: str) -> dict[str, Any]:
         return self._load_or_fetch("rosters", team_id, lambda: self.client.get_team_roster(team_id))
 
@@ -292,10 +310,24 @@ def _event_facts(event: dict[str, Any], *, season: int, requested_week: int) -> 
         kickoff_at = datetime.fromisoformat(kickoff.replace("Z", "+00:00")).astimezone(timezone.utc)
     except ValueError:
         return None
+    raw_week = event.get("week")
+    if isinstance(raw_week, dict):
+        event_week = raw_week.get("number") or requested_week
+    else:
+        # Scoreboard responses use {"number": ...}, while the authoritative
+        # per-event summary header returns the regular-season week directly.
+        # Both are provider facts; normalizing them here lets the importer
+        # validate a known numeric event without relying on the capped weekly
+        # scoreboard listing.
+        event_week = raw_week or requested_week
+    try:
+        event_week = int(event_week)
+    except (TypeError, ValueError):
+        return None
     return {
         "espn_event_id": event_id,
         "season": season,
-        "week": int((event.get("week") or {}).get("number") or requested_week),
+        "week": event_week,
         "home_team": home_name,
         "away_team": away_name,
         "home_team_id": str(home.get("id") or "").strip() or None,
@@ -635,7 +667,41 @@ def main() -> int:
         reference = CachedESPNReference(client, args.cache_dir / str(args.season), delay_seconds=args.request_delay_seconds)
         try:
             scoreboards = [(week, event) for week in weeks for event in reference.scoreboard(args.season, week)]
-            schedule_records, schedule_review = plan_schedule([event for _, event in scoreboards], season=args.season, weeks=[week for week, _ in scoreboards], internal_schools=schools)
+
+            # Preserve coverage when ESPN's week scoreboard omits otherwise
+            # valid games. Only existing numeric IDs are supplemented, and
+            # each is still required to pass the same exact event parser.
+            known_event_ids = {
+                str(external_id).strip()
+                for (external_id,) in (
+                    db.query(Game.external_id)
+                    .join(TeamSchedule, TeamSchedule.game_id == Game.id)
+                    .filter(
+                        TeamSchedule.season == args.season,
+                        TeamSchedule.week.in_(weeks),
+                        TeamSchedule.is_bye.is_(False),
+                        Game.external_id.is_not(None),
+                    )
+                    .distinct()
+                    .all()
+                )
+                if str(external_id or "").strip().isdigit()
+            }
+            discovered_event_ids = {str(event.get("id") or "").strip() for _, event in scoreboards}
+            summary_events = [
+                (int(event.get("week") or week), event)
+                for event_id in sorted(known_event_ids - discovered_event_ids)
+                if (event := reference.event_summary(event_id))
+                for week in [event.get("week")]
+                if str(week or "").isdigit()
+            ]
+            scheduled_events = [*scoreboards, *summary_events]
+            schedule_records, schedule_review = plan_schedule(
+                [event for _, event in scheduled_events],
+                season=args.season,
+                weeks=[week for week, _ in scheduled_events],
+                internal_schools=schools,
+            )
             team_ids = {
                 team_id
                 for record in schedule_records
