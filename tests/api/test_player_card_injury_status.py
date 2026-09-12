@@ -4,6 +4,7 @@ import pytest
 
 from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.api.routes import players as player_routes
 from collegefootballfantasy_api.app.services.injury_status import normalize_injury_status
 from collegefootballfantasy_api.app.services.league_roster_matchup import _injury_status_by_player
 
@@ -92,6 +93,25 @@ def test_player_card_uses_newest_current_reviewed_record_and_ignores_old_weeks(c
     assert current.json()["current_injury_status"] == "OUT"
     assert next_week.status_code == 200
     assert next_week.json()["current_injury_status"] is None
+
+
+def test_player_card_without_a_week_uses_the_current_fantasy_week(client, db_session, monkeypatch):
+    player = Player(name="Calendar Injury", position="RB", school="Missouri")
+    db_session.add(player)
+    db_session.flush()
+    db_session.add_all(
+        [
+            Injury(player_id=player.id, season=2026, week=1, status="FULL"),
+            Injury(player_id=player.id, season=2026, week=2, status="OUT", injury="Lower body"),
+        ]
+    )
+    db_session.commit()
+    monkeypatch.setattr(player_routes, "calendar_cfb_week", lambda _season: 2)
+
+    response = client.get(f"/players/{player.id}/card?injury_season=2026")
+
+    assert response.status_code == 200
+    assert response.json()["current_injury_status"] == "OUT"
 
 
 def test_player_card_resolved_current_injury_returns_normal_availability(client, db_session):

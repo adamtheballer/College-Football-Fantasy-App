@@ -18,7 +18,12 @@ from collegefootballfantasy_api.app.models.player_availability_event import Play
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 
 
+# A reviewed correction may cite either one primary team report or multiple
+# independent public reports.  Both sources are deliberately protected from a
+# later incomplete conference feed, but only for their bounded week window.
 MANUAL_VERIFIED_SOURCE = "manual_verified_team_report"
+MANUAL_CORROBORATED_SOURCE = "manual_corroborated_availability_report"
+MANUAL_VERIFIED_SOURCES = frozenset((MANUAL_VERIFIED_SOURCE, MANUAL_CORROBORATED_SOURCE))
 CORRECTION_VERSION = "CORRECTED_INJURY"
 CORRECTION_MODEL_VERSION = "injury_override_v1"
 
@@ -38,7 +43,7 @@ def has_active_manual_override(db: Session, *, player_id: int, season: int, week
         select(PlayerAvailabilityEvent.id).where(
             PlayerAvailabilityEvent.player_id == player_id,
             PlayerAvailabilityEvent.season == season,
-            PlayerAvailabilityEvent.source == MANUAL_VERIFIED_SOURCE,
+            PlayerAvailabilityEvent.source.in_(MANUAL_VERIFIED_SOURCES),
             PlayerAvailabilityEvent.reviewed.is_(True),
             PlayerAvailabilityEvent.effective_from_week <= week,
             (PlayerAvailabilityEvent.effective_until_week.is_(None))

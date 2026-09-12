@@ -164,6 +164,15 @@ export type LeaguePlayerHistoryResponse = {
   offset: number;
 };
 
+/**
+ * Player-card availability is resolved by the API's authoritative fantasy
+ * calendar.  Do not add a client-side week here: a stale cached bundle must
+ * never pin every card to Week 1 after the Tuesday rollover.
+ */
+export const playerCardRequestParams = (injurySeason: number) => ({
+  injury_season: injurySeason,
+});
+
 export type PlayerTradeValueResponse = {
   current: {
     week: number; value: number; raw_cfb27_rating?: number | null; current_value_rating: number; tier: string; positional_value_rank?: number | null;
@@ -800,9 +809,8 @@ export function usePlayerDetail(playerId?: number | null, enabled = true) {
 
 export function usePlayerCard(playerId?: number | null, enabled = true) {
   const injurySeason = new Date().getFullYear();
-  const injuryWeek = 1;
   return useQuery({
-    queryKey: ["player-card", playerId, injurySeason, injuryWeek],
+    queryKey: ["player-card", playerId, injurySeason],
     enabled: enabled && typeof playerId === "number" && !Number.isNaN(playerId),
     staleTime: 5_000,
     // An open player card is a live surface during games. Keep its stat line
@@ -810,10 +818,7 @@ export function usePlayerCard(playerId?: number | null, enabled = true) {
     refetchInterval: 30_000,
     refetchIntervalInBackground: true,
     refetchOnMount: "always",
-    queryFn: () => apiGet<PlayerCardResponse>(`/players/${playerId}/card`, {
-      injury_season: injurySeason,
-      injury_week: injuryWeek,
-    }),
+    queryFn: () => apiGet<PlayerCardResponse>(`/players/${playerId}/card`, playerCardRequestParams(injurySeason)),
   });
 }
 

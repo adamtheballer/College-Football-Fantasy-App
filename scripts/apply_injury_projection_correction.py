@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply one auditable, provider-backed player availability correction.
+"""Apply one auditable, reviewed player-availability correction.
 
 This is an operator tool for a verified official/team injury update that has
 not reached an automated availability provider yet.  It writes an Injury row
@@ -29,6 +29,7 @@ from collegefootballfantasy_api.app.models.player_availability_event import Play
 from collegefootballfantasy_api.app.models.player_news_event import PlayerNewsEvent
 from collegefootballfantasy_api.app.services.availability_corrections import (
     CORRECTION_VERSION,
+    MANUAL_CORROBORATED_SOURCE,
     MANUAL_VERIFIED_SOURCE,
     publish_zero_projection_for_unavailable_player,
 )
@@ -44,7 +45,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--injury", required=True)
     parser.add_argument("--return-timeline", required=True)
     parser.add_argument("--notes", required=True)
-    parser.add_argument("--source-url", required=True, help="Public team or reputable local-report URL backing this correction.")
+    parser.add_argument(
+        "--source-url",
+        action="append",
+        required=True,
+        help="Public report URL backing this correction. Repeat for each independent corroborating report.",
+    )
+    parser.add_argument(
+        "--require-corroboration",
+        action="store_true",
+        help="Require at least two distinct public reports and label the saved correction as corroborated.",
+    )
     parser.add_argument("--effective-until-week", type=int, help="Last week this override applies (defaults to --week).")
     parser.add_argument("--apply", action="store_true", help="Persist the correction; otherwise only print the target.")
     return parser.parse_args(argv)
@@ -52,6 +63,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 def apply_correction(args: argparse.Namespace) -> dict[str, object]:
     ensure_models_registered()
+    source_urls = tuple(dict.fromkeys(args.source_url))
+    if args.require_corroboration and len(source_urls) < 2:
+        raise ValueError("--require-corroboration needs at least two distinct --source-url values.")
+    source = MANUAL_CORROBORATED_SOURCE if args.require_corroboration else MANUAL_VERIFIED_SOURCE
+    source_url = source_urls[0]
+    corroboration_note = (
+        f"Corroborated by {len(source_urls)} independent public reports. {args.notes}"
+        if args.require_corroboration
+        else args.notes
+    )
     with SessionLocal() as db:
         player = db.scalar(
             select(Player).where(Player.name == args.player, Player.school == args.school)
@@ -73,19 +94,19 @@ def apply_correction(args: argparse.Namespace) -> dict[str, object]:
         injury.practice_level = "DNP"
         injury.is_game_time_decision = False
         injury.is_returning = False
-        injury.notes = args.notes
+        injury.notes = corroboration_note[:500]
         effective_until_week = args.effective_until_week or args.week
         if effective_until_week < args.week:
             raise ValueError("--effective-until-week cannot be before --week.")
         content_hash = sha256(
-            "\x1f".join((str(player.id), str(args.season), str(args.week), args.status, args.notes, args.source_url)).encode()
+            "\x1f".join((str(player.id), str(args.season), str(args.week), args.status, corroboration_note, *source_urls)).encode()
         ).hexdigest()
         event = db.scalar(
             select(PlayerAvailabilityEvent).where(
                 PlayerAvailabilityEvent.player_id == player.id,
                 PlayerAvailabilityEvent.season == args.season,
                 PlayerAvailabilityEvent.week == args.week,
-                PlayerAvailabilityEvent.source == MANUAL_VERIFIED_SOURCE,
+                PlayerAvailabilityEvent.source == source,
             )
         )
         if event is None:
@@ -94,40 +115,40 @@ def apply_correction(args: argparse.Namespace) -> dict[str, object]:
         event.status = args.status
         event.probability_active = 0.0 if args.status == "OUT" else 0.7
         event.availability_multiplier = 0.0 if args.status == "OUT" else 0.7
-        event.source = MANUAL_VERIFIED_SOURCE
-        event.source_url = args.source_url
+        event.source = source
+        event.source_url = source_url
         event.content_hash = content_hash
         event.source_reliability = 1.0
         event.published_at = datetime.now(timezone.utc)
         event.effective_from_week = args.week
         event.effective_until_week = effective_until_week
         event.reviewed = True
-        event.notes = args.notes
+        event.notes = corroboration_note
         db.flush()
         news = db.scalar(
             select(PlayerNewsEvent).where(
                 PlayerNewsEvent.player_id == player.id,
                 PlayerNewsEvent.season == args.season,
                 PlayerNewsEvent.week == args.week,
-                PlayerNewsEvent.source == MANUAL_VERIFIED_SOURCE,
+                PlayerNewsEvent.source == source,
             )
         )
         if news is None:
             news = PlayerNewsEvent(player_id=player.id, season=args.season, week=args.week)
             db.add(news)
         news.event_type = "AVAILABILITY"
-        news.source = MANUAL_VERIFIED_SOURCE
-        news.source_url = args.source_url
+        news.source = source
+        news.source_url = source_url
         news.content_hash = content_hash
         news.source_reliability = 1.0
         news.published_at = event.published_at
         news.effective_from_week = args.week
         news.effective_until_week = effective_until_week
         news.reviewed = True
-        news.notes = args.notes
+        news.notes = corroboration_note
         correction = publish_zero_projection_for_unavailable_player(
             db, player=player, season=args.season, week=args.week,
-            status=args.status, note=args.notes,
+            status=args.status, note=corroboration_note,
         )
         if correction is None and args.status in {"OUT", "IR"}:
             raise ValueError(
@@ -143,7 +164,8 @@ def apply_correction(args: argparse.Namespace) -> dict[str, object]:
             "status": args.status,
             "projection_version": CORRECTION_VERSION,
             "fantasy_points": 0.0 if correction is not None else None,
-            "source_url": args.source_url,
+            "source_urls": source_urls,
+            "corroborated": args.require_corroboration,
             "effective_until_week": effective_until_week,
         }
         if args.apply:

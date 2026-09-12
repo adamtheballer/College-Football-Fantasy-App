@@ -5,7 +5,14 @@ import {
   getDraftPlayerPoolBackendLimit,
   getDraftPlayerPoolPageOffsets,
   normalizePlayer,
+  playerCardRequestParams,
 } from "./use-players";
+
+describe("playerCardRequestParams", () => {
+  it("delegates the live injury week to the API instead of pinning cards to Week 1", () => {
+    expect(playerCardRequestParams(2026)).toEqual({ injury_season: 2026 });
+  });
+});
 
 describe("getDraftPlayerPoolBackendLimit", () => {
   it("never exceeds the backend /players API page limit", () => {
