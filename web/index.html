@@ -9,8 +9,14 @@
       behind the system UI.
     -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!--
+      Use versioned icon URLs. Safari caches home-screen icons aggressively by
+      path, so reusing an icon filename can leave an older app badge in place
+      even after a successful web deployment.
+    -->
+    <link rel="manifest" href="/manifest.webmanifest?v=2" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/cffb-app-icon-v2-32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/cffb-app-icon-v2-180.png" />
     <title>College Fantasy Football</title>
   </head>
 
