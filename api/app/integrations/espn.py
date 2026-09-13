@@ -446,6 +446,39 @@ def _field_goal_buckets_from_scoring_plays(summary: dict[str, Any]) -> dict[str,
     every player in that matchup from finalizing.
     """
 
+    # Some ESPN feeds use an abbreviated name plus "57 yd FG GOOD".
+    # Resolve that name only against the kickers in this same box score;
+    # initials that identify multiple athletes must never allocate points.
+    def name_key(value: str) -> str:
+        return re.sub(r"[^a-z0-9]", "", value.casefold())
+
+    kicker_aliases: dict[str, set[str]] = {}
+    boxscore = summary.get("boxscore")
+    teams = boxscore.get("players") if isinstance(boxscore, dict) else []
+    for team in teams if isinstance(teams, list) else []:
+        if not isinstance(team, dict):
+            continue
+        for category in team.get("statistics") or []:
+            if not isinstance(category, dict):
+                continue
+            if "fieldGoalsMade/fieldGoalAttempts" not in (category.get("keys") or []):
+                continue
+            for entry in category.get("athletes") or []:
+                if not isinstance(entry, dict):
+                    continue
+                athlete = entry.get("athlete") or {}
+                if not isinstance(athlete, dict):
+                    continue
+                full_name = str(athlete.get("displayName") or "").strip()
+                if not full_name:
+                    continue
+                aliases = [full_name, str(athlete.get("shortName") or "")]
+                parts = full_name.split(maxsplit=1)
+                if len(parts) == 2:
+                    aliases.append(f"{parts[0][0]}. {parts[1]}")
+                for alias in filter(None, aliases):
+                    kicker_aliases.setdefault(name_key(alias), set()).add(full_name.lower())
+
     buckets: dict[str, dict[str, int]] = {}
     scoring_plays: list[tuple[dict[str, Any], bool]] = []
     top_level = summary.get("scoringPlays")
@@ -469,7 +502,12 @@ def _field_goal_buckets_from_scoring_plays(summary: dict[str, Any]) -> dict[str,
         if not from_top_level and not play.get("scoringPlay"):
             continue
         text = str(play.get("text") or "")
-        if "Field Goal" not in text:
+        distance_match = re.search(
+            r"(\d+)\s+(?:yds?\.?|yards?)\s+(?:Field Goal\b|FG\s+GOOD\b)",
+            text,
+            re.IGNORECASE,
+        )
+        if not distance_match or re.search(r"\b(?:NO GOOD|MISSED|BLOCKED)\b", text, re.IGNORECASE):
             continue
         clock = play.get("clock") if isinstance(play.get("clock"), dict) else {}
         dedupe_key = str(play.get("id") or play.get("sequenceNumber") or "").strip()
@@ -478,13 +516,14 @@ def _field_goal_buckets_from_scoring_plays(summary: dict[str, Any]) -> dict[str,
         if dedupe_key in seen:
             continue
         seen.add(dedupe_key)
-        distance_match = re.search(r"(\d+)\s+Yd Field Goal", text, re.IGNORECASE)
-        if not distance_match:
-            continue
         distance = int(distance_match.group(1))
         name = text[: distance_match.start()].strip(" ,-")
         if not name:
             continue
+        matching_names = kicker_aliases.get(name_key(name), set())
+        if len(matching_names) != 1:
+            continue
+        name = next(iter(matching_names))
         bucket = _field_goal_bucket(distance)
         row = buckets.setdefault(
             name.lower(),
