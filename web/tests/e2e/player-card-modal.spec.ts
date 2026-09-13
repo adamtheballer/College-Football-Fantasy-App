@@ -130,7 +130,7 @@ test.describe("player card modal", () => {
     await expect(dialog.getByText("Upcoming game", { exact: true })).toHaveCount(0);
     await expect(dialog.getByText(/Michigan/)).toHaveCount(0);
     await expect(dialog.getByText("42", { exact: true })).toBeVisible();
-    await dialog.getByRole("button", { name: "Game Log", exact: true }).click();
+    await dialog.locator("#player-card-tab-game-log").click();
     await expect(dialog.getByText(/^Sep 4, 2026 • 8:00 PM.* • Home$/)).toBeVisible();
     await expect(dialog.getByText(/Sep 5, 2026/)).toHaveCount(0);
     await expect(dialog.getByText("Live", { exact: true }).last()).toBeVisible();
@@ -141,10 +141,10 @@ test.describe("player card modal", () => {
     await expect.poll(() => logRequests).toBeGreaterThan(previousRequests);
     await expect(dialog.getByText("74", { exact: true }).last()).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath("live-game-log-mobile.png"), fullPage: true });
-    await dialog.getByRole("button", { name: "Summary", exact: true }).click();
+    await dialog.locator("#player-card-tab-summary").click();
     await expect(dialog.getByText("74", { exact: true })).toBeVisible();
     await page.setViewportSize({ width: 1440, height: 960 });
-    await dialog.getByRole("button", { name: "Game Log", exact: true }).click();
+    await dialog.locator("#player-card-tab-game-log").click();
     await expect(dialog.getByRole("cell", { name: "74", exact: true })).toBeVisible();
     await expect(dialog.getByRole("cell", { name: "Live", exact: true })).toBeVisible();
   });
@@ -418,7 +418,7 @@ test.describe("player card modal", () => {
     // tab must not be reintroduced, and the selected season owns its summary
     // and position-specific game stats.
     await expect(dialog.getByRole("button", { name: "Stats", exact: true })).toHaveCount(0);
-    await dialog.getByRole("button", { name: "Game Log" }).click();
+    await dialog.locator("#player-card-tab-game-log").click();
     await expect(dialog.getByLabel("Game log season")).toHaveValue("2026");
     await expect(dialog.getByLabel("2026 season summary")).toBeVisible();
     await expect(dialog.getByText("vs. Texas", { exact: true }).last()).toBeVisible();

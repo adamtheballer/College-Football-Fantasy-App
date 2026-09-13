@@ -45,6 +45,7 @@ export function LeagueTabs({
           <Link
             key={tab.path}
             to={href}
+            aria-current={active ? "page" : undefined}
             className={`relative flex min-h-12 shrink-0 items-center px-1 text-xs font-black uppercase tracking-[0.11em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70 md:justify-self-center ${
               active ? "text-cfb-text-primary" : "text-cfb-text-muted hover:text-cfb-text-secondary"
             }`}

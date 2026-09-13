@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { ArrowDown, ArrowUp, Pencil, Search, Sparkles, UserPlus, Zap } from "lucide-react";
 
@@ -62,6 +62,34 @@ type AvailablePlayerRow = {
 };
 
 type PlayerBoardScope = "waiver" | "all" | "hot";
+
+type PersistedWaiverBoardState = {
+  hotWindowHours: 24 | 168;
+  playerBoardScope: PlayerBoardScope;
+  position: (typeof positions)[number];
+  search: string;
+  sortMode: WaiverSortMode;
+};
+
+const waiverBoardStorageKey = (leagueId: number) => `cffb:waiver-board:${leagueId}`;
+
+const readWaiverBoardState = (leagueId: number): Partial<PersistedWaiverBoardState> => {
+  if (!Number.isFinite(leagueId) || typeof window === "undefined") return {};
+  try {
+    const raw = window.sessionStorage.getItem(waiverBoardStorageKey(leagueId));
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Partial<PersistedWaiverBoardState>;
+    return {
+      hotWindowHours: parsed.hotWindowHours === 24 ? 24 : parsed.hotWindowHours === 168 ? 168 : undefined,
+      playerBoardScope: parsed.playerBoardScope === "all" || parsed.playerBoardScope === "hot" || parsed.playerBoardScope === "waiver" ? parsed.playerBoardScope : undefined,
+      position: positions.includes(parsed.position as (typeof positions)[number]) ? parsed.position as (typeof positions)[number] : undefined,
+      search: typeof parsed.search === "string" ? parsed.search : undefined,
+      sortMode: parsed.sortMode === "positional-rank" || parsed.sortMode === "projection" ? parsed.sortMode : undefined,
+    };
+  } catch {
+    return {};
+  }
+};
 
 /** A rostered player is researchable in All Players and can open a trade flow. */
 export const waiverPlayerCanBeTraded = (
@@ -282,11 +310,12 @@ export default function LeagueWaivers() {
   const { leagueId } = useParams();
   const navigate = useNavigate();
   const parsedLeagueId = Number(leagueId);
-  const [search, setSearch] = useState("");
-  const [position, setPosition] = useState<(typeof positions)[number]>("ALL");
-  const [playerBoardScope, setPlayerBoardScope] = useState<PlayerBoardScope>("waiver");
-  const [sortMode, setSortMode] = useState<WaiverSortMode>("projection");
-  const [hotWindowHours, setHotWindowHours] = useState<24 | 168>(168);
+  const initialBoardState = useMemo(() => readWaiverBoardState(parsedLeagueId), [parsedLeagueId]);
+  const [search, setSearch] = useState(initialBoardState.search ?? "");
+  const [position, setPosition] = useState<(typeof positions)[number]>(initialBoardState.position ?? "ALL");
+  const [playerBoardScope, setPlayerBoardScope] = useState<PlayerBoardScope>(initialBoardState.playerBoardScope ?? "waiver");
+  const [sortMode, setSortMode] = useState<WaiverSortMode>(initialBoardState.sortMode ?? "projection");
+  const [hotWindowHours, setHotWindowHours] = useState<24 | 168>(initialBoardState.hotWindowHours ?? 168);
   const [selectedPlayer, setSelectedPlayer] = useState<AvailablePlayerRow | null>(null);
   const [claimPlayer, setClaimPlayer] = useState<AvailablePlayerRow | null>(null);
   const [dropRosterEntryId, setDropRosterEntryId] = useState("none");
@@ -294,6 +323,27 @@ export default function LeagueWaivers() {
   const [preferenceOrder, setPreferenceOrder] = useState("1");
   const [editingClaimId, setEditingClaimId] = useState<number | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const restored = readWaiverBoardState(parsedLeagueId);
+    setSearch(restored.search ?? "");
+    setPosition(restored.position ?? "ALL");
+    setPlayerBoardScope(restored.playerBoardScope ?? "waiver");
+    setSortMode(restored.sortMode ?? "projection");
+    setHotWindowHours(restored.hotWindowHours ?? 168);
+  }, [parsedLeagueId]);
+
+  useEffect(() => {
+    if (!Number.isFinite(parsedLeagueId) || typeof window === "undefined") return;
+    const state: PersistedWaiverBoardState = { hotWindowHours, playerBoardScope, position, search, sortMode };
+    window.sessionStorage.setItem(waiverBoardStorageKey(parsedLeagueId), JSON.stringify(state));
+  }, [hotWindowHours, parsedLeagueId, playerBoardScope, position, search, sortMode]);
+
+  const clearBoardFilters = () => {
+    setSearch("");
+    setPosition("ALL");
+    setSortMode("projection");
+  };
   const leagueQuery = useLeagueDetail(parsedLeagueId);
   const postDraft = isLeaguePostDraft({
     draftStatus: leagueQuery.data?.draft?.status,
@@ -730,6 +780,7 @@ export default function LeagueWaivers() {
                     <button
                       key={windowHours}
                       type="button"
+                      aria-pressed={hotWindowHours === windowHours}
                       onClick={() => setHotWindowHours(windowHours)}
                       className={[
                         "rounded px-2.5 py-2 text-[9px] font-black uppercase tracking-[0.1em] transition-colors",
@@ -772,6 +823,7 @@ export default function LeagueWaivers() {
                     <button
                       key={item}
                       type="button"
+                      aria-pressed={active}
                       onClick={() => setPosition(item)}
                       className={[
                         "h-10 shrink-0 rounded-md border px-3 text-[10px] font-black uppercase tracking-[0.12em] transition-colors",
@@ -798,9 +850,17 @@ export default function LeagueWaivers() {
             Loading league-specific available players…
           </p>
         ) : waiverQuery.isError ? (
-          <p className="px-5 py-6 text-sm font-semibold text-cfb-text-secondary">
-            {waiverBoardLoadMessage(playerBoardScope)}
-          </p>
+          <div className="flex flex-col items-start gap-3 px-5 py-6 text-sm font-semibold text-cfb-text-secondary" role="alert">
+            <p>{waiverBoardLoadMessage(playerBoardScope)}</p>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" className="h-9 rounded-md" onClick={() => void waiverQuery.refetch()}>
+                Try again
+              </Button>
+              <Button type="button" variant="ghost" className="h-9 rounded-md" onClick={clearBoardFilters}>
+                Clear filters
+              </Button>
+            </div>
+          </div>
         ) : filteredPlayers.length === 0 ? (
           <p className="px-5 py-6 text-sm text-slate-400">
             No league-scoped available players match the current filters.
@@ -898,8 +958,8 @@ export default function LeagueWaivers() {
               );
             })}
             </div>
-            <div className="hidden overflow-x-auto sm:block">
-            <table className="min-w-[1200px] w-full table-fixed text-left">
+            <div className="hidden sm:block">
+            <table className="w-full table-fixed text-left">
               <thead className="border-b border-cfb-border-subtle bg-cfb-surface-raised">
                 <tr className="text-[10px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">
                   <th className="w-[7rem] min-w-[7rem] whitespace-nowrap px-5 py-3 text-right">RK</th>

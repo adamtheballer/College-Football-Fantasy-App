@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { UserRound, X } from "lucide-react";
 
 import type { PlayerCardResponse } from "@/hooks/use-players";
@@ -73,6 +73,13 @@ export function PlayerCardHeader({
   position: string;
   title: string;
 }) {
+  const [headshotFailed, setHeadshotFailed] = useState(false);
+
+  // A card modal can stay mounted while a manager moves between players. Do
+  // not let one failed image suppress the next player's headshot.
+  useEffect(() => {
+    setHeadshotFailed(false);
+  }, [card?.about.headshot_url, player.id]);
   const playerStatus = resolvePlayerCardStatus(card, player.status);
   const statusSource = playerStatus;
   const seasonRank = card?.season_positional_rank;
@@ -110,6 +117,7 @@ export function PlayerCardHeader({
     <>
       <button
         type="button"
+        data-player-card-close="true"
         aria-label="Close player card"
         onClick={onClose}
         className="absolute right-3 top-3 z-30 inline-flex h-9 w-9 items-center justify-center rounded-sm border border-white/15 bg-black/25 text-white/75 backdrop-blur transition hover:bg-white/10 hover:text-white sm:right-4 sm:top-4 sm:h-11 sm:w-11"
@@ -146,8 +154,13 @@ export function PlayerCardHeader({
           <p className="hidden text-[10px] font-black uppercase tracking-[0.28em] text-white/65 sm:block">{title}</p>
           <div className="flex min-w-0 items-center gap-3 sm:mt-4 sm:gap-5">
             <div className="cfb-player-sticker-frame flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/25 bg-white/10 sm:h-[5.75rem] sm:w-[5.75rem]">
-                {card?.about.headshot_url ? (
-                  <img src={card.about.headshot_url} alt={player.name} className="h-full w-full object-cover" />
+                {card?.about.headshot_url && !headshotFailed ? (
+                  <img
+                    src={card.about.headshot_url}
+                    alt={player.name}
+                    className="h-full w-full object-cover"
+                    onError={() => setHeadshotFailed(true)}
+                  />
                 ) : (
                   <div className={cn("flex h-full w-full items-center justify-center bg-gradient-to-b", palette.silhouette)}>
                     <UserRound className="h-8 w-8 text-white/75 sm:h-11 sm:w-11" />

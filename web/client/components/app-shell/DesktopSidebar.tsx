@@ -11,6 +11,8 @@ type DesktopSidebarProps = {
 };
 
 const displayNavName = (name: string) => name.toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
+const isCurrentRoute = (pathname: string, path: string) =>
+  pathname === path || (path === "/leagues" && (pathname.startsWith("/league/") || pathname.startsWith("/leagues/")));
 
 export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarProps) {
   return (
@@ -29,7 +31,7 @@ export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarPro
       <nav className="relative z-10 flex flex-1 flex-col justify-between overflow-hidden px-3 pb-5 pt-4">
         {items.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.path;
+          const isActive = isCurrentRoute(pathname, item.path);
           const isSignOut = item.kind === "danger";
           const isAuth = item.kind === "auth";
           const isAdmin = item.kind === "admin";
@@ -68,7 +70,7 @@ export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarPro
               {item.badge ? (
                 <span
                   role="status"
-                  aria-label={`${item.badge} unread chat messages`}
+                  aria-label={`${item.badge} ${item.name.toLowerCase()} notifications`}
                   className="ml-auto inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1.5 py-0.5 text-[9px] font-black tracking-normal text-white"
                 >
                   {item.badge}
@@ -86,7 +88,7 @@ export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarPro
           }
 
           return (
-            <Link key={item.name} to={item.path} className="w-full">
+            <Link key={item.name} to={item.path} aria-current={isActive ? "page" : undefined} className="w-full">
               {content}
             </Link>
           );

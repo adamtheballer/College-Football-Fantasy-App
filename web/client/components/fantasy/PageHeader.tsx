@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
@@ -8,12 +8,21 @@ type PageHeaderProps = {
   description?: ReactNode;
   actions?: ReactNode;
   className?: string;
+  /** A 0–1 position for the small active glow that travels across the header rule. */
+  accentProgress?: number;
 };
 
 /** A compact, repeatable page introduction for data-heavy fantasy routes. */
-export function PageHeader({ eyebrow, title, description, actions, className }: PageHeaderProps) {
+export function PageHeader({ eyebrow, title, description, actions, className, accentProgress }: PageHeaderProps) {
+  const normalizedAccentProgress = typeof accentProgress === "number"
+    ? Math.min(1, Math.max(0, accentProgress))
+    : 0;
+
   return (
-    <header className={cn("cfb-page-header flex flex-col gap-4 border-b border-cfb-border-subtle pb-5 sm:flex-row sm:items-end sm:justify-between", className)}>
+    <header
+      className={cn("cfb-page-header flex flex-col gap-4 border-b border-cfb-border-subtle pb-5 sm:flex-row sm:items-end sm:justify-between", className)}
+      style={{ "--cfb-page-accent-progress": normalizedAccentProgress } as CSSProperties}
+    >
       <div className="min-w-0">
         {eyebrow ? <p className="cfb-micro-label mb-2 text-cfb-brand">{eyebrow}</p> : null}
         <h1 className="cfb-section-title text-2xl sm:text-3xl">{title}</h1>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Activity, AlertTriangle, CalendarDays, History, Info, Loader2, Newspaper } from "lucide-react";
 
 import { useLeaguePlayerHistory, usePlayerGameLog, usePlayerTradeValues, usePlayerTrajectory, type PlayerCardResponse, type PlayerGameLogResponse } from "@/hooks/use-players";
@@ -406,6 +406,8 @@ export function PlayerCardModal({
   player: PlayerCardModalPlayer;
   title?: string;
 }) {
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
   const [activeTab, setActiveTab] = useState<PlayerCardTab>("summary");
   const [isOutlookExpanded, setIsOutlookExpanded] = useState(false);
   const [selectedGameLogSeason, setSelectedGameLogSeason] = useState<number | null>(null);
@@ -519,8 +521,48 @@ export function PlayerCardModal({
     };
   }, []);
 
+  useEffect(() => {
+    openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const dialog = dialogRef.current;
+    const closeButton = dialog?.querySelector<HTMLElement>("[data-player-card-close='true']");
+    closeButton?.focus({ preventScroll: true });
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab" || !dialog) return;
+
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
+        "button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])",
+      )).filter((element) => !element.hasAttribute("disabled") && element.getAttribute("aria-hidden") !== "true");
+      if (!focusable.length) {
+        event.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      if (openerRef.current?.isConnected) openerRef.current.focus({ preventScroll: true });
+    };
+  }, [onClose]);
+
   return (
     <div
+      ref={dialogRef}
       className="fixed inset-0 z-[1400] flex items-end justify-center overscroll-none bg-slate-950/78 p-4 backdrop-blur-md sm:items-center sm:p-6"
       role="dialog"
       aria-modal="true"
@@ -544,7 +586,7 @@ export function PlayerCardModal({
           title={title}
         />
 
-        <nav className="flex gap-1 overflow-x-auto border-b border-white/10 bg-black/18 px-3 pt-1 sm:gap-3 sm:flex-wrap sm:overflow-visible sm:px-8 sm:pt-2 lg:grid lg:grid-cols-7 lg:gap-0 lg:px-0 lg:pt-0">
+        <nav role="tablist" aria-label="Player card sections" className="flex gap-1 overflow-x-auto border-b border-white/10 bg-black/18 px-3 pt-1 sm:gap-3 sm:flex-wrap sm:overflow-visible sm:px-8 sm:pt-2 lg:grid lg:grid-cols-7 lg:gap-0 lg:px-0 lg:pt-0">
           {visiblePlayerCardTabs(hasLeagueContext).map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -552,6 +594,10 @@ export function PlayerCardModal({
               <button
                 key={tab.id}
                 type="button"
+                id={`player-card-tab-${tab.id}`}
+                role="tab"
+                aria-selected={active}
+                aria-controls="player-card-tabpanel"
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
                   "relative inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-2 py-2.5 text-[9px] font-semibold uppercase tracking-[0.06em] transition after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/80 sm:gap-2 sm:px-1 sm:text-[10px] sm:tracking-[0.12em] lg:justify-center lg:px-2",
@@ -569,9 +615,15 @@ export function PlayerCardModal({
 
         <div
           data-testid="player-card-scroll-area"
+          id="player-card-tabpanel"
+          role="tabpanel"
+          aria-labelledby={`player-card-tab-${activeTab}`}
           tabIndex={0}
           aria-label="Player card details"
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch] p-3 pb-20 scroll-pb-20 sm:p-8 sm:pb-8 sm:scroll-pb-8"
+          className={cn(
+            "min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch] pb-20 scroll-pb-20 sm:pb-8 sm:scroll-pb-8",
+            activeTab === "game-log" ? "p-0" : "p-3 sm:p-8",
+          )}
         >
           {loading ? (
             <div className="flex min-h-56 items-center justify-center gap-3 rounded-md border border-cfb-border-subtle bg-cfb-surface-raised text-[10px] font-semibold uppercase tracking-[0.18em] text-cfb-text-muted">
@@ -710,8 +762,8 @@ export function PlayerCardModal({
               </section>
             </div>
           ) : activeTab === "game-log" ? (
-            <section className="rounded-md border border-cfb-border-subtle bg-cfb-surface-raised p-5">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <section data-testid="player-game-log-tab">
+              <div className="flex flex-col gap-4 px-4 pb-5 pt-5 sm:px-8 sm:pb-6 sm:pt-7 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Game Log</p>
                   <p className="mt-2 text-sm font-bold leading-6 text-white/55">
@@ -734,17 +786,17 @@ export function PlayerCardModal({
                 </label>
               </div>
               {gameLogQuery.isLoading ? (
-                <div className="mt-5 flex min-h-40 items-center justify-center gap-3 rounded-2xl border border-white/10 bg-black/20 text-[10px] font-black uppercase tracking-[0.18em] text-white/55">
+                <div className="flex min-h-40 items-center justify-center gap-3 border-y border-white/10 bg-black/20 px-4 text-[10px] font-black uppercase tracking-[0.18em] text-white/55 sm:px-8">
                   <Loader2 className="h-4 w-4 animate-spin" /> Loading game log
                 </div>
               ) : gameLogQuery.isError ? (
-                <p className="mt-5 rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm font-bold leading-6 text-amber-100">
+                <p className="border-y border-amber-300/20 bg-amber-300/10 px-4 py-4 text-sm font-bold leading-6 text-amber-100 sm:px-8">
                   The Game Log is unavailable right now. Please try again shortly.
                 </p>
               ) : selectedGameLogData ? (
                 <>
                 {selectedGameLogData.season_summary || calculatedGameLogSummary.gamesPlayed > 0 ? (
-                  <section className="mt-5 border-y border-cfb-border-subtle bg-cfb-surface px-4 py-4" aria-label={`${selectedGameLogData.season} season summary`}>
+                  <section className="border-y border-cfb-border-subtle bg-cfb-surface px-4 py-4 sm:px-8" aria-label={`${selectedGameLogData.season} season summary`}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">Season summary</p>
                       <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/45">{selectedGameLogData.season}</p>
@@ -767,7 +819,7 @@ export function PlayerCardModal({
                 ) : null}
                 {shouldShowGameLogSchedule && selectedGameLogData.games.length ? (
                 <>
-                <div className="mt-5 overflow-x-auto rounded-sm border border-cfb-border-subtle bg-cfb-surface" data-testid="player-game-log-table">
+                <div className="overflow-x-auto border-b border-cfb-border-subtle bg-cfb-surface" data-testid="player-game-log-table">
                   <table className="min-w-[44rem] w-full border-collapse text-left">
                     <thead className="bg-white/[0.055] text-[9px] font-black uppercase tracking-[0.16em] text-white/45">
                       <tr>

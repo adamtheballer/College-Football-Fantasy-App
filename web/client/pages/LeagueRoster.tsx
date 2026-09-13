@@ -233,6 +233,23 @@ export default function LeagueRoster() {
     return <Navigate to={`/league/${parsedLeagueId}/lobby`} replace />;
   }
 
+  // Do not mistake an in-flight roster query for an empty roster. That was
+  // especially misleading just after the weekly workspace changes over.
+  if (rosterQuery.isLoading) {
+    return (
+      <main className="relative mx-auto flex w-full max-w-none flex-col gap-4 px-0 pb-24 pt-4 sm:gap-6 sm:px-0 sm:py-8">
+        <div className="space-y-3" aria-label="Loading roster">
+          <div className="h-8 w-40 animate-pulse rounded bg-cfb-surface-raised" />
+          <div className="h-10 w-full animate-pulse rounded-md bg-cfb-surface-raised" />
+          <div className="grid grid-cols-3 gap-2 sm:gap-4">
+            {[0, 1, 2].map((index) => <div key={index} className="h-20 animate-pulse rounded-xl bg-cfb-surface-raised" />)}
+          </div>
+          <div className="h-72 animate-pulse rounded-xl bg-cfb-surface-raised" />
+        </div>
+      </main>
+    );
+  }
+
   if (rosterQuery.isError) {
     return (
       <main className="relative mx-auto w-full max-w-[1320px] px-0 py-4 sm:px-6 sm:py-8">

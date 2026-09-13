@@ -59,7 +59,7 @@ const MOCK_TABS: Array<{ value: MockDraftTab; label: string }> = [
 
 const formatPlayerPoolError = (error: unknown) => {
   if (error instanceof Error && error.message) return error.message;
-  return "Unable to load players. Start the backend API and try again.";
+  return "We couldn't load the player board. Try again in a moment.";
 };
 
 const POSITION_STYLES: Record<string, string> = {
@@ -128,7 +128,7 @@ export default function SinglePlayerMockDraftRoom() {
   const mobileCarouselRef = useRef<HTMLDivElement | null>(null);
   const mobilePickRefs = useRef<Map<number, HTMLDivElement | null>>(new Map());
   const [mobileCarouselInset, setMobileCarouselInset] = useState(0);
-  const { data: playersPayload, isLoading, isError, error: playerPoolError } = useDraftPlayerPool({
+  const { data: playersPayload, isLoading, isError, error: playerPoolError, refetch: refetchPlayerPool } = useDraftPlayerPool({
     limit: 200,
     fetchAll: true,
     sort: "draft_rank",
@@ -491,8 +491,11 @@ export default function SinglePlayerMockDraftRoom() {
             <Loader2 className="h-5 w-5 animate-spin" /> Loading draft board...
           </div>
         ) : isError ? (
-          <div className="flex min-h-40 items-center justify-center px-6 text-center text-[10px] font-black uppercase tracking-[0.22em] text-red-300">
-            {formatPlayerPoolError(playerPoolError)}
+          <div className="flex min-h-40 flex-col items-center justify-center gap-3 px-6 text-center text-[10px] font-black uppercase tracking-[0.22em] text-red-300" role="alert">
+            <p>{formatPlayerPoolError(playerPoolError)}</p>
+            <Button type="button" variant="outline" className="h-9 rounded-md text-[9px]" onClick={() => void refetchPlayerPool()}>
+              Try again
+            </Button>
           </div>
         ) : availablePlayers.length === 0 ? (
           <div className="flex min-h-40 items-center justify-center px-6 text-center text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">

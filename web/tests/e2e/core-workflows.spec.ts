@@ -1796,11 +1796,6 @@ test.describe("critical browser workflows", () => {
     await expect(desktopStartingLineup.getByRole("button", { name: "Open R. QB player card" })).toBeVisible();
     await expect(desktopStartingLineup.locator('[data-desktop-slot-rail="true"]')).toHaveCount(1);
     await expect(desktopStartingLineup.locator('[data-desktop-slot-column="true"]')).toHaveCount(1);
-    await expect(page.getByRole("button", { name: "Previous week" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Next week" })).toHaveCount(0);
-    await expect(page.getByText("Prev", { exact: true })).toHaveCount(0);
-    await expect(page.getByText("Next", { exact: true })).toHaveCount(0);
-
     await page.setViewportSize({ width: 390, height: 844 });
     const swipeSurface = page.getByTestId("matchup-swipe-surface");
     await expect(swipeSurface).toBeVisible();

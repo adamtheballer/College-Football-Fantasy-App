@@ -38,6 +38,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isGuideActive, setIsGuideActive] = useState(false);
   const [guidedNavItem, setGuidedNavItem] = useState<string | undefined>();
   const mainScrollRef = useRef<HTMLElement | null>(null);
+  const scrollPositionsRef = useRef(new Map<string, { left: number; top: number }>());
 
   const navItems = useMemo(
     () =>
@@ -60,13 +61,24 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   );
 
   // AppShell deliberately owns scrolling so persistent navigation never creates
-  // a second document scroller. Reset that one owner before a new route paints;
-  // otherwise navigating from a long page can leave the next page at its old
-  // bottom offset on mobile Safari.
+  // a second document scroller. A distinct route starts at the top, while a
+  // history return restores the exact position a manager left behind.
   useLayoutEffect(() => {
-    mainScrollRef.current?.scrollTo({ top: 0, left: 0, behavior: "auto" });
-    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-  }, [location.key, location.pathname, location.search]);
+    const mainScroller = mainScrollRef.current;
+    const saved = scrollPositionsRef.current.get(location.key);
+    const target = saved ?? { top: 0, left: 0 };
+    mainScroller?.scrollTo({ top: target.top, left: target.left, behavior: "auto" });
+    window.scrollTo({ top: target.top, left: target.left, behavior: "auto" });
+
+    return () => {
+      if (mainScroller) {
+        scrollPositionsRef.current.set(location.key, {
+          left: mainScroller.scrollLeft,
+          top: mainScroller.scrollTop,
+        });
+      }
+    };
+  }, [location.key]);
 
   useEffect(() => {
     if (!user) {

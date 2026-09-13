@@ -1,5 +1,5 @@
-import { ChevronRight, Trophy } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight, Trophy } from "lucide-react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 
 import { WinChanceBar, formatDisplayedProbabilityPair, validProbability } from "@/components/league/WinChanceMeter";
 import type { LeagueDetail } from "@/types/league";
@@ -51,10 +51,12 @@ export function LeagueMatchupCarousel({
   leagues,
   activeLeagueId,
   onOpenLeague,
+  onProgressChange,
 }: {
   leagues: LeagueDetail[];
   activeLeagueId?: number | null;
   onOpenLeague: (leagueId: number) => void;
+  onProgressChange?: (progress: number) => void;
 }) {
   const railRef = useRef<HTMLDivElement>(null);
   const cardRefs = useRef(new Map<number, HTMLButtonElement>());
@@ -109,6 +111,23 @@ export function LeagueMatchupCarousel({
     setVisibleLeagueIndex((current) => (current === leagueIndex ? current : leagueIndex));
   }, [hasLoop, leagues.length, nearestCardIndex]);
 
+  const syncScrollProgress = useCallback(() => {
+    const rail = railRef.current;
+    const firstCard = cardRefs.current.get(hasLoop ? 1 : 0);
+    const lastCard = cardRefs.current.get(hasLoop ? leagues.length : leagues.length - 1);
+    if (!rail || !firstCard || !lastCard || leagues.length < 2) {
+      onProgressChange?.(0);
+      return;
+    }
+
+    const railCenter = rail.scrollLeft + rail.clientWidth / 2;
+    const firstCenter = firstCard.offsetLeft + firstCard.offsetWidth / 2;
+    const lastCenter = lastCard.offsetLeft + lastCard.offsetWidth / 2;
+    const span = lastCenter - firstCenter;
+    const progress = span > 0 ? Math.min(1, Math.max(0, (railCenter - firstCenter) / span)) : 0;
+    onProgressChange?.(progress);
+  }, [hasLoop, leagues.length, onProgressChange]);
+
   const normalizeLoopPosition = useCallback(() => {
     if (!hasLoop) return;
     const nearestIndex = nearestCardIndex();
@@ -119,29 +138,34 @@ export function LeagueMatchupCarousel({
     }
   }, [hasLoop, leagues.length, nearestCardIndex, scrollToCard]);
 
+  const selectAdjacentLeague = useCallback((direction: -1 | 1) => {
+    if (leagues.length < 2) return;
+    const nextIndex = (visibleLeagueIndex + direction + leagues.length) % leagues.length;
+    scrollToCard(hasLoop ? nextIndex + 1 : nextIndex, "smooth");
+  }, [hasLoop, leagues.length, scrollToCard, visibleLeagueIndex]);
+
   const handleScroll = useCallback(() => {
     syncVisibleLeague();
+    syncScrollProgress();
     if (!hasLoop) return;
     if (loopResetTimeoutRef.current !== null) window.clearTimeout(loopResetTimeoutRef.current);
     loopResetTimeoutRef.current = window.setTimeout(() => {
       normalizeLoopPosition();
       loopResetTimeoutRef.current = null;
     }, 120);
-  }, [hasLoop, normalizeLoopPosition, syncVisibleLeague]);
+  }, [hasLoop, normalizeLoopPosition, syncScrollProgress, syncVisibleLeague]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setVisibleLeagueIndex(0);
-    const animationFrame = window.requestAnimationFrame(() => {
-      if (hasLoop) scrollToCard(1);
-      syncVisibleLeague();
-    });
+    if (hasLoop) scrollToCard(1);
+    syncVisibleLeague();
+    syncScrollProgress();
     window.addEventListener("resize", syncVisibleLeague);
     return () => {
-      window.cancelAnimationFrame(animationFrame);
       if (loopResetTimeoutRef.current !== null) window.clearTimeout(loopResetTimeoutRef.current);
       window.removeEventListener("resize", syncVisibleLeague);
     };
-  }, [hasLoop, leagueOrderKey, scrollToCard, syncVisibleLeague]);
+  }, [hasLoop, leagueOrderKey, scrollToCard, syncScrollProgress, syncVisibleLeague]);
 
   return (
     <section aria-labelledby="league-matchup-carousel-title">
@@ -155,24 +179,36 @@ export function LeagueMatchupCarousel({
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           <p className="text-[10px] font-black uppercase tracking-[0.12em] text-cfb-text-muted">Swipe leagues</p>
           {leagues.length > 0 ? (
-            <div
-              aria-label={`Showing league ${visibleLeagueIndex + 1} of ${leagues.length}`}
-              data-testid="league-carousel-pagination"
-              className="flex h-2 items-center justify-end gap-1.5"
-            >
-              {leagues.map((league, index) => (
-                <span
-                  key={league.id}
-                  aria-hidden="true"
-                  data-active={index === visibleLeagueIndex ? "true" : "false"}
-                  className={`block rounded-full transition-[width,background-color] duration-200 ${
-                    index === visibleLeagueIndex
-                      ? "h-1.5 w-4 bg-cfb-brand"
-                      : "h-1.5 w-1.5 bg-cfb-text-muted/50"
-                  }`}
-                />
-              ))}
-            </div>
+            <>
+              <div
+                aria-label={`Showing league ${visibleLeagueIndex + 1} of ${leagues.length}`}
+                data-testid="league-carousel-pagination"
+                className="flex h-2 items-center justify-end gap-1.5"
+              >
+                {leagues.map((league, index) => (
+                  <span
+                    key={league.id}
+                    aria-hidden="true"
+                    data-active={index === visibleLeagueIndex ? "true" : "false"}
+                    className={`block rounded-full transition-[width,background-color] duration-200 ${
+                      index === visibleLeagueIndex
+                        ? "h-1.5 w-4 bg-cfb-brand"
+                        : "h-1.5 w-1.5 bg-cfb-text-muted/50"
+                    }`}
+                  />
+                ))}
+              </div>
+              {leagues.length > 1 ? (
+                <div className="flex gap-1">
+                  <button type="button" aria-label="Previous league" onClick={() => selectAdjacentLeague(-1)} className="cfb-icon-button h-8 w-8">
+                    <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                  <button type="button" aria-label="Next league" onClick={() => selectAdjacentLeague(1)} className="cfb-icon-button h-8 w-8">
+                    <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </div>
+              ) : null}
+            </>
           ) : null}
         </div>
       </div>
@@ -184,6 +220,7 @@ export function LeagueMatchupCarousel({
         className="flex min-w-0 max-w-full snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-1 touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {carouselLeagues.map((league, index) => {
+          const isClone = hasLoop && (index === 0 || index === carouselLeagues.length - 1);
           const summary = league.current_user_summary;
           const chance = probabilityPair(league);
           const active = league.id === activeLeagueId;
@@ -194,6 +231,8 @@ export function LeagueMatchupCarousel({
               key={`${league.id}-${index}`}
               data-testid={`league-carousel-card-${league.id}-${index}`}
               type="button"
+              aria-hidden={isClone || undefined}
+              tabIndex={isClone ? -1 : undefined}
               ref={(element) => {
                 if (element) cardRefs.current.set(index, element);
                 else cardRefs.current.delete(index);
