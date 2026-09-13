@@ -231,6 +231,41 @@ def test_top_level_scoring_plays_supply_exact_kicker_distances_when_drives_are_a
     assert kicker["espn_field_goal_distance_detail_available"] is True
 
 
+def test_abbreviated_good_field_goals_use_exact_distances_and_deduplicate_plays():
+    payload = espn_summary_payload()
+    plays = [
+        {"id": "fg-57", "scoringPlay": True, "text": "B. Auburn 57 yd FG GOOD"},
+        {"id": "fg-41", "scoringPlay": True, "text": "B. Auburn 41 yd FG GOOD"},
+        {"id": "miss-30", "scoringPlay": True, "text": "B. Auburn 30 yd FG NO GOOD"},
+    ]
+    payload["scoringPlays"] = plays
+    payload["drives"] = {"previous": [{"plays": plays}]}
+
+    kicker = next(row for row in extract_player_box_score_stats(payload) if row["PlayerName"] == "Bert Auburn")
+
+    assert kicker["fg_made_51_60"] == 1
+    assert kicker["fg_made_41_50"] == 1
+    assert kicker["fg_made_0_30"] == 0
+    assert kicker["espn_field_goal_distance_detail_available"] is True
+
+
+def test_ambiguous_abbreviated_kicker_names_do_not_guess_distance_credit():
+    payload = espn_summary_payload()
+    payload.pop("drives")
+    kicking = next(category for category in payload["boxscore"]["players"][0]["statistics"] if category["name"] == "kicking")
+    kicking["athletes"].append({
+        "athlete": {"id": "404", "displayName": "Bob Auburn"},
+        "stats": ["2/2", "100.0", "57", "3/3"],
+    })
+    payload["scoringPlays"] = [
+        {"id": "fg-57", "text": "B. Auburn 57 yd FG GOOD"},
+        {"id": "fg-41", "text": "B. Auburn 41 yd FG GOOD"},
+    ]
+    kickers = [row for row in extract_player_box_score_stats(payload) if "Auburn" in row["PlayerName"]]
+    assert len(kickers) == 2
+    assert all(row["espn_field_goal_distance_detail_available"] is False for row in kickers)
+
+
 class FakeESPNClient:
     def get_weekly_boxscore_summaries(self, season, week):
         return [espn_summary_payload()]

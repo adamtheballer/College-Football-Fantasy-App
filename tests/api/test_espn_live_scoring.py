@@ -852,6 +852,42 @@ def test_verified_rostered_kicker_with_unbucketed_made_field_goal_delays_the_gam
     assert db_session.query(UnmatchedProviderRow).filter_by(feed="live_boxscore_kicker_distance").count() == 1
 
 
+@pytest.mark.parametrize("final", [False, True])
+def test_abbreviated_kicker_plays_allow_public_scores_for_every_verified_player(db_session, final):
+    league, home, _away, _players, _matchup = create_scoring_fixture(db_session)
+    arch, wingo = _verified_players(db_session)
+    kicker = Player(name="Bert Auburn", position="K", school="Texas")
+    db_session.add(kicker)
+    db_session.flush()
+    db_session.add_all([
+        PlayerProviderId(player_id=kicker.id, provider="espn", provider_player_id="303", verification_status="verified"),
+        RosterEntry(league_id=league.id, team_id=home.id, player_id=kicker.id, slot="K", status="active"),
+    ])
+    db_session.commit()
+    _make_public_promotion_ready(db_session, at=NOW)
+    summary = _final_summary(pass_yards=275) if final else espn_summary_payload()
+    summary.pop("drives")
+    summary["scoringPlays"] = [
+        {"id": "fg57", "text": "B. Auburn 57 yd FG GOOD"},
+        {"id": "fg41", "text": "B. Auburn 41 yd FG GOOD"},
+    ]
+
+    result = run_espn_scoring_cycle(
+        db_session, season=2026, week=1, mode="enabled",
+        client=FakeLiveESPN(summary=summary), now=NOW, relevant_team_names={"texas"},
+    )
+
+    assert result.failed_games == 0
+    assert result.promoted_rows == 3
+    assert db_session.query(PlayerStat).filter_by(player_id=arch.id, season=2026, week=1).one().stats["pass_yards"] == 275
+    assert db_session.query(PlayerStat).filter_by(player_id=wingo.id, season=2026, week=1).one().stats["rec_yards"] == 90
+    stats = db_session.query(PlayerStat).filter_by(player_id=kicker.id, season=2026, week=1).one().stats
+    assert stats["fg_made_51_60"] == 1
+    assert stats["fg_made_41_50"] == 1
+    if final:
+        assert db_session.query(PlayerGameStat).filter_by(player_id=kicker.id, season=2026, week=1).one().stats["fg_made_51_60"] == 1
+
+
 def test_final_snapshot_can_omit_an_unrostered_kicker_without_blocking_active_players(db_session):
     _verified_players(db_session)
     kicker = Player(name="Exact Distance Kicker", position="K", school="Texas")
