@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Activity, AlertTriangle, CalendarDays, History, Info, Loader2, Newspaper } from "lucide-react";
 
 import { useLeaguePlayerHistory, usePlayerGameLog, usePlayerTradeValues, usePlayerTrajectory, type PlayerCardResponse, type PlayerGameLogResponse } from "@/hooks/use-players";
@@ -458,6 +458,8 @@ export function PlayerCardModal({
     ([, value]) => value !== null && value !== undefined && value !== "",
   );
   const projectionRows = statRowsForPosition(position || player.position || "");
+  const dialogRef = useRef<HTMLElement | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   const weeklyProjectionDetailRows = weeklyProjectionStats
     ? projectionRows
         .map((row) => [row.label, statValue(weeklyProjectionStats as unknown as Record<string, unknown>, row.projectionKeys)] as const)
@@ -501,15 +503,53 @@ export function PlayerCardModal({
     };
   }, []);
 
+  useEffect(() => {
+    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const frame = window.requestAnimationFrame(() => dialogRef.current?.focus({ preventScroll: true }));
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )).filter((element) => !element.hasAttribute("hidden") && element.getClientRects().length > 0);
+      if (focusable.length === 0) {
+        event.preventDefault();
+        dialogRef.current.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("keydown", handleKeyDown);
+      returnFocusRef.current?.focus({ preventScroll: true });
+    };
+  }, [onClose]);
+
   return (
     <div
       className="fixed inset-0 z-[1400] flex items-end justify-center overscroll-none bg-slate-950/78 p-4 backdrop-blur-md sm:items-center sm:p-6"
       role="dialog"
       aria-modal="true"
-      aria-label={`${player.name} player card`}
+      aria-labelledby="player-card-title"
       onClick={onClose}
     >
       <article
+        ref={dialogRef}
+        tabIndex={-1}
         className={cn(
           "relative mb-[max(1rem,env(safe-area-inset-bottom))] flex h-[78dvh] max-h-[calc(100dvh-3rem-env(safe-area-inset-bottom))] w-full max-w-5xl flex-col overflow-hidden rounded-md border border-cfb-border-subtle bg-cfb-surface text-cfb-text-primary shadow-[0_16px_44px_rgba(2,6,23,0.46)] sm:mb-0 sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:rounded-lg",
           palette.glow
@@ -526,7 +566,7 @@ export function PlayerCardModal({
           title={title}
         />
 
-        <nav className="flex gap-1 overflow-x-auto border-b border-white/10 bg-black/18 px-3 pt-1 sm:gap-3 sm:flex-wrap sm:overflow-visible sm:px-8 sm:pt-2 lg:grid lg:grid-cols-7 lg:gap-0 lg:px-0 lg:pt-0">
+        <nav aria-label="Player card sections" role="tablist" className="flex gap-1 overflow-x-auto border-b border-white/10 bg-black/18 px-3 pt-1 sm:gap-3 sm:flex-wrap sm:overflow-visible sm:px-8 sm:pt-2 lg:grid lg:grid-cols-7 lg:gap-0 lg:px-0 lg:pt-0">
           {visiblePlayerCardTabs(hasLeagueContext).map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -534,6 +574,10 @@ export function PlayerCardModal({
               <button
                 key={tab.id}
                 type="button"
+                role="tab"
+                aria-selected={active}
+                aria-controls="player-card-panel"
+                id={`player-card-tab-${tab.id}`}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
                   "relative inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-2 py-2.5 text-[9px] font-semibold uppercase tracking-[0.06em] transition after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/80 sm:gap-2 sm:px-1 sm:text-[10px] sm:tracking-[0.12em] lg:justify-center lg:px-2",
@@ -550,6 +594,9 @@ export function PlayerCardModal({
         </nav>
 
         <div
+          id="player-card-panel"
+          role="tabpanel"
+          aria-labelledby={`player-card-tab-${activeTab}`}
           data-testid="player-card-scroll-area"
           tabIndex={0}
           aria-label="Player card details"

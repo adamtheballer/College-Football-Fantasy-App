@@ -798,13 +798,17 @@ export default function LeagueWaivers() {
             Loading league-specific available players…
           </p>
         ) : waiverQuery.isError ? (
-          <p className="px-5 py-6 text-sm font-semibold text-cfb-text-secondary">
-            {waiverBoardLoadMessage(playerBoardScope)}
-          </p>
+          <div className="flex flex-col items-start gap-3 px-5 py-6 text-sm font-semibold text-cfb-text-secondary">
+            <p>{waiverBoardLoadMessage(playerBoardScope)}</p>
+            <Button type="button" variant="outline" onClick={() => void waiverQuery.refetch()}>Retry</Button>
+          </div>
         ) : filteredPlayers.length === 0 ? (
-          <p className="px-5 py-6 text-sm text-slate-400">
-            No league-scoped available players match the current filters.
-          </p>
+          <div className="flex flex-col items-start gap-3 px-5 py-6 text-sm text-slate-400">
+            <p>No league-scoped available players match the current filters.</p>
+            {(search || position !== "ALL") ? (
+              <Button type="button" variant="outline" onClick={() => { setSearch(""); setPosition("ALL"); }}>Clear filters</Button>
+            ) : null}
+          </div>
         ) : (
           <>
             <div className="divide-y divide-cfb-border-subtle 2xl:hidden">
@@ -826,6 +830,7 @@ export default function LeagueWaivers() {
                   tabIndex={0}
                   onClick={() => setSelectedPlayer(player)}
                   onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return;
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
                       setSelectedPlayer(player);
@@ -932,6 +937,7 @@ export default function LeagueWaivers() {
                       tabIndex={0}
                       onClick={() => setSelectedPlayer(player)}
                       onKeyDown={(event) => {
+                        if (event.target !== event.currentTarget) return;
                         if (event.key === "Enter" || event.key === " ") {
                           event.preventDefault();
                           setSelectedPlayer(player);

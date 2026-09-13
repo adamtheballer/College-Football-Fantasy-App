@@ -1386,7 +1386,7 @@ export default function Draft() {
               </div>
             ) : playersError ? (
               <div className="flex min-h-40 items-center justify-center px-6 text-center text-[10px] font-black uppercase tracking-[0.22em] text-red-300">
-                {formatApiError(playersErrorObject, "Unable to load players. Start the backend API and try again.")}
+                {formatApiError(playersErrorObject, "Unable to load players right now. Please try again in a moment.")}
               </div>
             ) : visiblePlayers.length === 0 ? (
               <div className="flex min-h-40 items-center justify-center px-6 text-center text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">

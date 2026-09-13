@@ -184,6 +184,7 @@ export function LeagueMatchupCarousel({
         className="flex min-w-0 max-w-full snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-1 touch-pan-x [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {carouselLeagues.map((league, index) => {
+          const isLoopClone = hasLoop && (index === 0 || index === carouselLeagues.length - 1);
           const summary = league.current_user_summary;
           const chance = probabilityPair(league);
           const active = league.id === activeLeagueId;
@@ -194,6 +195,8 @@ export function LeagueMatchupCarousel({
               key={`${league.id}-${index}`}
               data-testid={`league-carousel-card-${league.id}-${index}`}
               type="button"
+              tabIndex={isLoopClone ? -1 : undefined}
+              aria-hidden={isLoopClone || undefined}
               ref={(element) => {
                 if (element) cardRefs.current.set(index, element);
                 else cardRefs.current.delete(index);
