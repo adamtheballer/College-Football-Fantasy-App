@@ -1096,6 +1096,9 @@ test.describe("critical browser workflows", () => {
     let draftRoom = {
       league_id: 1,
       draft_id: 21,
+      draft_version: 1,
+      server_time: new Date().toISOString(),
+      current_pick_deadline: new Date(Date.now() + 90_000).toISOString(),
       status: "on_clock",
       pick_timer_seconds: 90,
       roster_slots: { QB: 1, RB: 2, WR: 2, TE: 1, K: 1, BENCH: 4, IR: 1 },
@@ -1184,6 +1187,9 @@ test.describe("critical browser workflows", () => {
         current_team_id: 12,
         current_team_name: "Other Team",
         can_make_pick: false,
+        draft_version: 2,
+        server_time: new Date().toISOString(),
+        current_pick_deadline: new Date(Date.now() + 90_000).toISOString(),
       };
 
       await route.fulfill({

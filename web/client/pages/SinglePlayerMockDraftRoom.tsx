@@ -8,6 +8,9 @@ import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { DraftRoomVisuals, draftMatteControlClass, draftMattePanelClass } from "@/components/DraftRoomVisuals";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { PickConfirmationStrip } from "@/components/draft/PickConfirmationStrip";
+import { usePickConfirmation } from "@/hooks/use-pick-confirmation";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useDraftPlayerPool, usePlayerCard, usePlayerDetail } from "@/hooks/use-players";
 import { buildDraftBoard, type DraftPlayer } from "@/lib/draftRankings";
@@ -342,8 +345,17 @@ export default function SinglePlayerMockDraftRoom() {
   const secondsRemaining = getSecondsRemaining(draftState, now);
   const timerDanger = isPickTimerDanger(draftState, secondsRemaining);
   const userOnClock = isUserOnClock(draftState);
+  const canPick = userOnClock && secondsRemaining > 0;
+  const exhausted = draftState.completionReason === "pool_exhausted";
   const draftedCount = draftState.picks.length;
   const latestPick = draftState.picks[draftState.picks.length - 1];
+  const confirmedPicks = useMemo(() => draftState.picks.map((pick) => ({
+    key: `${pick.overallPick}:${pick.playerId}`, number: pick.overallPick, teamId: pick.teamId,
+    playerId: pick.playerId, name: pick.playerName, school: pick.school,
+    position: pick.position, auto: pick.pickedBy === "auto",
+    imageUrl: draftBoard.find((player) => player.id === pick.playerId)?.imageUrl,
+  })), [draftState.picks, draftBoard]);
+  const confirmation = usePickConfirmation(`mock:${draftState.id}:${draftState.userTeamId}`, confirmedPicks, draftState.userTeamId);
   const historyRounds = useMemo(() => groupPicksByRound(draftState.picks), [draftState.picks]);
 
   const draftOrderPicks = useMemo(
@@ -408,12 +420,15 @@ export default function SinglePlayerMockDraftRoom() {
 
   const draftPlayer = (playerId: number) => {
     setError(null);
-    try {
-      setDraftState((current) => makeUserMockPick(current, draftBoard, playerId));
-      setActiveTab("draft");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to make pick.");
-    }
+    // Validate inside the committed state update, not only against the render's
+    // clock. React may run this updater after a timeout/bot update has queued.
+    setDraftState((current) => {
+      try { return makeUserMockPick(current, draftBoard, playerId); }
+      catch (err) {
+        queueMicrotask(() => setError(err instanceof Error ? err.message : "Unable to make pick."));
+        return current;
+      }
+    });
   };
 
   const toggleQueue = (playerId: number) => {
@@ -497,7 +512,7 @@ export default function SinglePlayerMockDraftRoom() {
             const visibleRank = player.masterDraftRank ?? player.draftRank;
             const isLegalForCurrentPick = draftablePlayerIds.has(player.id);
             const actionIsDraft = userOnClock && draftState.status === "live";
-            const actionIsDisabled = actionIsDraft && !isLegalForCurrentPick;
+            const actionIsDisabled = actionIsDraft && (!canPick || !isLegalForCurrentPick);
             return (
               <div
                 key={player.id}
@@ -506,6 +521,7 @@ export default function SinglePlayerMockDraftRoom() {
                 tabIndex={0}
                 onClick={() => setSelectedPlayerId(player.id)}
                 onKeyDown={(event) => {
+                  if (event.target !== event.currentTarget) return;
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
                     setSelectedPlayerId(player.id);
@@ -622,7 +638,7 @@ export default function SinglePlayerMockDraftRoom() {
                 <Button variant="outline" className="h-10 flex-1 rounded-2xl text-[10px] font-black uppercase tracking-[0.14em]" onClick={() => toggleQueue(player.id)}>
                   Remove
                 </Button>
-                <Button className="h-10 flex-1 rounded-2xl bg-cfb-brand text-[10px] font-black uppercase tracking-[0.14em] text-slate-950 hover:bg-cfb-brand/90" disabled={!userOnClock || draftState.status !== "live" || !isLegalForCurrentPick} onClick={() => draftPlayer(player.id)}>
+                <Button className="h-10 flex-1 rounded-2xl bg-cfb-brand text-[10px] font-black uppercase tracking-[0.14em] text-slate-950 hover:bg-cfb-brand/90" disabled={!canPick || !isLegalForCurrentPick} onClick={() => draftPlayer(player.id)}>
                   {isLegalForCurrentPick ? "Draft" : "No Slot"}
                 </Button>
               </div>
@@ -770,13 +786,13 @@ export default function SinglePlayerMockDraftRoom() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[9px] font-black uppercase tracking-[0.12em] text-muted-foreground">On the clock · Pick {getRoundNumber(draftState.currentPick, teamCount)}.{getRoundPick(draftState.currentPick, teamCount)}</p>
-            <p className="truncate text-sm font-black text-cyan-100">{draftState.status === "complete" ? "Draft complete" : currentTeam?.name ?? "Loading"}</p>
+            <p className="truncate text-[9px] font-black uppercase tracking-[0.12em] text-muted-foreground">{draftState.status === "complete" ? "Draft results" : "On the clock"} · Pick {getRoundNumber(draftState.currentPick, teamCount)}.{getRoundPick(draftState.currentPick, teamCount)}</p>
+            <p className="truncate text-sm font-black text-cyan-100">{draftState.status === "complete" ? exhausted ? "Draft stopped" : "Draft complete" : currentTeam?.name ?? "Loading"}</p>
           </div>
-          <div className={cn("shrink-0 text-right", timerDanger ? "text-red-300" : "text-cyan-100")}>
+          {draftState.status !== "complete" ? <div className={cn("shrink-0 text-right", timerDanger ? "text-red-300" : "text-cyan-100")}>
             <p className="text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground">Timer</p>
             <p className="text-2xl font-black leading-none tabular-nums">{formatTimer(secondsRemaining)}</p>
-          </div>
+          </div> : null}
           <Button
             type="button"
             variant="outline"
@@ -807,7 +823,7 @@ export default function SinglePlayerMockDraftRoom() {
             </Button>
           </div>
 
-          <div className="pointer-events-none order-3 flex w-full justify-center sm:fixed sm:left-1/2 sm:top-3 sm:z-[1250] sm:w-auto sm:-translate-x-1/2">
+          {draftState.status !== "complete" ? <div className="pointer-events-none order-3 flex w-full justify-center sm:fixed sm:left-1/2 sm:top-3 sm:z-[1250] sm:w-auto sm:-translate-x-1/2">
             <div
               className={cn(
                   "rounded-3xl border border-cfb-border-subtle bg-cfb-surface-raised/95 px-6 py-3 text-center shadow-[0_10px_24px_rgba(0,0,0,0.30)] backdrop-blur-sm transition sm:px-8",
@@ -817,7 +833,7 @@ export default function SinglePlayerMockDraftRoom() {
               )}
             >
               <p className="text-[9px] font-black uppercase tracking-[0.26em] text-muted-foreground">
-                {draftState.status === "intermission" ? "Draft Starts In" : draftState.status === "complete" ? "Draft Complete" : "Pick Timer"}
+                {draftState.status === "intermission" ? "Draft Starts In" : "Pick Timer"}
               </p>
               <p
                 className={cn(
@@ -828,7 +844,7 @@ export default function SinglePlayerMockDraftRoom() {
                 {formatTimer(secondsRemaining)}
               </p>
             </div>
-          </div>
+          </div> : null}
 
           <div className="flex flex-wrap items-center justify-end gap-3">
             <div className="rounded-3xl border border-cfb-border-subtle bg-cfb-surface-raised/95 px-6 py-4 text-right shadow-[0_10px_24px_rgba(0,0,0,0.30)] backdrop-blur-sm">
@@ -846,7 +862,7 @@ export default function SinglePlayerMockDraftRoom() {
               )}
             >
               <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">On Clock</p>
-              <p className="text-xl font-black uppercase text-cyan-100">{draftState.status === "complete" ? "Complete" : currentTeam?.name ?? "Loading"}</p>
+              <p className="text-xl font-black uppercase text-cyan-100">{draftState.status === "complete" ? exhausted ? "Stopped" : "Complete" : currentTeam?.name ?? "Loading"}</p>
             </div>
             <Button variant="outline" className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface-raised/90 px-5 text-[10px] font-black uppercase tracking-[0.18em] text-white hover:bg-cfb-surface-hover" onClick={resetDraft}>
               <RefreshCcw className="mr-2 h-4 w-4" /> Reset
@@ -858,11 +874,8 @@ export default function SinglePlayerMockDraftRoom() {
           <div className="rounded-2xl border border-red-300/20 bg-red-400/10 p-4 text-sm font-bold text-red-100">{error}</div>
         ) : null}
 
-        {latestPick ? (
-          <div className="flex min-w-0 shrink-0 items-center rounded-xl border border-cyan-300/15 bg-cyan-400/10 px-3 py-2 text-[9px] font-black uppercase tracking-[0.08em] text-cyan-100 sm:mx-auto sm:w-fit sm:rounded-full sm:px-5 sm:text-[10px] sm:tracking-[0.18em]">
-            <span className="shrink-0">Last pick&nbsp;</span><span className="truncate text-white">{latestPick.playerName}</span><span className="shrink-0">&nbsp;to&nbsp;{latestPick.teamName}</span>
-          </div>
-        ) : null}
+        {draftState.status === "live" && secondsRemaining === 0 ? <p role="status" className="p-3 text-sm text-amber-200">Time expired · Auto-pick pending</p> : null}
+        <PickConfirmationStrip pick={confirmation.pick} onFinish={confirmation.finish} lastPick={latestPick ? { name: latestPick.playerName, team: latestPick.teamName } : undefined} />
 
         <section data-testid="mobile-draft-order" className={cn("shrink-0 overflow-hidden sm:hidden", draftMattePanelClass)}>
           <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
@@ -1027,31 +1040,27 @@ export default function SinglePlayerMockDraftRoom() {
 
       {renderScoutingPanel()}
 
-      {draftState.status === "complete" && showCompleteDialog ? (
-        <div className="fixed inset-0 z-[1450] flex items-center justify-center bg-slate-950/58 px-4 backdrop-blur-[7px]">
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="mock-draft-complete-title"
-            className="w-full max-w-[720px] overflow-hidden rounded-[2rem] border border-cfb-border-subtle bg-cfb-surface-raised text-center shadow-[0_16px_44px_rgba(0,0,0,0.34)]"
-          >
+      {draftState.status === "complete" && showCompleteDialog && !confirmation.pending ? (
+        <Dialog open onOpenChange={setShowCompleteDialog}>
+          <DialogContent overlayClassName="z-[1450]" className="z-[1451] max-w-[720px] gap-0 p-0 text-center sm:p-0" onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            document.querySelector<HTMLButtonElement>('[data-testid="draft-room-tabs"] button[aria-current="page"]')?.focus();
+          }}>
             <div className="border-b border-cfb-border-subtle bg-cfb-surface px-8 py-10">
               <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl border border-cfb-brand/30 bg-cfb-brand/10 text-cfb-brand">
                 <Trophy className="h-10 w-10" />
               </div>
               <p className="mt-6 text-[10px] font-black uppercase tracking-[0.28em] text-cfb-brand">
-                Mock Draft Complete
+                {exhausted ? "Mock draft stopped" : "Mock Draft Complete"}
               </p>
-              <h2
-                id="mock-draft-complete-title"
+              <DialogTitle
                 className="mt-3 text-4xl font-black uppercase tracking-tight text-white md:text-5xl"
               >
-                Draft Complete
-              </h2>
-              <p className="mx-auto mt-4 max-w-md text-sm font-bold leading-6 text-muted-foreground">
-                {totalPicks} picks completed. This single-player mock draft did not mutate real leagues,
-                rosters, standings, or transactions.
-              </p>
+                {exhausted ? "Player pool exhausted" : "Draft Complete"}
+              </DialogTitle>
+              <DialogDescription className="mx-auto mt-4 max-w-md text-sm font-bold leading-6 text-muted-foreground">
+                {draftState.picks.length} of {totalPicks} picks completed. {exhausted ? "No eligible player remains for the next roster slot. Review these results or start a new mock." : "Your mock roster is ready to review."} Your real leagues and rosters are unchanged.
+              </DialogDescription>
             </div>
             <div className="grid gap-3 px-8 py-6 sm:grid-cols-3">
               <Button
@@ -1080,8 +1089,8 @@ export default function SinglePlayerMockDraftRoom() {
                 Start New Mock
               </Button>
             </div>
-          </section>
-        </div>
+          </DialogContent>
+        </Dialog>
       ) : null}
 
       <div data-testid="draft-room-tabs" className="fixed inset-x-0 bottom-0 z-[1200] border-t border-cfb-border-subtle bg-cfb-surface-raised/96 p-0 shadow-[0_-8px_24px_rgba(0,0,0,0.26)] backdrop-blur-xl sm:pointer-events-none sm:inset-x-auto sm:bottom-3 sm:left-1/2 sm:flex sm:w-[min(100vw-3rem,60rem)] sm:-translate-x-1/2 sm:border-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:shadow-none sm:backdrop-blur-none">
