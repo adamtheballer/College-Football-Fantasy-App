@@ -566,7 +566,7 @@ export function PlayerCardModal({
           title={title}
         />
 
-        <nav aria-label="Player card sections" role="tablist" className="flex gap-1 overflow-x-auto border-b border-white/10 bg-black/18 px-3 pt-1 sm:gap-3 sm:flex-wrap sm:overflow-visible sm:px-8 sm:pt-2 lg:grid lg:grid-cols-7 lg:gap-0 lg:px-0 lg:pt-0">
+        <nav aria-label="Player card sections" className="flex gap-1 overflow-x-auto border-b border-white/10 bg-black/18 px-3 pt-1 sm:gap-3 sm:flex-wrap sm:overflow-visible sm:px-8 sm:pt-2 lg:grid lg:grid-cols-7 lg:gap-0 lg:px-0 lg:pt-0">
           {visiblePlayerCardTabs(hasLeagueContext).map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -574,10 +574,7 @@ export function PlayerCardModal({
               <button
                 key={tab.id}
                 type="button"
-                role="tab"
-                aria-selected={active}
-                aria-controls="player-card-panel"
-                id={`player-card-tab-${tab.id}`}
+                aria-pressed={active}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
                   "relative inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-2 py-2.5 text-[9px] font-semibold uppercase tracking-[0.06em] transition after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/80 sm:gap-2 sm:px-1 sm:text-[10px] sm:tracking-[0.12em] lg:justify-center lg:px-2",
@@ -594,9 +591,6 @@ export function PlayerCardModal({
         </nav>
 
         <div
-          id="player-card-panel"
-          role="tabpanel"
-          aria-labelledby={`player-card-tab-${activeTab}`}
           data-testid="player-card-scroll-area"
           tabIndex={0}
           aria-label="Player card details"

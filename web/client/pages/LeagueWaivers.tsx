@@ -877,7 +877,7 @@ export default function LeagueWaivers() {
                     <Button
                       type="button"
                       variant="outline"
-                      aria-label={watching ? "Watching" : "Watch"}
+                      aria-label={watching ? `Remove ${player.name} from watchlist` : "Watch"}
                       onClick={(event) => {
                         event.stopPropagation();
                         void handleWatchPlayer(player.id);
@@ -913,7 +913,7 @@ export default function LeagueWaivers() {
                   <th className="w-40 px-3 py-3">Opponent</th>
                   <th className="w-20 px-3 py-3">POS</th>
                   <th className="w-24 px-3 py-3">POS RK</th>
-                  <th className={`w-32 px-3 py-3 ${playerBoardScope === "all" ? "text-left" : "text-right"}`}>
+                  <th className={`w-40 px-3 py-3 ${playerBoardScope === "all" ? "text-left" : "text-right"}`}>
                     Week {displayWeek} Pts
                   </th>
                   <th className="w-32 px-4 py-3 text-right">Action</th>
@@ -988,7 +988,7 @@ export default function LeagueWaivers() {
                           {waiverPositionRankLabel(player)}
                         </span>
                       </td>
-                      <td className={`w-32 px-3 py-3 align-middle ${playerBoardScope === "all" ? "text-left" : "text-right"}`}>
+                      <td className={`w-40 px-3 py-3 align-middle ${playerBoardScope === "all" ? "text-left" : "text-right"}`}>
                         <span
                           data-testid={`waiver-week-points-${player.id}`}
                           className={`text-lg font-semibold tabular-nums ${waiverWeekPointsClassName(weekPoints)}`}

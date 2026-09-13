@@ -58,7 +58,7 @@ describe("PlayerCardModal game log", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("tab", { name: "Game Log" }));
+    fireEvent.click(screen.getByRole("button", { name: "Game Log" }));
 
     const tableContainer = screen.getByTestId("player-game-log-table");
     expect(tableContainer.className).toContain("overflow-x-auto");
