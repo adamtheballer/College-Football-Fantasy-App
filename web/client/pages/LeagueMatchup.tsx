@@ -1,4 +1,4 @@
-import { Bell, ChevronLeft, ChevronRight, Clock3, MessageCircle, ShieldAlert } from "lucide-react";
+import { Bell, Clock3, MessageCircle, ShieldAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
@@ -191,8 +191,6 @@ function CompactMatchupScoreboard({
   matchupIndex,
   matchupCount,
   status,
-  onPreviousMatchup,
-  onNextMatchup,
 }: {
   data: LeagueMatchupTabResponse;
   myTeam: LeagueMatchupTeam | null;
@@ -201,8 +199,6 @@ function CompactMatchupScoreboard({
   matchupIndex: number;
   matchupCount: number;
   status: string;
-  onPreviousMatchup: () => void;
-  onNextMatchup: () => void;
 }) {
   const winChance = probabilityPair(myTeam?.win_probability, opponentTeam?.win_probability);
   const displayedWinChance = winChance ? displayedProbabilityPair(winChance.my, winChance.opponent) : null;
@@ -215,7 +211,7 @@ function CompactMatchupScoreboard({
       </h2>
       {matchupCount > 1 ? (
         <div
-          aria-label={`Matchup ${matchupIndex + 1} of ${matchupCount}. Use the previous and next controls or swipe to view another matchup.`}
+          aria-label={`Matchup ${matchupIndex + 1} of ${matchupCount}. Swipe horizontally to view another matchup.`}
           className="absolute right-3 top-2 flex items-center gap-1 sm:right-5"
         >
           {Array.from({ length: matchupCount }, (_, index) => (
@@ -227,26 +223,6 @@ function CompactMatchupScoreboard({
               }`}
             />
           ))}
-        </div>
-      ) : null}
-      {matchupCount > 1 ? (
-        <div className="absolute left-3 top-2 flex items-center gap-1 sm:left-1/2 sm:-translate-x-1/2">
-          <button
-            type="button"
-            aria-label="Previous matchup"
-            onClick={onPreviousMatchup}
-            className="cfb-icon-button h-7 w-7"
-          >
-            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            aria-label="Next matchup"
-            onClick={onNextMatchup}
-            className="cfb-icon-button h-7 w-7"
-          >
-            <ChevronRight className="h-4 w-4" aria-hidden="true" />
-          </button>
         </div>
       ) : null}
       <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:gap-5">
@@ -486,8 +462,6 @@ export default function LeagueMatchup() {
                 matchupIndex={activeMatchupIndex}
                 matchupCount={scheduledMatchups.length}
                 status={presentationStatus}
-                onPreviousMatchup={() => selectAdjacentMatchup(-1)}
-                onNextMatchup={() => selectAdjacentMatchup(1)}
               />
             </div>
             <div className="mt-3 border-y border-cfb-border-subtle bg-cfb-surface px-4 py-3 sm:px-5"><p className="cfb-section-title text-base">Starters</p></div>

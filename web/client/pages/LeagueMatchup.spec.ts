@@ -167,7 +167,9 @@ describe("league matchup scoreboard", () => {
     expect(screen.getByTestId("matchup-scoreboard").parentElement?.className).not.toContain("sticky");
     expect(screen.getByRole("heading", { name: "Updated Adam's Team vs Taylor's Team" })).toBeTruthy();
     expect(screen.queryByRole("region", { name: "League matchups" })).toBeNull();
-    expect(screen.getByLabelText("Matchup 1 of 2. Use the previous and next controls or swipe to view another matchup.")).toBeTruthy();
+    expect(screen.getByLabelText("Matchup 1 of 2. Swipe horizontally to view another matchup.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Previous matchup" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Next matchup" })).toBeNull();
     expect(
       screen
         .queryAllByText("Projected", { exact: true })
@@ -259,13 +261,10 @@ describe("league matchup scoreboard", () => {
     expect(nextParams.toString()).toBe("week=1&matchup=2");
   });
 
-  it("provides desktop previous and next matchup controls", () => {
+  it("uses swipe navigation without rendering controls over the team avatars", () => {
     render(createElement(LeagueMatchup));
 
-    fireEvent.click(screen.getByRole("button", { name: "Next matchup" }));
-
-    expect(routerMocks.setSearchParams).toHaveBeenCalledTimes(1);
-    const nextParams = routerMocks.setSearchParams.mock.calls[0][0] as URLSearchParams;
-    expect(nextParams.toString()).toBe("week=1&matchup=2");
+    expect(screen.queryByRole("button", { name: "Previous matchup" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Next matchup" })).toBeNull();
   });
 });
