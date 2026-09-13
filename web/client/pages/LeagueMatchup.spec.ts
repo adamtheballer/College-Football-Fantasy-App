@@ -164,7 +164,11 @@ describe("league matchup scoreboard", () => {
     expect(screen.queryByText("Rival Week")).toBeNull();
     expect(screen.queryByText("Permanent rival")).toBeNull();
     expect(screen.getByText("Week 1 matchup")).toBeTruthy();
-    expect(screen.getByTestId("matchup-scoreboard").parentElement?.className).not.toContain("sticky");
+    const scoreboard = screen.getByTestId("matchup-scoreboard");
+    expect(scoreboard.className).toContain("sticky");
+    expect(scoreboard.className).toContain("top-0");
+    expect(scoreboard.className).toContain("z-40");
+    expect(scoreboard.className).toContain("bg-cfb-surface");
     expect(screen.getByRole("heading", { name: "Updated Adam's Team vs Taylor's Team" })).toBeTruthy();
     expect(screen.queryByRole("region", { name: "League matchups" })).toBeNull();
     expect(screen.getByLabelText("Matchup 1 of 2. Swipe horizontally to view another matchup.")).toBeTruthy();

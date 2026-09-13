@@ -1821,6 +1821,33 @@ test.describe("critical browser workflows", () => {
     const appScroll = page.locator("main[data-app-scroll='true']");
     await expect(appViewport).toHaveCSS("overflow-x", "clip");
     await expect(appScroll).toHaveCSS("overflow-x", "hidden");
+    const scoreboard = page.getByTestId("matchup-scoreboard");
+    await expect(scoreboard).toHaveCSS("position", "sticky");
+    // Use a compact phone viewport so this short fixture has enough overflow
+    // to exercise the app shell's real scroll owner.
+    await page.setViewportSize({ width: 390, height: 500 });
+    await appScroll.evaluate((scroller) => scroller.scrollTo({ top: 520, behavior: "auto" }));
+    await expect.poll(() => appScroll.evaluate((scroller) => scroller.scrollTop)).toBeGreaterThan(0);
+    const stickyScoreboard = await page.evaluate(() => {
+      const scroller = document.querySelector<HTMLElement>("main[data-app-scroll='true']");
+      const scoreboard = document.querySelector<HTMLElement>("[data-testid='matchup-scoreboard']");
+      const bar = document.querySelector<HTMLElement>("[data-testid='scoreboard-win-chance-left-bar']");
+      if (!scroller || !scoreboard || !bar) throw new Error("Sticky matchup scoreboard was not rendered");
+      const scrollerBox = scroller.getBoundingClientRect();
+      const scoreboardBox = scoreboard.getBoundingClientRect();
+      const barBox = bar.getBoundingClientRect();
+      return {
+        scrollerTop: scrollerBox.top,
+        scoreboardTop: scoreboardBox.top,
+        scoreboardBottom: scoreboardBox.bottom,
+        barTop: barBox.top,
+        backgroundColor: getComputedStyle(scoreboard).backgroundColor,
+      };
+    });
+    expect(Math.abs(stickyScoreboard.scoreboardTop - stickyScoreboard.scrollerTop)).toBeLessThanOrEqual(1);
+    expect(stickyScoreboard.barTop).toBeGreaterThan(stickyScoreboard.scoreboardTop);
+    expect(stickyScoreboard.barTop).toBeLessThan(stickyScoreboard.scoreboardBottom);
+    expect(stickyScoreboard.backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
     expect(
       await page.evaluate(() => {
         return new Promise((resolve) => {
