@@ -90,6 +90,8 @@ describe("LeagueMatchupCarousel", () => {
       expect(screen.getByTestId("league-carousel-pagination").getAttribute("aria-label")).toBe("Showing league 2 of 2");
     });
     expect(screen.getAllByTestId("league-carousel-pagination").flatMap((pagination) => Array.from(pagination.children)).map((dot) => dot.getAttribute("data-active"))).toEqual(["false", "true"]);
+    expect(screen.getByTestId("league-carousel-glow-progress").getAttribute("data-active-index")).toBe("1");
+    expect(screen.getByTestId("league-carousel-glow-progress").getAttribute("data-progress")).toBe("100.00");
   });
 
   it("loops from the final league clone back to the first league without widening the page", async () => {

@@ -836,7 +836,7 @@ export default function LeagueWaivers() {
                       setSelectedPlayer(player);
                     }
                   }}
-                  className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-cfb-surface-hover focus:outline-none focus-visible:bg-cfb-surface-hover"
+                  className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-3 py-3 text-left transition-colors hover:bg-cfb-surface-hover focus:outline-none focus-visible:bg-cfb-surface-hover sm:gap-3 sm:px-4"
                   data-testid={`waiver-mobile-player-row-${player.id}`}
                 >
                   <span
@@ -864,8 +864,8 @@ export default function LeagueWaivers() {
                     ) : null}
                     <PlayerPopularityMetrics popularity={player.popularity} />
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <div className="text-right">
+                  <div className="grid shrink-0 grid-cols-[3.75rem_2.25rem_4rem] items-center gap-1.5 sm:gap-2">
+                    <div className="min-w-[3.75rem] text-right">
                       <p className="text-[8px] font-black uppercase tracking-[0.1em] text-cfb-text-muted">{weekPoints.isFinal ? `W${weekPoints.finalWeek ?? displayWeek} final` : `W${displayWeek}`}</p>
                       <p
                         data-testid={`waiver-mobile-week-points-${player.id}`}
@@ -894,7 +894,7 @@ export default function LeagueWaivers() {
                         event.stopPropagation();
                         openClaimDialog(player);
                       }}
-                      className="h-9 rounded-md bg-cfb-brand px-3 text-[9px] font-black uppercase tracking-[0.1em] text-cfb-canvas shadow-none hover:bg-cfb-brand-hover disabled:opacity-50"
+                      className="h-9 min-w-16 rounded-md bg-cfb-brand px-2 text-[9px] font-black uppercase tracking-[0.1em] text-cfb-canvas shadow-none hover:bg-cfb-brand-hover disabled:opacity-50"
                     >
                       {claimable ? (player.availability_state === "free_agent" ? "Add" : "Claim") : availabilityLabel(player.availability_state)}
                     </Button>

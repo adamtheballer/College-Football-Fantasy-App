@@ -62,6 +62,8 @@ describe("PlayerCardModal game log", () => {
 
     const tableContainer = screen.getByTestId("player-game-log-table");
     expect(tableContainer.className).toContain("overflow-x-auto");
+    expect(tableContainer.className).toContain("border-y");
+    expect(tableContainer.className).not.toContain("rounded");
     expect(tableContainer.querySelector("table")).toBeTruthy();
     expect(screen.getByRole("columnheader", { name: "Opponent" })).toBeTruthy();
     expect(screen.getByText("vs. UCLA")).toBeTruthy();

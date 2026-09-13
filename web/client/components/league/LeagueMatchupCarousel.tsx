@@ -63,6 +63,9 @@ export function LeagueMatchupCarousel({
   const hasLoop = leagues.length > 1;
   const leagueOrderKey = leagues.map((league) => league.id).join(",");
   const carouselLeagues = hasLoop ? [leagues[leagues.length - 1], ...leagues, leagues[0]] : leagues;
+  const carouselProgress = leagues.length > 1
+    ? (visibleLeagueIndex / (leagues.length - 1)) * 100
+    : 0;
 
   const nearestCardIndex = useCallback(() => {
     const rail = railRef.current;
@@ -145,6 +148,23 @@ export function LeagueMatchupCarousel({
 
   return (
     <section aria-labelledby="league-matchup-carousel-title">
+      <div
+        aria-label={`League carousel position: ${visibleLeagueIndex + 1} of ${leagues.length}`}
+        aria-valuemax={Math.max(leagues.length - 1, 0)}
+        aria-valuemin={0}
+        aria-valuenow={visibleLeagueIndex}
+        data-active-index={visibleLeagueIndex}
+        data-progress={carouselProgress.toFixed(2)}
+        data-testid="league-carousel-glow-progress"
+        role="progressbar"
+        className="relative mb-3 h-px overflow-hidden bg-cfb-brand/25 sm:mb-4"
+      >
+        <span
+          aria-hidden="true"
+          className="absolute top-0 h-px w-12 rounded-full bg-gradient-to-r from-cfb-gold via-cfb-brand to-cfb-brand/15 shadow-[0_0_14px_rgba(74,169,255,0.9)] transition-[left] duration-500 ease-out motion-reduce:transition-none"
+          style={{ left: `calc(${carouselProgress}% - ${carouselProgress * 0.48}px)` }}
+        />
+      </div>
       <div className="mb-3 flex items-center justify-between gap-3 px-1 sm:mb-4">
         <div>
           <p className="cfb-micro-label text-cfb-brand">Your leagues</p>
