@@ -366,9 +366,12 @@ test.describe("critical browser workflows", () => {
     const pagination = page.getByTestId("league-carousel-pagination");
     const glowProgress = page.getByTestId("league-carousel-glow-progress");
     const rail = page.getByLabel("Swipe through your league matchups");
+    const homeHeader = page.locator(".cfb-home-league-header");
     await expect(pagination).toHaveAttribute("aria-label", "Showing league 1 of 2");
     await expect(glowProgress).toHaveAttribute("data-progress", "0.00");
     await expect(rail).toBeVisible();
+    await expect(homeHeader).toBeVisible();
+    await expect(homeHeader.evaluate((element) => getComputedStyle(element, "::after").display)).resolves.toBe("none");
     await expect(page.getByTestId("league-carousel-card-2-1")).toBeVisible();
     expect(await rail.evaluate((element) => element.scrollWidth > element.clientWidth)).toBeTruthy();
 

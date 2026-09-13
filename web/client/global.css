@@ -413,6 +413,13 @@
     background: linear-gradient(90deg, hsl(45 84% 59% / 0.72), hsl(207 90% 63% / 0.42) 34%, transparent 72%);
   }
 
+  /* The home league carousel owns the only animated divider in this area.
+   * Suppress PageHeader's static decorative rule so the two treatments do
+   * not render as duplicate glowing bars on narrow screens. */
+  .cfb-home-league-header::after {
+    display: none;
+  }
+
   .cfb-stat-card {
     box-shadow:
       inset 0 1px 0 hsl(210 40% 96% / 0.045),
