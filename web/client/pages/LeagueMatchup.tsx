@@ -209,7 +209,7 @@ function CompactMatchupScoreboard({
   const myTeamIsLeading = Boolean(winChance && winChance.my >= winChance.opponent);
 
   return (
-    <section className="relative border-b border-cfb-border-subtle bg-cfb-surface-raised/50 px-3 pb-3 pt-6 sm:px-5 sm:pb-4 sm:pt-7">
+    <section data-testid="matchup-scoreboard" className="relative border-b border-cfb-border-subtle bg-cfb-surface-raised/50 px-3 pb-3 pt-6 sm:px-5 sm:pb-4 sm:pt-7">
       <h2 className="sr-only">
         {managerTeamName(myTeam, "Your team")} vs {managerTeamName(opponentTeam, "Opponent")}
       </h2>
@@ -477,7 +477,7 @@ export default function LeagueMatchup() {
                 <span className="text-amber-100/70">Playoffs</span>
               </div>
             ) : null}
-            <div className="sticky top-0 z-30">
+            <div className="relative">
               <CompactMatchupScoreboard
                 data={data}
                 myTeam={myTeam}
