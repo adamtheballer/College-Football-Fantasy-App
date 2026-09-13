@@ -544,7 +544,7 @@ export function PlayerCardModal({
       className="fixed inset-0 z-[1400] flex items-end justify-center overscroll-none bg-slate-950/78 p-4 backdrop-blur-md sm:items-center sm:p-6"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="player-card-title"
+      aria-label={`${player.name} player card`}
       onClick={onClose}
     >
       <article

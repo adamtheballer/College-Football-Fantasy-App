@@ -390,11 +390,14 @@ export default function Draft() {
   const adjustedNowMs = draftRoom ? draftServerNow(draftRoom, now) : now;
   const reconnecting = Boolean(draftRoom && (draftRoomError || draftRoomFailureCount > 0 || draftRoomPaused ||
     (isDraftActive && draftSnapshotAge(draftRoom, now) > 10_000)));
-  const expired = Boolean(draftRoom && isDraftPickExpired(draftRoom, now));
   const secondsRemaining =
     Number.isFinite(countdownDeadlineMs)
       ? Math.max(0, Math.ceil((countdownDeadlineMs - adjustedNowMs) / 1000))
       : draftRoom?.seconds_remaining ?? 0;
+  // The timer is rendered from the server-adjusted clock. Use that same
+  // authoritative display state as a final guard so a 0:00 pick can never
+  // remain actionable while a stale receipt timestamp is being reconciled.
+  const expired = Boolean(draftRoom && (isDraftPickExpired(draftRoom, now) || (isDraftActive && secondsRemaining === 0)));
   useEffect(() => {
     if (!draftRoom) return;
     const currentState = toDraftAudioState(draftRoom);

@@ -811,7 +811,7 @@ export default function LeagueWaivers() {
           </div>
         ) : (
           <>
-            <div className="divide-y divide-cfb-border-subtle 2xl:hidden">
+            <div className="divide-y divide-cfb-border-subtle lg:hidden">
             {filteredPlayers.map((player) => {
               const tone = positionTone(player.position);
               const weekPoints = waiverWeekPoints(
@@ -877,7 +877,7 @@ export default function LeagueWaivers() {
                     <Button
                       type="button"
                       variant="outline"
-                      aria-label={watching ? `Remove ${player.name} from watchlist` : `Watch ${player.name}`}
+                      aria-label={watching ? "Watching" : "Watch"}
                       onClick={(event) => {
                         event.stopPropagation();
                         void handleWatchPlayer(player.id);
@@ -903,7 +903,7 @@ export default function LeagueWaivers() {
               );
             })}
             </div>
-            <div className="hidden overflow-x-hidden 2xl:block">
+            <div className="hidden overflow-x-hidden lg:block">
             <table className="w-full table-fixed text-left">
               <thead className="border-b border-cfb-border-subtle bg-cfb-surface-raised">
                 <tr className="text-[10px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">
@@ -1010,7 +1010,7 @@ export default function LeagueWaivers() {
                               toggleWatchlistPlayer.isPending ||
                               watchlistsQuery.isError
                             }
-                            aria-label={watchedPlayerIds.has(player.id) ? `Remove ${player.name} from watchlist` : `Watch ${player.name}`}
+                            aria-label={watchedPlayerIds.has(player.id) ? "Watching" : "Watch"}
                             className="h-9 w-9 shrink-0 rounded-md border-cfb-border-subtle bg-cfb-surface-raised p-0 text-cfb-text-secondary transition-colors hover:border-cfb-border-strong hover:bg-cfb-surface-hover hover:text-cfb-text-primary"
                           >
                             <Sparkles className="h-3.5 w-3.5" />

@@ -49,8 +49,7 @@ export function PickConfirmationStrip({ pick, onFinish, lastPick }: Props) {
     <div
       data-testid="pick-context-strip"
       className={cn(
-        "pointer-events-none fixed inset-x-0 top-0 z-[1260] overflow-hidden border-b border-cfb-border-subtle/80 bg-cfb-surface/96 shadow-[0_6px_18px_rgba(0,0,0,0.2)] backdrop-blur-sm",
-        pick ? "h-24" : "h-9"
+        "pointer-events-none fixed inset-x-0 top-0 z-[1260] h-9 overflow-visible border-b border-cfb-border-subtle/80 bg-cfb-surface/96 shadow-[0_6px_18px_rgba(0,0,0,0.2)] backdrop-blur-sm"
       )}
     >
       <div className="flex h-full items-center justify-center gap-1 px-4 text-xs text-muted-foreground" aria-hidden={Boolean(pick)}>
