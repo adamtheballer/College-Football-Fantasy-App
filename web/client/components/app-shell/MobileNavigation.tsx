@@ -12,7 +12,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
-import { navDomId, type ShellNavItem } from "./navigation";
+import { isShellNavItemActive, navDomId, type ShellNavItem } from "./navigation";
 
 type MobileNavigationProps = {
   items: ShellNavItem[];
@@ -40,7 +40,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut, guidedN
     if (guidedNavItem) setIsMoreOpen(false);
   }, [guidedNavItem]);
   const isMoreActive = drawerItems.some(
-    (item) => item.path === pathname && !items.some((mobileItem) => mobileItem.name === item.name),
+    (item) => isShellNavItemActive(pathname, item) && !items.some((mobileItem) => mobileItem.name === item.name),
   );
   // Guests have three destinations; signed-in managers have four. Include the
   // More button in the grid calculation so neither state leaves a blank mobile
@@ -64,7 +64,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut, guidedN
         >
           {items.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.path;
+            const isActive = isShellNavItemActive(pathname, item);
             const isGuided = guidedNavItem === item.name;
 
             return (
@@ -73,7 +73,8 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut, guidedN
                 to={item.path}
                 data-nav-item="true"
                 data-guide-nav={item.name}
-                aria-label={item.badge ? `${item.name}: ${item.badge} unread chat messages` : item.name}
+                aria-current={isActive ? "page" : undefined}
+                aria-label={item.badge ? `${item.name}: ${item.badge} unread ${item.name === "CHATS" ? "chat messages" : item.name.toLowerCase()}` : item.name}
                 className={cn(
                   "font-ui relative flex min-h-[54px] min-w-0 flex-col items-center justify-center gap-1 rounded-sm px-0.5 text-[11px] font-semibold leading-none transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-transparent",
                   isGuided
@@ -147,7 +148,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut, guidedN
           <div className="grid gap-2">
             {drawerItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.path;
+              const isActive = isShellNavItemActive(pathname, item);
               const isGuided = guidedNavItem === item.name;
 
               return (
@@ -157,6 +158,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut, guidedN
                     data-mobile-nav-item={navDomId(item.name)}
                     data-nav-item="true"
                     data-guide-nav={item.name}
+                    aria-current={isActive ? "page" : undefined}
                     className={cn(
                       "font-ui flex min-h-[52px] items-center gap-4 rounded-md border px-4 py-3 text-sm font-bold uppercase tracking-[0.05em] transition-colors",
                       isGuided

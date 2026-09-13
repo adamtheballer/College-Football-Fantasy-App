@@ -46,7 +46,12 @@ function Announcement({ pick, onFinish }: { pick: ConfirmedDraftPick; onFinish: 
 
 export function PickConfirmationStrip({ pick, onFinish, lastPick }: Props) {
   return (
-    <div data-testid="pick-context-strip" className="sticky top-[calc(env(safe-area-inset-top)+3.5rem)] z-[1260] h-24 shrink-0 overflow-hidden bg-cfb-surface sm:top-28">
+    <div
+      data-testid="pick-context-strip"
+      className={cn(
+        "pointer-events-none fixed inset-x-0 top-0 z-[1260] h-9 overflow-visible border-b border-cfb-border-subtle/80 bg-cfb-surface/96 shadow-[0_6px_18px_rgba(0,0,0,0.2)] backdrop-blur-sm"
+      )}
+    >
       <div className="flex h-full items-center justify-center gap-1 px-4 text-xs text-muted-foreground" aria-hidden={Boolean(pick)}>
         {lastPick ? <p className="line-clamp-2 text-center">Last pick <strong className="text-foreground">{lastPick.name}</strong> to {lastPick.team}</p> : <p>Confirmed picks will appear here.</p>}
       </div>

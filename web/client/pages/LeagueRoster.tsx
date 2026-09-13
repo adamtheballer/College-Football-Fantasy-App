@@ -246,6 +246,22 @@ export default function LeagueRoster() {
     );
   }
 
+  if (rosterQuery.isLoading && !rosterData) {
+    return (
+      <main className="relative mx-auto flex w-full max-w-none flex-col gap-4 px-0 pb-24 pt-4 sm:gap-6 sm:py-8">
+        <div className="space-y-3" aria-busy="true" aria-label="Loading roster">
+          <div className="h-5 w-28 animate-pulse rounded bg-cfb-surface-raised" />
+          <div className="h-10 w-44 animate-pulse rounded bg-cfb-surface-raised" />
+          <div className="h-12 w-full animate-pulse rounded bg-cfb-surface-raised" />
+        </div>
+        <div className="grid grid-cols-3 gap-2 sm:gap-4">
+          {[0, 1, 2].map((index) => <div key={index} className="h-24 animate-pulse rounded-xl border border-cfb-border-subtle bg-cfb-surface-raised" />)}
+        </div>
+        <div className="h-80 animate-pulse rounded-xl border border-cfb-border-subtle bg-cfb-surface-raised" />
+      </main>
+    );
+  }
+
   return (
     <main className="relative mx-auto flex w-full max-w-none flex-col gap-4 px-0 pb-24 pt-4 sm:gap-6 sm:px-0 sm:py-8">
       <div className="space-y-4">

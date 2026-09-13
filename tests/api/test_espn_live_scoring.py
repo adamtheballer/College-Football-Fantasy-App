@@ -42,7 +42,6 @@ from collegefootballfantasy_api.app.services.espn_live_scoring import (
     queue_accepted_espn_long_play_notifications,
     prune_espn_snapshot_history,
     _canonical_hash,
-    _replay_accepted_punt_return_stats,
     run_espn_scoring_cycle,
 )
 from collegefootballfantasy_api.app.core.config import settings
@@ -453,72 +452,6 @@ def test_synthetic_three_minute_drill_updates_matchup_then_finalizes_downstream_
         week=2,
         projection_version="MIDWEEK",
     ).count() == 1
-
-
-def test_deployed_punt_return_parser_replays_a_duplicate_accepted_snapshot(db_session):
-    """A normalization release must not wait for ESPN to change its payload."""
-
-    _arch, wingo = _verified_players(db_session)
-    summary = espn_summary_payload()
-    normalized_rows, _ = normalize_espn_summary_player_stats(
-        db_session,
-        season=2026,
-        week=1,
-        summary=summary,
-        strict_identity=True,
-    )
-    legacy_rows = []
-    for row in normalized_rows:
-        legacy_stats = dict(row["stats"])
-        legacy_stats.pop("punt_return_yards", None)
-        legacy_stats.pop("punt_return_tds", None)
-        legacy_rows.append({"player_id": row["player_id"], "stats": legacy_stats})
-    payload_hash = _canonical_hash(summary)
-    db_session.add(
-        ProviderGamePoll(
-            provider="espn",
-            provider_game_id="401",
-            season=2026,
-            week=1,
-            status="live",
-            accepted_snapshot_hash=payload_hash,
-            latest_snapshot_hash=payload_hash,
-            latest_payload=summary,
-        )
-    )
-    db_session.add(
-        ProviderGameSnapshot(
-            provider="espn",
-            provider_game_id="401",
-            season=2026,
-            week=1,
-            status="live",
-            captured_at=NOW,
-            event_state="live",
-            classification="NEWER",
-            accepted=True,
-            snapshot_hash=payload_hash,
-            raw_payload=summary,
-            normalized_rows=legacy_rows,
-        )
-    )
-    db_session.add(
-        PlayerStat(
-            player_id=wingo.id,
-            season=2026,
-            week=1,
-            source="espn",
-            stats=next(row["stats"] for row in legacy_rows if row["player_id"] == wingo.id),
-        )
-    )
-    db_session.commit()
-
-    replay_rows, final_rows = _replay_accepted_punt_return_stats(db_session, season=2026, week=1)
-
-    replayed_wingo = next(row for row in replay_rows if row["player_id"] == wingo.id)
-    assert replayed_wingo["stats"]["punt_return_yards"] == 73.0
-    assert replayed_wingo["stats"]["punt_return_tds"] == 1.0
-    assert final_rows == {}
 
 
 def test_recorded_replay_runs_through_worker_entrypoint_and_survives_restart(db_session, monkeypatch):

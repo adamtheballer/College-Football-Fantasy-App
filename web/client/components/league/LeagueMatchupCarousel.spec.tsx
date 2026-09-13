@@ -104,7 +104,7 @@ describe("LeagueMatchupCarousel", () => {
     Object.defineProperty(rail, "scrollLeft", { configurable: true, writable: true, value: 1020 });
     const scrollTo = vi.fn();
     Object.defineProperty(rail, "scrollTo", { configurable: true, value: scrollTo });
-    screen.getAllByRole("button", { name: /Saturday Legends|Midnight Managers/i }).forEach((card, index) => {
+    screen.getAllByTestId(/league-carousel-card-/).forEach((card, index) => {
       Object.defineProperty(card, "offsetLeft", { configurable: true, value: index * 340 });
       Object.defineProperty(card, "offsetWidth", { configurable: true, value: 320 });
     });

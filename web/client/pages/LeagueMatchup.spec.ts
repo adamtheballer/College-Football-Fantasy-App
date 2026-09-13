@@ -250,8 +250,8 @@ describe("league matchup scoreboard", () => {
     render(createElement(LeagueMatchup));
 
     const swipeSurface = screen.getByTestId("matchup-swipe-surface");
-    fireEvent.touchStart(swipeSurface, { touches: [{ clientX: 240 }] });
-    fireEvent.touchEnd(swipeSurface, { changedTouches: [{ clientX: 120 }] });
+    fireEvent.touchStart(swipeSurface, { touches: [{ clientX: 240, clientY: 100 }] });
+    fireEvent.touchEnd(swipeSurface, { changedTouches: [{ clientX: 120, clientY: 100 }] });
 
     expect(routerMocks.setSearchParams).toHaveBeenCalledTimes(1);
     const nextParams = routerMocks.setSearchParams.mock.calls[0][0] as URLSearchParams;

@@ -204,11 +204,8 @@ function CompactMatchupScoreboard({
   onPreviousMatchup: () => void;
   onNextMatchup: () => void;
 }) {
-  // The API normally supplies probabilities. A neutral fallback keeps an
-  // incomplete/injured lineup from replacing the matchup with an unavailable
-  // message while fresh roster totals are loading.
-  const winChance = probabilityPair(myTeam?.win_probability, opponentTeam?.win_probability) ?? { my: 50, opponent: 50 };
-  const displayedWinChance = displayedProbabilityPair(winChance.my, winChance.opponent);
+  const winChance = probabilityPair(myTeam?.win_probability, opponentTeam?.win_probability);
+  const displayedWinChance = winChance ? displayedProbabilityPair(winChance.my, winChance.opponent) : null;
   const myTeamIsLeading = Boolean(winChance && winChance.my >= winChance.opponent);
 
   return (
@@ -233,7 +230,7 @@ function CompactMatchupScoreboard({
         </div>
       ) : null}
       {matchupCount > 1 ? (
-        <div className="absolute left-1/2 top-2 hidden -translate-x-1/2 items-center gap-1 md:flex">
+        <div className="absolute left-3 top-2 flex items-center gap-1 sm:left-1/2 sm:-translate-x-1/2">
           <button
             type="button"
             aria-label="Previous matchup"
@@ -264,15 +261,13 @@ function CompactMatchupScoreboard({
         <div className="flex min-w-[80px] flex-col items-center text-center">
           <span className="font-ui text-[8px] font-bold uppercase tracking-[0.06em] text-cfb-text-primary">Week {displayWeek} matchup</span>
           <span className="mt-0.5 font-ui text-[8px] font-bold uppercase tracking-[0.06em] text-cfb-text-muted">Win chance</span>
-          <div className="mt-0.5 flex items-center gap-1 whitespace-nowrap text-[10px] font-black tabular-nums sm:text-xs">
-            <span className={myTeamIsLeading ? "text-emerald-300" : "text-cfb-crimson"}>
-              {`${displayedWinChance.my.toFixed(1)}%`}
-            </span>
-            <span className="text-cfb-text-muted">VS</span>
-            <span className={myTeamIsLeading ? "text-cfb-crimson" : "text-emerald-300"}>
-              {`${displayedWinChance.opponent.toFixed(1)}%`}
-            </span>
-          </div>
+          {displayedWinChance ? (
+            <div className="mt-0.5 flex items-center gap-1 whitespace-nowrap text-[10px] font-black tabular-nums sm:text-xs">
+              <span className={myTeamIsLeading ? "text-emerald-300" : "text-cfb-crimson"}>{`${displayedWinChance.my.toFixed(1)}%`}</span>
+              <span className="text-cfb-text-muted">VS</span>
+              <span className={myTeamIsLeading ? "text-cfb-crimson" : "text-emerald-300"}>{`${displayedWinChance.opponent.toFixed(1)}%`}</span>
+            </div>
+          ) : <span className="mt-0.5 text-[9px] font-bold text-cfb-text-muted">Awaiting data</span>}
         </div>
 
         <MatchupTeamSummary
@@ -284,11 +279,13 @@ function CompactMatchupScoreboard({
         />
       </div>
 
-      <div className="mt-3 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-t border-cfb-border-subtle pt-2 text-[9px] font-bold uppercase tracking-[0.12em] text-cfb-text-muted">
-        <span>{`${displayedWinChance.my.toFixed(1)}%`}</span>
-        <WinChanceBar myPercent={winChance.my} opponentPercent={winChance.opponent} className="h-2" testIdPrefix="scoreboard-win-chance" />
-        <span>{`${displayedWinChance.opponent.toFixed(1)}%`}</span>
-      </div>
+      {displayedWinChance && winChance ? (
+        <div className="mt-3 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-t border-cfb-border-subtle pt-2 text-[9px] font-bold uppercase tracking-[0.12em] text-cfb-text-muted">
+          <span>{`${displayedWinChance.my.toFixed(1)}%`}</span>
+          <WinChanceBar myPercent={winChance.my} opponentPercent={winChance.opponent} className="h-2" testIdPrefix="scoreboard-win-chance" />
+          <span>{`${displayedWinChance.opponent.toFixed(1)}%`}</span>
+        </div>
+      ) : <p className="mt-3 border-t border-cfb-border-subtle pt-2 text-center text-[9px] font-bold uppercase tracking-[0.12em] text-cfb-text-muted">Win probability unavailable</p>}
     </section>
   );
 }
@@ -333,6 +330,7 @@ export default function LeagueMatchup() {
   const activeMatchupId = selectedMatchupId ?? data?.matchup_id;
   const activeMatchupIndex = Math.max(0, scheduledMatchups.findIndex((matchup) => matchup.matchup_id === activeMatchupId));
   const swipeStartX = useRef<number | null>(null);
+  const swipeStartY = useRef<number | null>(null);
   const presentationStatus = rosteredPlayerIsLive && !["final", "stat_corrected", "corrected"].includes((data?.status ?? "").toLowerCase())
     ? "live"
     : data?.status ?? "projected";
@@ -449,17 +447,28 @@ export default function LeagueMatchup() {
           <div
             data-testid="matchup-swipe-surface"
             onTouchStart={(event) => {
-              swipeStartX.current = event.touches[0]?.clientX ?? null;
+              const touch = event.touches[0];
+              swipeStartX.current = touch?.clientX ?? null;
+              swipeStartY.current = touch?.clientY ?? null;
             }}
             onTouchEnd={(event) => {
               const startX = swipeStartX.current;
+              const startY = swipeStartY.current;
               swipeStartX.current = null;
-              const endX = event.changedTouches[0]?.clientX;
-              if (startX === null || typeof endX !== "number" || Math.abs(endX - startX) < 48) return;
-              selectAdjacentMatchup(endX < startX ? 1 : -1);
+              swipeStartY.current = null;
+              const touch = event.changedTouches[0];
+              const endX = touch?.clientX;
+              const endY = touch?.clientY;
+              const target = event.target as HTMLElement | null;
+              if (target?.closest("button,a,input,textarea,select,[role='button']") || startX === null || startY === null || typeof endX !== "number" || typeof endY !== "number") return;
+              const deltaX = endX - startX;
+              const deltaY = endY - startY;
+              if (Math.abs(deltaX) < 48 || Math.abs(deltaX) <= Math.abs(deltaY) * 1.25) return;
+              selectAdjacentMatchup(deltaX < 0 ? 1 : -1);
             }}
             onTouchCancel={() => {
               swipeStartX.current = null;
+              swipeStartY.current = null;
             }}
           >
             {data.postseason ? (
@@ -468,21 +477,22 @@ export default function LeagueMatchup() {
                 <span className="text-amber-100/70">Playoffs</span>
               </div>
             ) : null}
-            <CompactMatchupScoreboard
-              data={data}
-              myTeam={myTeam}
-              opponentTeam={opponentTeam}
-              displayWeek={displayWeek}
-              matchupIndex={activeMatchupIndex}
-              matchupCount={scheduledMatchups.length}
-              status={presentationStatus}
-              onPreviousMatchup={() => selectAdjacentMatchup(-1)}
-              onNextMatchup={() => selectAdjacentMatchup(1)}
-            />
+            <div className="sticky top-0 z-30">
+              <CompactMatchupScoreboard
+                data={data}
+                myTeam={myTeam}
+                opponentTeam={opponentTeam}
+                displayWeek={displayWeek}
+                matchupIndex={activeMatchupIndex}
+                matchupCount={scheduledMatchups.length}
+                status={presentationStatus}
+                onPreviousMatchup={() => selectAdjacentMatchup(-1)}
+                onNextMatchup={() => selectAdjacentMatchup(1)}
+              />
+            </div>
+            <div className="mt-3 border-y border-cfb-border-subtle bg-cfb-surface px-4 py-3 sm:px-5"><p className="cfb-section-title text-base">Starters</p></div>
+            <div className="mt-2"><SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} leagueId={parsedLeagueId} scoringStatus={presentationStatus} /></div>
           </div>
-
-          <div className="mt-3 border-y border-cfb-border-subtle bg-cfb-surface px-4 py-3 sm:px-5"><p className="cfb-section-title text-base">Starters</p></div>
-          <div className="mt-2"><SideBySideMatchup myTeam={myTeam} opponentTeam={opponentTeam} leagueId={parsedLeagueId} scoringStatus={presentationStatus} /></div>
         </>
       )}
     </main>

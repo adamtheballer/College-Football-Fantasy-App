@@ -5,6 +5,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.domain.stat_normalization import strip_unscored_return_stats
 from collegefootballfantasy_api.app.integrations.espn import ESPNClient, extract_player_box_score_stats
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.player import Player
@@ -197,7 +198,10 @@ def persist_normalized_espn_player_stats(
     upserted = 0
     for normalized in normalized_rows:
         player_id = int(normalized["player_id"])
-        stats = dict(normalized["stats"])
+        stats = strip_unscored_return_stats(
+            normalized["stats"],
+            remove_derived_fantasy_points=True,
+        )
         stat = (
             db.query(PlayerStat)
             .filter(
@@ -238,7 +242,10 @@ def persist_final_espn_player_game_stats(
     upserted = 0
     for normalized in normalized_rows:
         player_id = int(normalized["player_id"])
-        stats = dict(normalized["stats"])
+        stats = strip_unscored_return_stats(
+            normalized["stats"],
+            remove_derived_fantasy_points=True,
+        )
         stat = (
             db.query(PlayerGameStat)
             .filter(PlayerGameStat.player_id == player_id, PlayerGameStat.game_id == game_id)

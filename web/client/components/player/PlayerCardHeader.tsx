@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { UserRound, X } from "lucide-react";
 
 import type { PlayerCardResponse } from "@/hooks/use-players";
@@ -73,6 +73,8 @@ export function PlayerCardHeader({
   position: string;
   title: string;
 }) {
+  const [headshotFailed, setHeadshotFailed] = useState(false);
+  useEffect(() => setHeadshotFailed(false), [card?.about.headshot_url]);
   const playerStatus = resolvePlayerCardStatus(card, player.status);
   const statusSource = playerStatus;
   const seasonRank = card?.season_positional_rank;
@@ -146,8 +148,8 @@ export function PlayerCardHeader({
           <p className="hidden text-[10px] font-black uppercase tracking-[0.28em] text-white/65 sm:block">{title}</p>
           <div className="flex min-w-0 items-center gap-3 sm:mt-4 sm:gap-5">
             <div className="cfb-player-sticker-frame flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/25 bg-white/10 sm:h-[5.75rem] sm:w-[5.75rem]">
-                {card?.about.headshot_url ? (
-                  <img src={card.about.headshot_url} alt={player.name} className="h-full w-full object-cover" />
+                {card?.about.headshot_url && !headshotFailed ? (
+                  <img src={card.about.headshot_url} alt={player.name} className="h-full w-full object-cover" onError={() => setHeadshotFailed(true)} />
                 ) : (
                   <div className={cn("flex h-full w-full items-center justify-center bg-gradient-to-b", palette.silhouette)}>
                     <UserRound className="h-8 w-8 text-white/75 sm:h-11 sm:w-11" />
@@ -155,7 +157,7 @@ export function PlayerCardHeader({
                 )}
             </div>
             <div className="min-w-0">
-              <h2 className="max-w-2xl break-words text-[1.7rem] font-semibold leading-[0.98] tracking-tight text-white sm:text-5xl">
+              <h2 id="player-card-title" className="max-w-2xl break-words text-[1.7rem] font-semibold leading-[0.98] tracking-tight text-white sm:text-5xl">
                 {player.name}
               </h2>
               <p className="mt-2 truncate text-[10px] font-black uppercase tracking-[0.15em] text-white/80 sm:mt-3 sm:text-xs sm:tracking-[0.18em]">

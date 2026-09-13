@@ -5,7 +5,7 @@ import React, {
   useRef,
   useState,
 } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useNavigationType } from "react-router-dom";
 
 import { AppOnboardingTour } from "./AppOnboardingTour";
 import { AppShell } from "./app-shell/AppShell";
@@ -28,6 +28,7 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
+  const navigationType = useNavigationType();
   const navigate = useNavigate();
   const { user, logout, isLoggedIn } = useAuth();
   const { data: unreadChatSummary } = useChatUnreadSummary(
@@ -38,6 +39,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const [isGuideActive, setIsGuideActive] = useState(false);
   const [guidedNavItem, setGuidedNavItem] = useState<string | undefined>();
   const mainScrollRef = useRef<HTMLElement | null>(null);
+  const scrollPositionsRef = useRef(new Map<string, number>());
 
   const navItems = useMemo(
     () =>
@@ -59,14 +61,19 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     (location.state as { replayGuide?: boolean } | null)?.replayGuide,
   );
 
-  // AppShell deliberately owns scrolling so persistent navigation never creates
-  // a second document scroller. Reset that one owner before a new route paints;
-  // otherwise navigating from a long page can leave the next page at its old
-  // bottom offset on mobile Safari.
+  // AppShell deliberately owns scrolling. New destinations start at the top,
+  // while browser Back/Forward restores the manager's prior research position.
+  // Keeping this per history entry avoids throwing a manager back to the top
+  // after they inspect a player card or return from a league child route.
   useLayoutEffect(() => {
-    mainScrollRef.current?.scrollTo({ top: 0, left: 0, behavior: "auto" });
-    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-  }, [location.key, location.pathname, location.search]);
+    const scroller = mainScrollRef.current;
+    const targetTop = navigationType === "POP" ? scrollPositionsRef.current.get(location.key) ?? 0 : 0;
+    scroller?.scrollTo({ top: targetTop, left: 0, behavior: "auto" });
+    window.scrollTo({ top: targetTop, left: 0, behavior: "auto" });
+    return () => {
+      if (scroller) scrollPositionsRef.current.set(location.key, scroller.scrollTop);
+    };
+  }, [location.key, navigationType]);
 
   useEffect(() => {
     if (!user) {

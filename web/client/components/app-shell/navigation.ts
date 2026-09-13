@@ -22,6 +22,13 @@ export type ShellNavItem = {
   badge?: string;
 };
 
+export const isShellNavItemActive = (pathname: string, item: Pick<ShellNavItem, "path">) =>
+  item.path === "/"
+    ? pathname === "/"
+    : item.path === "/leagues"
+      ? pathname === "/leagues" || pathname.startsWith("/leagues/") || pathname.startsWith("/league/")
+    : pathname === item.path || pathname.startsWith(`${item.path}/`);
+
 export const isDraftRoomRoute = (pathname: string) =>
   pathname === "/draft/mock/single-player" || /^\/league\/[^/]+\/draft$/.test(pathname);
 

@@ -110,6 +110,7 @@ export function AppOnboardingTour({ isOpen, userId, onClose, onStepChange }: App
   const [tooltipPosition, setTooltipPosition] = useState<TooltipPosition | null>(null);
   const primaryButtonRef = useRef<HTMLButtonElement | null>(null);
   const activeTargetRef = useRef<HTMLElement | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   // This dialog is portaled outside AppShell. It needs the same explicit
   // native-status-bar floor as the More drawer instead of relying on the
   // viewport's padding.
@@ -132,12 +133,14 @@ export function AppOnboardingTour({ isOpen, userId, onClose, onStepChange }: App
 
   useEffect(() => {
     if (!isOpen) return;
+    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const originalOverflow = document.body.style.overflow;
     document.body.classList.add("cfb-tour-open");
     document.body.style.overflow = "hidden";
     return () => {
       document.body.classList.remove("cfb-tour-open");
       document.body.style.overflow = originalOverflow;
+      returnFocusRef.current?.focus({ preventScroll: true });
     };
   }, [isOpen]);
 
@@ -184,6 +187,7 @@ export function AppOnboardingTour({ isOpen, userId, onClose, onStepChange }: App
 
       element.classList.add("cfb-tour-active-target");
       activeTargetRef.current = element;
+      const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
       const sidebarNav = element.closest("aside nav");
       if (sidebarNav instanceof HTMLElement) {
@@ -195,15 +199,11 @@ export function AppOnboardingTour({ isOpen, userId, onClose, onStepChange }: App
 
         if (elementTop < containerTop + margin || elementBottom > containerBottom - margin) {
           const targetTop = Math.max(0, elementTop - sidebarNav.clientHeight * 0.25);
-          sidebarNav.scrollTo({ top: targetTop, left: 0, behavior: "smooth" });
+          sidebarNav.scrollTo({ top: targetTop, left: 0, behavior: reducedMotion ? "auto" : "smooth" });
         }
       } else {
-        element.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+        element.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "center", inline: "nearest" });
       }
-      if (!element.hasAttribute("tabindex")) {
-        element.setAttribute("tabindex", "-1");
-      }
-      element.focus({ preventScroll: true });
 
       const rect = element.getBoundingClientRect();
       setTargetRect(rect);

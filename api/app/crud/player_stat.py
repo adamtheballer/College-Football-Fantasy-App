@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.domain.stat_normalization import strip_unscored_return_stats
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 
 
@@ -21,6 +22,7 @@ def upsert_player_stat(
     stats: dict,
     source: str,
 ) -> PlayerStat:
+    stats = strip_unscored_return_stats(stats, remove_derived_fantasy_points=True)
     existing = get_player_stat(db, player_id, season, week)
     if existing:
         existing.stats = stats

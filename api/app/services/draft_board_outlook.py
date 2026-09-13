@@ -56,10 +56,6 @@ def _fantasy_points(stats: dict | None, *, position: str) -> float | None:
         value = stats.get(key)
         if isinstance(value, (int, float)) and not isinstance(value, bool):
             return float(value)
-    # Provider stat payloads usually contain raw box-score categories rather
-    # than a precomputed fantasy total.  Normalize them through the same
-    # default scoring engine used by weekly projections instead of silently
-    # ignoring a real result.
     return calculate_fantasy_points(stats, position=position)
 
 

@@ -798,16 +798,20 @@ export default function LeagueWaivers() {
             Loading league-specific available players…
           </p>
         ) : waiverQuery.isError ? (
-          <p className="px-5 py-6 text-sm font-semibold text-cfb-text-secondary">
-            {waiverBoardLoadMessage(playerBoardScope)}
-          </p>
+          <div className="flex flex-col items-start gap-3 px-5 py-6 text-sm font-semibold text-cfb-text-secondary">
+            <p>{waiverBoardLoadMessage(playerBoardScope)}</p>
+            <Button type="button" variant="outline" onClick={() => void waiverQuery.refetch()}>Retry</Button>
+          </div>
         ) : filteredPlayers.length === 0 ? (
-          <p className="px-5 py-6 text-sm text-slate-400">
-            No league-scoped available players match the current filters.
-          </p>
+          <div className="flex flex-col items-start gap-3 px-5 py-6 text-sm text-slate-400">
+            <p>No league-scoped available players match the current filters.</p>
+            {(search || position !== "ALL") ? (
+              <Button type="button" variant="outline" onClick={() => { setSearch(""); setPosition("ALL"); }}>Clear filters</Button>
+            ) : null}
+          </div>
         ) : (
           <>
-            <div className="divide-y divide-cfb-border-subtle sm:hidden">
+            <div className="divide-y divide-cfb-border-subtle lg:hidden">
             {filteredPlayers.map((player) => {
               const tone = positionTone(player.position);
               const weekPoints = waiverWeekPoints(
@@ -826,6 +830,7 @@ export default function LeagueWaivers() {
                   tabIndex={0}
                   onClick={() => setSelectedPlayer(player)}
                   onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return;
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
                       setSelectedPlayer(player);
@@ -872,7 +877,7 @@ export default function LeagueWaivers() {
                     <Button
                       type="button"
                       variant="outline"
-                      aria-label={watching ? `Remove ${player.name} from watchlist` : `Watch ${player.name}`}
+                      aria-label={watching ? `Remove ${player.name} from watchlist` : "Watch"}
                       onClick={(event) => {
                         event.stopPropagation();
                         void handleWatchPlayer(player.id);
@@ -898,20 +903,20 @@ export default function LeagueWaivers() {
               );
             })}
             </div>
-            <div className="hidden overflow-x-auto sm:block">
-            <table className="min-w-[1200px] w-full table-fixed text-left">
+            <div className="hidden overflow-x-hidden lg:block">
+            <table className="w-full table-fixed text-left">
               <thead className="border-b border-cfb-border-subtle bg-cfb-surface-raised">
                 <tr className="text-[10px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">
-                  <th className="w-[7rem] min-w-[7rem] whitespace-nowrap px-5 py-3 text-right">RK</th>
+                  <th className="w-16 whitespace-nowrap px-4 py-3 text-right">RK</th>
                   <th className="px-4 py-3">Player</th>
-                  <th className="w-44 px-4 py-3">School</th>
-                  <th className="w-44 px-4 py-3">Opponent</th>
-                  <th className="w-24 px-4 py-3">POS</th>
-                  <th className="w-28 px-4 py-3">POS RK</th>
-                  <th className={`w-40 px-4 py-3 ${playerBoardScope === "all" ? "text-left" : "text-right"}`}>
+                  <th className="w-36 px-3 py-3">School</th>
+                  <th className="w-40 px-3 py-3">Opponent</th>
+                  <th className="w-20 px-3 py-3">POS</th>
+                  <th className="w-24 px-3 py-3">POS RK</th>
+                  <th className={`w-40 px-3 py-3 ${playerBoardScope === "all" ? "text-left" : "text-right"}`}>
                     Week {displayWeek} Pts
                   </th>
-                  <th className="w-56 px-5 py-3 text-right">Action</th>
+                  <th className="w-32 px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-cfb-border-subtle">
@@ -932,6 +937,7 @@ export default function LeagueWaivers() {
                       tabIndex={0}
                       onClick={() => setSelectedPlayer(player)}
                       onKeyDown={(event) => {
+                        if (event.target !== event.currentTarget) return;
                         if (event.key === "Enter" || event.key === " ") {
                           event.preventDefault();
                           setSelectedPlayer(player);
@@ -939,7 +945,7 @@ export default function LeagueWaivers() {
                       }}
                       className="group cursor-pointer text-sm text-cfb-text-secondary transition-colors hover:bg-cfb-surface-hover focus:outline-none focus-visible:bg-cfb-surface-hover"
                     >
-                      <td className="w-[7rem] min-w-[7rem] whitespace-nowrap px-5 py-3 text-right align-middle">
+                      <td className="w-16 whitespace-nowrap px-4 py-3 text-right align-middle">
                         <span
                           data-testid={`waiver-rank-${player.id}`}
                           className="inline-flex min-w-[4ch] justify-end whitespace-nowrap text-lg font-semibold tabular-nums text-cfb-text-muted transition-colors group-hover:text-cfb-text-primary"
@@ -964,25 +970,25 @@ export default function LeagueWaivers() {
                           <PlayerPopularityMetrics popularity={player.popularity} />
                         </div>
                       </td>
-                      <td className="px-4 py-3 align-middle text-sm font-semibold text-cfb-text-secondary">
+                      <td className="px-3 py-3 align-middle text-sm font-semibold text-cfb-text-secondary">
                         {player.school ?? "-"}
                       </td>
-                      <td className="px-4 py-3 align-middle text-sm font-semibold text-cfb-text-secondary">
+                      <td className="px-3 py-3 align-middle text-sm font-semibold text-cfb-text-secondary">
                         {waiverOpponentLabel(player.opponent)}
                       </td>
-                      <td className="px-4 py-3 align-middle">
+                      <td className="px-3 py-3 align-middle">
                         <span
                           className={`inline-flex min-w-12 items-center justify-center rounded-md border px-2.5 py-1.5 text-[10px] font-black uppercase tracking-[0.1em] ${tone.border} ${tone.bg} ${tone.text}`}
                         >
                           {player.position ?? "-"}
                         </span>
                       </td>
-                      <td className="px-4 py-3 align-middle text-sm font-black tabular-nums text-cfb-text-primary">
+                      <td className="px-3 py-3 align-middle text-sm font-black tabular-nums text-cfb-text-primary">
                         <span title={player.season_rank_through_week ? `Finalized through Week ${player.season_rank_through_week}` : "No finalized positional rank yet"}>
                           {waiverPositionRankLabel(player)}
                         </span>
                       </td>
-                      <td className={`w-40 px-4 py-3 align-middle ${playerBoardScope === "all" ? "text-left" : "text-right"}`}>
+                      <td className={`w-40 px-3 py-3 align-middle ${playerBoardScope === "all" ? "text-left" : "text-right"}`}>
                         <span
                           data-testid={`waiver-week-points-${player.id}`}
                           className={`text-lg font-semibold tabular-nums ${waiverWeekPointsClassName(weekPoints)}`}
@@ -990,7 +996,7 @@ export default function LeagueWaivers() {
                           {weekPoints.label}
                         </span>
                       </td>
-                      <td className="px-5 py-3 align-middle">
+                      <td className="px-4 py-3 align-middle">
                         <div className="flex items-center justify-end gap-2">
                           <Button
                             type="button"
@@ -1004,10 +1010,10 @@ export default function LeagueWaivers() {
                               toggleWatchlistPlayer.isPending ||
                               watchlistsQuery.isError
                             }
-                            className="h-9 rounded-md border-cfb-border-subtle bg-cfb-surface-raised px-3 text-[10px] font-black uppercase tracking-[0.1em] text-cfb-text-secondary transition-colors hover:border-cfb-border-strong hover:bg-cfb-surface-hover hover:text-cfb-text-primary"
+                            aria-label={watchedPlayerIds.has(player.id) ? "Watching" : "Watch"}
+                            className="h-9 w-9 shrink-0 rounded-md border-cfb-border-subtle bg-cfb-surface-raised p-0 text-cfb-text-secondary transition-colors hover:border-cfb-border-strong hover:bg-cfb-surface-hover hover:text-cfb-text-primary"
                           >
-                            <Sparkles className="mr-2 h-3.5 w-3.5" />
-                            {watchedPlayerIds.has(player.id) ? "Watching" : "Watch"}
+                            <Sparkles className="h-3.5 w-3.5" />
                           </Button>
                           <Button
                             type="button"
