@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, LocateFixed, Loader2, Lock, Search, ShieldAlert, Trophy, Users } from "lucide-react";
 
 import { DraftBoard } from "@/components/DraftBoard";
@@ -10,6 +10,10 @@ import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
 import { DraftRoomVisuals, draftMatteControlClass, draftMattePanelClass } from "@/components/DraftRoomVisuals";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { PickConfirmationStrip } from "@/components/draft/PickConfirmationStrip";
+import { usePickConfirmation } from "@/hooks/use-pick-confirmation";
+import { draftServerNow, draftSnapshotAge, isDraftPickExpired } from "@/lib/draftReconciliation";
 import { useDraftPick, useDraftRoom, useStartDraft } from "@/hooks/use-draft";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { useLeagueDetail } from "@/hooks/use-leagues";
@@ -247,6 +251,8 @@ export default function Draft() {
   const draftAudioRefs = useRef<Partial<Record<DraftAudioCue, HTMLAudioElement>>>({});
   const playedDraftAudioCueKeysRef = useRef<Set<string>>(new Set());
   const previousDraftAudioStateRef = useRef<DraftAudioState | null>(null);
+  const submittingPickRef = useRef(false);
+  const [rosterExitPending, setRosterExitPending] = useState(false);
 
   const parsedLeagueId =
     leagueId && !Number.isNaN(Number(leagueId)) ? Number(leagueId) : undefined;
@@ -256,7 +262,9 @@ export default function Draft() {
     data: draftRoom,
     isLoading: draftRoomLoading,
     error: draftRoomError,
-    dataUpdatedAt: draftRoomUpdatedAt,
+    failureCount: draftRoomFailureCount,
+    isPaused: draftRoomPaused,
+    refetch: refetchDraftRoom,
   } = useDraftRoom(parsedLeagueId);
   const pickMutation = useDraftPick(parsedLeagueId);
   const startDraftMutation = useStartDraft(parsedLeagueId);
@@ -314,13 +322,15 @@ export default function Draft() {
 
   const viewFinalRoster = useCallback(async () => {
     if (!parsedLeagueId) return;
-
-    // The draft-room poll can observe completion before the cached league
-    // detail does. Refresh that exact cache before moving to the post-draft
-    // route so LeagueRoster does not briefly redirect back to the lobby.
-    await queryClient.invalidateQueries({ queryKey: ["league", parsedLeagueId] });
-    await queryClient.refetchQueries({ queryKey: ["league", parsedLeagueId], type: "active" });
-    navigate(`/league/${parsedLeagueId}/roster`);
+    setRosterExitPending(true);
+    setLocalError(null);
+    try {
+      await queryClient.invalidateQueries({ queryKey: ["league", parsedLeagueId], refetchType: "none" });
+      await queryClient.refetchQueries({ queryKey: ["league", parsedLeagueId], type: "active" }, { throwOnError: true });
+      navigate(`/league/${parsedLeagueId}/roster`);
+    } catch {
+      setLocalError("Your draft is saved. We couldn't load your roster. Please try View Your Roster again.");
+    } finally { setRosterExitPending(false); }
   }, [navigate, parsedLeagueId, queryClient]);
 
   useEffect(() => {
@@ -369,7 +379,6 @@ export default function Draft() {
     draftRoom?.user_team_id,
     playDraftAudioCue,
   ]);
-  const serverNowAtFetchMs = draftRoom?.server_time ? Date.parse(draftRoom.server_time) : Number.NaN;
   const countdownDeadline = isPreDraft
     ? draftRoom?.draft_starts_at
     : isDraftActive
@@ -378,10 +387,10 @@ export default function Draft() {
         ? draftRoom?.transition_ends_at
         : null;
   const countdownDeadlineMs = countdownDeadline ? Date.parse(countdownDeadline) : Number.NaN;
-  const adjustedNowMs =
-    Number.isFinite(serverNowAtFetchMs) && draftRoomUpdatedAt
-      ? serverNowAtFetchMs + Math.max(0, now - draftRoomUpdatedAt)
-      : now;
+  const adjustedNowMs = draftRoom ? draftServerNow(draftRoom, now) : now;
+  const reconnecting = Boolean(draftRoom && (draftRoomError || draftRoomFailureCount > 0 || draftRoomPaused ||
+    (isDraftActive && draftSnapshotAge(draftRoom, now) > 10_000)));
+  const expired = Boolean(draftRoom && isDraftPickExpired(draftRoom, now));
   const secondsRemaining =
     Number.isFinite(countdownDeadlineMs)
       ? Math.max(0, Math.ceil((countdownDeadlineMs - adjustedNowMs) / 1000))
@@ -411,7 +420,7 @@ export default function Draft() {
     },
     [],
   );
-  const timerDanger = isDraftActive && secondsRemaining > 0 && secondsRemaining <= 10;
+  const timerDanger = isDraftActive && secondsRemaining <= 10;
   const leagueSize = Math.max(league?.max_teams ?? draftRoom?.teams.length ?? 12, draftRoom?.teams.length ?? 0, 1);
 
   const draftConfig = useMemo(
@@ -526,9 +535,21 @@ export default function Draft() {
   const queuedPlayers = useMemo(() => {
     const byId = new Map(draftBoard.map((player) => [player.id, player]));
     return queuedPlayerIds
+      .filter((playerId) => !draftedIds.has(playerId))
       .map((playerId) => byId.get(playerId))
       .filter((player): player is DraftPlayer => Boolean(player));
-  }, [draftBoard, queuedPlayerIds]);
+  }, [draftBoard, queuedPlayerIds, draftedIds]);
+  useEffect(() => {
+    setQueuedPlayerIds((ids) => ids.some((id) => draftedIds.has(id)) ? ids.filter((id) => !draftedIds.has(id)) : ids);
+  }, [draftedIds]);
+
+  const confirmedPicks = useMemo(() => (draftRoom?.picks ?? []).map((pick) => ({
+    key: `${pick.id}:${pick.overall_pick}`, number: pick.overall_pick, teamId: pick.team_id,
+    playerId: pick.player_id, name: pick.player_name, school: pick.player_school,
+    position: pick.player_position, auto: pick.auto_pick,
+    imageUrl: draftBoard.find((player) => player.id === pick.player_id)?.imageUrl,
+  })), [draftRoom?.picks, draftBoard]);
+  const confirmation = usePickConfirmation(draftRoom ? `live:${draftRoom.draft_id}:${draftRoom.user_team_id}` : undefined, confirmedPicks, draftRoom?.user_team_id);
 
   useEffect(() => {
     if (
@@ -579,8 +600,14 @@ export default function Draft() {
 
   const completed = isTerminalDraftStatus(draftRoom?.status);
   const showCompletionModal = Boolean(
-    completed && draftRoom?.draft_id && dismissedCompletedDraftId !== draftRoom.draft_id
+    completed && draftRoom?.draft_id && dismissedCompletedDraftId !== draftRoom.draft_id && !confirmation.pending
   );
+  useEffect(() => {
+    if (completed && parsedLeagueId) {
+      void queryClient.invalidateQueries({ queryKey: ["league", parsedLeagueId] });
+      if (draftRoom?.user_team_id) void queryClient.invalidateQueries({ queryKey: ["team", draftRoom.user_team_id, "roster"] });
+    }
+  }, [completed, parsedLeagueId, draftRoom?.user_team_id, queryClient]);
   const currentPick = draftRoom?.current_pick ?? 1;
   const displayPick = completed
     ? Math.min(totalPicks, Math.max(1, draftRoom?.picks.length ?? currentPick))
@@ -686,6 +713,15 @@ export default function Draft() {
   }, [centerDraftCarouselOnPick, completed, displayPick, mobileCarouselInset]);
 
   const makePick = async (player: DraftPlayer) => {
+    if (submittingPickRef.current || pickMutation.isPending) return;
+    if (reconnecting || (draftRoom && draftSnapshotAge(draftRoom) > 10_000)) {
+      setLocalError("Reconnecting. Picks are disabled until the draft is up to date.");
+      return;
+    }
+    if (draftRoom && isDraftPickExpired(draftRoom)) {
+      setLocalError("Time expired. Waiting for the confirmed auto-pick.");
+      return;
+    }
     if (!isLeagueFull) {
       setLocalError("Draft cannot start until the league is full.");
       return;
@@ -699,6 +735,7 @@ export default function Draft() {
       return;
     }
     setLocalError(null);
+    submittingPickRef.current = true;
     try {
       await pickMutation.mutateAsync({
         playerId: player.id,
@@ -707,7 +744,7 @@ export default function Draft() {
       });
     } catch {
       // Rendered below from mutation state.
-    }
+    } finally { submittingPickRef.current = false; }
   };
 
   const toggleQueue = (playerId: number) => {
@@ -741,7 +778,7 @@ export default function Draft() {
     );
   }
 
-  if (!draftRoom || draftRoomError) {
+  if (!draftRoom) {
     return (
       <div className="mx-auto max-w-5xl py-16">
         <div className="space-y-4 rounded-[2rem] border border-red-400/20 bg-red-500/10 p-12 text-center">
@@ -764,8 +801,9 @@ export default function Draft() {
   const leagueName = league?.name || `League ${draftRoom.league_id}`;
   const latestPick = draftRoom.picks[draftRoom.picks.length - 1];
   const isUserTurn = isDraftActive && draftRoom.can_make_pick;
-  const canPick = isUserTurn && !pickMutation.isPending;
+  const canPick = isUserTurn && !pickMutation.isPending && !expired && !reconnecting;
   const exitPath = completed ? `/league/${parsedLeagueId}/roster` : `/league/${parsedLeagueId}/lobby`;
+  const exitDraft = () => completed ? void viewFinalRoster() : navigate(exitPath);
   const backendPlayerCount = playersPayload?.total ?? 0;
   const masterBoardCount = draftBoard.length;
 
@@ -775,6 +813,7 @@ export default function Draft() {
         <p className="text-[11px] font-black uppercase tracking-[0.24em] text-primary">Draft Queue</p>
         <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">{queuedPlayers.length} queued</p>
       </div>
+      <p className="mb-4 text-xs text-muted-foreground">Research queue for this visit. Live auto-picks use the league's draft rankings.</p>
       {queuedPlayers.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-white/10 bg-white/[0.03] p-8 text-center text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
           Queue players from the draft tab.
@@ -960,7 +999,7 @@ export default function Draft() {
             size="icon"
             className="h-9 w-9 shrink-0 rounded-lg border-white/15 bg-[#0b121a] text-slate-200"
             aria-label="Exit real draft room"
-            onClick={() => navigate(exitPath)}
+            onClick={exitDraft}
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
@@ -997,12 +1036,12 @@ export default function Draft() {
               className="h-12 w-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface-raised text-cfb-text-primary shadow-[0_8px_20px_rgba(0,0,0,0.24)] hover:border-cfb-gold/55 hover:bg-cfb-gold/10 hover:text-white"
               aria-label="Exit real draft room"
               title="Exit real draft room"
-              onClick={() => navigate(exitPath)}
+              onClick={exitDraft}
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <Button asChild variant="outline" className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface-raised px-5 text-[10px] font-black uppercase tracking-[0.18em] text-cfb-text-primary hover:border-cfb-gold/55 hover:bg-cfb-gold/10 hover:text-white">
-              <Link to={exitPath}>Exit</Link>
+            <Button onClick={exitDraft} disabled={rosterExitPending} variant="outline" className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface-raised px-5 text-[10px] font-black uppercase tracking-[0.18em] text-cfb-text-primary hover:border-cfb-gold/55 hover:bg-cfb-gold/10 hover:text-white">
+              Exit
             </Button>
           </div>
 
@@ -1060,8 +1099,8 @@ export default function Draft() {
                 <p className="mt-1 text-[9px] font-black uppercase tracking-[0.18em] text-amber-100/90">{draftProgressLabel}</p>
               ) : null}
             </div>
-            <Button asChild variant="outline" className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface-raised/90 px-5 text-[10px] font-black uppercase tracking-[0.18em] text-white hover:bg-cfb-surface-hover">
-              <Link to={`/league/${parsedLeagueId}`}>League Hub</Link>
+            <Button onClick={() => completed ? void viewFinalRoster() : navigate(`/league/${parsedLeagueId}`)} disabled={rosterExitPending} variant="outline" className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface-raised/90 px-5 text-[10px] font-black uppercase tracking-[0.18em] text-white hover:bg-cfb-surface-hover">
+              League Hub
             </Button>
           </div>
         </div>
@@ -1107,11 +1146,11 @@ export default function Draft() {
           </div>
         )}
 
-        {latestPick ? (
-          <div className="flex min-w-0 shrink-0 items-center rounded-xl border border-cyan-300/15 bg-cyan-400/10 px-3 py-2 text-[9px] font-black uppercase tracking-[0.08em] text-cyan-100 sm:mx-auto sm:w-fit sm:rounded-full sm:px-5 sm:text-[10px] sm:tracking-[0.18em]">
-            <span className="shrink-0">Last pick&nbsp;</span><span className="truncate text-white">{latestPick.player_name}</span><span className="shrink-0">&nbsp;to&nbsp;{latestPick.team_name}</span>
-          </div>
-        ) : null}
+        {reconnecting || expired ? <div role="status" className="flex items-center justify-between gap-3 border border-amber-300/25 bg-cfb-surface-raised p-3 text-sm text-amber-200">
+          <span>{reconnecting ? "Reconnecting · Showing last confirmed draft. Picks are temporarily disabled." : "Time expired · Auto-pick pending"}</span>
+          {reconnecting ? <Button variant="outline" onClick={() => void refetchDraftRoom()}>Retry</Button> : null}
+        </div> : null}
+        <PickConfirmationStrip pick={confirmation.pick} onFinish={confirmation.finish} lastPick={latestPick ? { name: latestPick.player_name, team: latestPick.team_name } : undefined} />
 
         <section data-testid="mobile-draft-order" className={cn("shrink-0 overflow-hidden sm:hidden", draftMattePanelClass)}>
           <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
@@ -1375,6 +1414,7 @@ export default function Draft() {
                     tabIndex={0}
                     onClick={() => setSelectedPlayerId(player.id)}
                     onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) return;
                       if (event.key === "Enter" || event.key === " ") {
                         event.preventDefault();
                         setSelectedPlayerId(player.id);
@@ -1422,7 +1462,7 @@ export default function Draft() {
                           actionIsDraft && !isBackendPlayer
                             ? "This master-board player needs backend CFB27 sync before a real pick can be saved."
                             : actionIsDraft && !canPick
-                              ? "Submitting your draft pick."
+                              ? reconnecting ? "Reconnecting to the draft." : expired ? "Time expired. Waiting for auto-pick." : "Submitting your draft pick."
                               : isQueued
                                 ? `Remove ${player.name} from your queue.`
                                 : actionIsDraft
@@ -1482,13 +1522,11 @@ export default function Draft() {
       ) : null}
 
       {showCompletionModal ? (
-        <div className="fixed inset-0 z-[1450] flex items-center justify-center bg-slate-950/72 px-4 py-6 backdrop-blur-md">
-          <section
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="real-draft-complete-title"
-            className="relative w-full max-w-xl overflow-hidden rounded-[2rem] border border-cfb-border-subtle bg-cfb-surface-raised text-center shadow-[0_16px_44px_rgba(0,0,0,0.34)]"
-          >
+        <Dialog open onOpenChange={(open) => { if (!open) setDismissedCompletedDraftId(draftRoom.draft_id); }}>
+          <DialogContent overlayClassName="z-[1450]" className="z-[1451] max-w-xl gap-0 p-0 text-center sm:p-0" onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            document.querySelector<HTMLButtonElement>('[data-testid="draft-room-tabs"] button[aria-current="page"]')?.focus();
+          }}>
             <div className="relative border-b border-cfb-border-subtle bg-cfb-surface px-8 pb-8 pt-12 sm:px-12 sm:pb-10">
               <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl border border-cfb-brand/30 bg-cfb-brand/10 text-cfb-brand">
                 <Trophy className="h-10 w-10" />
@@ -1496,18 +1534,20 @@ export default function Draft() {
               <p className="mt-6 text-[10px] font-black uppercase tracking-[0.30em] text-cfb-brand">
                 Rosters finalized
               </p>
-              <h2 id="real-draft-complete-title" className="mt-3 text-4xl font-black uppercase tracking-tight text-white sm:text-5xl">
+              <DialogTitle className="mt-3 text-4xl font-black uppercase tracking-tight text-white sm:text-5xl">
                 Draft Complete
-              </h2>
-              <p className="mx-auto mt-4 max-w-md text-sm font-bold leading-6 text-slate-200/80">
-                Every draftable roster slot is full. Your league is ready for lineup decisions and Week 1 matchups.
-              </p>
+              </DialogTitle>
+              <DialogDescription className="mx-auto mt-4 max-w-md text-sm font-bold leading-6 text-slate-200/80">
+                Every draftable roster slot is full. Your league is ready for lineup decisions and matchups.
+              </DialogDescription>
+              {localError ? <p role="alert" className="mt-3 text-sm text-red-200">{localError}</p> : null}
             </div>
             <div className="relative grid gap-3 px-6 py-6 sm:grid-cols-2 sm:px-8">
               <Button
                 type="button"
                 className="h-16 rounded-2xl bg-cfb-brand px-6 text-[11px] font-black uppercase tracking-[0.16em] text-slate-950 transition hover:bg-cfb-brand/90"
                 onClick={() => void viewFinalRoster()}
+                disabled={rosterExitPending}
               >
                 <Users className="mr-2 h-5 w-5" />
                 View Your Roster
@@ -1521,8 +1561,8 @@ export default function Draft() {
                 Stay in Draft Room
               </Button>
             </div>
-          </section>
-        </div>
+          </DialogContent>
+        </Dialog>
       ) : null}
 
       <div data-testid="draft-room-tabs" className="fixed inset-x-0 bottom-0 z-[1200] border-t border-cfb-border-subtle bg-cfb-surface-raised/96 p-0 shadow-[0_-8px_24px_rgba(0,0,0,0.26)] backdrop-blur-xl sm:pointer-events-none sm:inset-x-auto sm:bottom-3 sm:left-1/2 sm:flex sm:w-[min(100vw-3rem,60rem)] sm:-translate-x-1/2 sm:border-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:shadow-none sm:backdrop-blur-none">

@@ -577,6 +577,33 @@ describe("single-player mock draft engine", () => {
     expect(isPickTimerDanger({ ...live, status: "complete" }, 5)).toBe(false);
   });
 
+  it("rejects manual picks at and after expiry before the next advancement tick", () => {
+    const start = 1_000;
+    const live: SinglePlayerMockDraftState = {
+      ...createSinglePlayerMockDraft(start), status: "live", currentPick: MOCK_USER_TEAM_ID,
+      pickStartedAt: start, pickExpiresAt: start + 30_000,
+    };
+    expect(makeUserMockPick(live, board, 1, 30_999).picks).toHaveLength(1);
+    expect(() => makeUserMockPick(live, board, 1, 31_000)).toThrow("Time expired");
+    expect(() => makeUserMockPick(live, board, 1, 31_001)).toThrow("Time expired");
+    const expired = advanceSinglePlayerMockDraft(live, board, 31_001);
+    expect(expired.picks).toHaveLength(1);
+    expect(expired.picks[0].pickedBy).toBe("auto");
+    expect(advanceSinglePlayerMockDraft(expired, board, 31_001).picks).toHaveLength(1);
+  });
+
+  it("reports the actual progress when the eligible pool is exhausted", () => {
+    const live: SinglePlayerMockDraftState = {
+      ...createSinglePlayerMockDraft(1000), status: "live", currentPick: 1,
+      pickStartedAt: 1000, pickExpiresAt: 31_000,
+    };
+    const result = advanceSinglePlayerMockDraft(live, [], 31_000);
+    expect(result.completionReason).toBe("pool_exhausted");
+    expect(result.picks).toHaveLength(0);
+    expect(result.currentPick).toBe(1);
+    expect(result.pickExpiresAt).toBeNull();
+  });
+
   it("only allows user picks on the user team turn", () => {
     const start = 1_000;
     const initial = createSinglePlayerMockDraft(start);

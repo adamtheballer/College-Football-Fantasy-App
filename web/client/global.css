@@ -11,6 +11,17 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes pick-reveal {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
+@keyframes pick-retract {
+  from { transform: translateY(0); }
+  to { transform: translateY(-100%); }
+}
+.animate-pick-reveal { animation: pick-reveal 240ms ease-out both; }
+.animate-pick-retract { animation: pick-retract 240ms ease-in both; }
+
 @layer base {
   /**
    * Tailwind CSS theme

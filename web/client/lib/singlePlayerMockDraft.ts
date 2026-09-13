@@ -62,6 +62,7 @@ export type SinglePlayerMockDraftState = {
   teams: MockDraftTeam[];
   picks: MockDraftPick[];
   queuedPlayerIds: number[];
+  completionReason?: "pool_exhausted";
 };
 
 export type MockRosterSlot = {
@@ -273,7 +274,7 @@ export const isUserOnClock = (state: SinglePlayerMockDraftState) =>
 export const isPickTimerDanger = (
   state: SinglePlayerMockDraftState,
   secondsRemaining: number
-) => state.status === "live" && secondsRemaining > 0 && secondsRemaining <= 10;
+) => state.status === "live" && secondsRemaining >= 0 && secondsRemaining <= 10;
 
 export const getCenteredDraftCarouselScrollLeft = getCenteredDraftOrderScrollLeft;
 
@@ -616,6 +617,9 @@ export const makeUserMockPick = (
   if (!isUserOnClock(state)) {
     throw new Error("It is not your turn.");
   }
+  if (state.pickExpiresAt === null || now >= state.pickExpiresAt) {
+    throw new Error("Time expired. Waiting for auto-pick.");
+  }
   const player = getDraftablePlayersForTeam(board, state).find((row) => row.id === playerId);
   if (!player) {
     const alreadyDrafted = draftedPlayerIds(state).has(playerId);
@@ -696,7 +700,8 @@ export const advanceSinglePlayerMockDraft = (
       return {
         ...nextState,
         status: "complete",
-        currentPick: totalPicks,
+        completionReason: "pool_exhausted",
+        currentPick: nextState.currentPick,
         pickStartedAt: null,
         pickExpiresAt: null,
       };
