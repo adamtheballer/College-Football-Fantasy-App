@@ -135,6 +135,14 @@ test.describe("player card modal", () => {
     await expect(dialog.getByText(/Sep 5, 2026/)).toHaveCount(0);
     await expect(dialog.getByText("Live", { exact: true }).last()).toBeVisible();
     await expect(dialog.getByText("42", { exact: true }).last()).toBeVisible();
+    const gameLogWidth = await dialog.getByTestId("player-game-log-table").evaluate((table) => {
+      const tableBox = table.getBoundingClientRect();
+      const cardBox = table.closest("article")?.getBoundingClientRect();
+      return cardBox ? { tableLeft: tableBox.left, tableRight: tableBox.right, cardLeft: cardBox.left, cardRight: cardBox.right } : null;
+    });
+    expect(gameLogWidth).not.toBeNull();
+    expect(gameLogWidth?.tableLeft).toBeLessThanOrEqual((gameLogWidth?.cardLeft ?? 0) + 1);
+    expect(gameLogWidth?.tableRight).toBeGreaterThanOrEqual((gameLogWidth?.cardRight ?? 0) - 1);
     const previousRequests = logRequests;
     yards = 74;
     await page.clock.runFor(30_100);

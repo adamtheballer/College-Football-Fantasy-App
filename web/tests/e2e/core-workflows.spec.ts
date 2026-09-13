@@ -364,8 +364,10 @@ test.describe("critical browser workflows", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
     const pagination = page.getByTestId("league-carousel-pagination");
+    const glowProgress = page.getByTestId("league-carousel-glow-progress");
     const rail = page.getByLabel("Swipe through your league matchups");
     await expect(pagination).toHaveAttribute("aria-label", "Showing league 1 of 2");
+    await expect(glowProgress).toHaveAttribute("data-progress", "0.00");
     await expect(rail).toBeVisible();
     await expect(page.getByTestId("league-carousel-card-2-1")).toBeVisible();
     expect(await rail.evaluate((element) => element.scrollWidth > element.clientWidth)).toBeTruthy();
@@ -383,6 +385,8 @@ test.describe("critical browser workflows", () => {
     await expect(pagination).toHaveAttribute("aria-label", "Showing league 2 of 2");
     await expect(pagination.locator("[data-active='true']")).toHaveCount(1);
     await expect(pagination.locator("[data-active='true']").nth(0)).toHaveAttribute("data-active", "true");
+    await expect(glowProgress).toHaveAttribute("data-active-index", "1");
+    await expect(glowProgress).toHaveAttribute("data-progress", "100.00");
   });
 
   test("mobile dashboard retains the normal page scroller outside draft rooms", async ({ page }, testInfo) => {
@@ -3180,6 +3184,14 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByTestId("waiver-mobile-week-points-801")).toHaveText("26.4");
     await expect(page.getByTestId("waiver-mobile-week-points-801")).toHaveClass(/text-cfb-brand/);
     await expect(mobileRow.getByRole("button", { name: /Remove Arch Manning from watchlist/i })).toBeVisible();
+    const mobileScoreLayout = await page.getByTestId("waiver-mobile-week-points-801").evaluate((score) => {
+      const scoreBox = score.getBoundingClientRect();
+      const rowBox = score.closest("[data-testid^='waiver-mobile-player-row-']")?.getBoundingClientRect();
+      return rowBox ? { left: scoreBox.left, right: scoreBox.right, rowLeft: rowBox.left, rowRight: rowBox.right } : null;
+    });
+    expect(mobileScoreLayout).not.toBeNull();
+    expect(mobileScoreLayout?.left).toBeGreaterThanOrEqual(mobileScoreLayout?.rowLeft ?? 0);
+    expect(mobileScoreLayout?.right).toBeLessThanOrEqual((mobileScoreLayout?.rowRight ?? 0) + 1);
     const playerBoard = page.getByTestId("league-player-board");
     const playerBoardBox = await playerBoard.boundingBox();
     expect(playerBoardBox).not.toBeNull();
