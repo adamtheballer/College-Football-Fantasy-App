@@ -246,6 +246,7 @@ export default function Index() {
           eyebrow="League dashboard"
           title={`Good to see you, ${user?.firstName ?? "Manager"}.`}
           description="Your current league, matchup, and time-sensitive decisions."
+          className="cfb-home-league-header border-b-0 pb-2"
         />
         {leaguesLoading ? (
           <SkeletonState rows={1} label="Loading your league matchups" />
