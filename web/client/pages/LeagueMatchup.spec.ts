@@ -164,6 +164,7 @@ describe("league matchup scoreboard", () => {
     expect(screen.queryByText("Rival Week")).toBeNull();
     expect(screen.queryByText("Permanent rival")).toBeNull();
     expect(screen.getByText("Week 1 matchup")).toBeTruthy();
+    expect(screen.getByTestId("matchup-scoreboard").parentElement?.className).not.toContain("sticky");
     expect(screen.getByRole("heading", { name: "Updated Adam's Team vs Taylor's Team" })).toBeTruthy();
     expect(screen.queryByRole("region", { name: "League matchups" })).toBeNull();
     expect(screen.getByLabelText("Matchup 1 of 2. Use the previous and next controls or swipe to view another matchup.")).toBeTruthy();
