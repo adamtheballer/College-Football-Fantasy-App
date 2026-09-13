@@ -59,9 +59,6 @@ LABEL_ALIASES = {
         "KR": "kick_return_attempts",
         "KRYDS": "kick_return_yards",
         "KRTD": "kick_return_touchdowns",
-        "PR": "punt_return_attempts",
-        "PRYDS": "punt_return_yards",
-        "PRTD": "punt_return_touchdowns",
     },
     "turnovers": {
         "FUM": "fumbles",

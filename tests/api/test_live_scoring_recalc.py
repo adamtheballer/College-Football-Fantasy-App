@@ -122,12 +122,12 @@ def test_stat_correction_changes_scores_without_incrementing(client, db_session)
     assert home_score.total_points == 68.0
 
 
-def test_live_punt_return_touchdown_refreshes_the_starting_lineup_score(client, db_session):
+def test_live_punt_return_touchdown_does_not_change_the_starting_lineup_score(client, db_session):
     league, home, _away, players, _matchup = create_scoring_fixture(db_session)
     recalculate_league_week_scores(db_session, league.id, 2026, 1)
 
-    # A provider refresh replaces cumulative current-game totals. The return
-    # must update the starter's score and team total without manufacturing PPR.
+    # A provider refresh replaces cumulative current-game totals, but punt
+    # returns are outside CFFB's stat and scoring contract.
     stat = db_session.query(PlayerStat).filter_by(player_id=players["rb"].id, season=2026, week=1).one()
     stat.stats = {"PuntReturnYards": 50, "PuntReturnTouchdowns": 1}
     recalculate_league_week_scores(db_session, league.id, 2026, 1)
@@ -139,10 +139,10 @@ def test_live_punt_return_touchdown_refreshes_the_starting_lineup_score(client, 
     team_score = db_session.query(TeamWeekScore).filter_by(
         league_id=league.id, team_id=home.id, season=2026, week=1
     ).one()
-    assert player_score.fantasy_points == 11.0
+    assert player_score.fantasy_points == 0.0
     assert player_score.breakdown_json["receptions"]["points"] == 0.0
-    assert player_score.breakdown_json["punt_return_tds"]["points"] == 6.0
-    assert team_score.total_points == 48.0
+    assert "punt_return_tds" not in player_score.breakdown_json
+    assert team_score.total_points == 37.0
 
 
 def test_scoring_run_records_success_and_failure(client, db_session):

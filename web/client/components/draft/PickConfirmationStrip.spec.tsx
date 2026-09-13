@@ -14,6 +14,16 @@ afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); });
 const tick = (ms: number) => act(() => vi.advanceTimersByTime(ms));
 
 describe("confirmed pick presentation", () => {
+  it("keeps the compact last-pick context fixed above the scrolling draft content", () => {
+    render(<PickConfirmationStrip onFinish={vi.fn()} lastPick={{ name: "Player One", team: "Blue Team" }} />);
+    const strip = screen.getByTestId("pick-context-strip");
+    expect(strip.className).toContain("fixed");
+    expect(strip.className).toContain("top-0");
+    expect(strip.className).toContain("pointer-events-none");
+    expect(strip.className).toContain("h-9");
+    expect(strip.textContent).toContain("Player One");
+  });
+
   it("does not replay initial history, remounts or a different draft baseline", () => {
     const view = render(<Harness picks={[own(1)]} />);
     expect(screen.queryByTestId("pick-confirmation")).toBeNull();

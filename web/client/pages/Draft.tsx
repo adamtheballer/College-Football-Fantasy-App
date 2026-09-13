@@ -991,7 +991,7 @@ export default function Draft() {
     <div data-draft-room="league" className="relative min-h-[100dvh] overflow-x-clip text-foreground">
       <DraftRoomVisuals />
 
-      <div className="relative flex min-h-0 w-full flex-1 flex-col space-y-2 pb-[5.75rem] pt-[max(0.5rem,env(safe-area-inset-top))] sm:mx-auto sm:block sm:max-w-[1800px] sm:space-y-6 sm:px-4 sm:pb-[calc(env(safe-area-inset-bottom)+7.5rem)] sm:pt-4 md:px-6 md:pb-28">
+      <div className="relative flex min-h-0 w-full flex-1 flex-col space-y-2 pb-[5.75rem] pt-[max(2.75rem,calc(env(safe-area-inset-top)+2.25rem))] sm:mx-auto sm:block sm:max-w-[1800px] sm:space-y-6 sm:px-4 sm:pb-[calc(env(safe-area-inset-bottom)+7.5rem)] sm:pt-14 md:px-6 md:pb-28">
         <div className="relative z-20 flex h-12 shrink-0 items-center gap-2 border-y border-white/12 bg-[#0b121a]/92 px-3 shadow-none sm:hidden">
           <Button
             type="button"
@@ -1046,7 +1046,7 @@ export default function Draft() {
           </div>
 
           {(isPreDraft || isDraftActive || isTransition) && !completed ? (
-            <div className="pointer-events-none order-3 flex w-full justify-center sm:fixed sm:left-1/2 sm:top-3 sm:z-[1250] sm:w-auto sm:-translate-x-1/2">
+            <div className="pointer-events-none order-3 flex w-full justify-center sm:fixed sm:left-1/2 sm:top-12 sm:z-[1250] sm:w-auto sm:-translate-x-1/2">
               <div
                 className={cn(
                   "rounded-3xl border border-cfb-border-subtle bg-cfb-surface-raised/95 px-6 py-3 text-center shadow-[0_10px_24px_rgba(0,0,0,0.30)] backdrop-blur-sm transition sm:px-8",

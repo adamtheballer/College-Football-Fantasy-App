@@ -4,6 +4,7 @@ from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.domain.scoring_engine import calculate_score
+from collegefootballfantasy_api.app.domain.stat_normalization import strip_unscored_return_stats
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.historical_stats import PlayerHistoricalSeasonStat
 from collegefootballfantasy_api.app.models.league import League
@@ -83,15 +84,19 @@ def _stat_read(
 ) -> PlayerGameLogStatRead | None:
     if stat is None:
         return None
-    fantasy_points = _fantasy_points(stat.stats)
-    if fantasy_points is None and scoring_rules is not None:
-        # Canonical provider stats may still use source field names such as
-        # PassingYards.  calculate_score normalizes them before applying the
-        # selected league's scoring rules.
-        fantasy_points = calculate_score(stat.stats or {}, position, scoring_rules).total
+    # A legacy provider total is retained only when its row contains no
+    # retired return production. Rows with punt returns have that stale total
+    # removed and fall back to CFFB's current scoring calculation.
+    public_stats = strip_unscored_return_stats(
+        stat.stats,
+        remove_derived_fantasy_points=True,
+    )
+    fantasy_points = _fantasy_points(public_stats)
+    if fantasy_points is None:
+        fantasy_points = calculate_score(public_stats, position, scoring_rules or {}).total
     return PlayerGameLogStatRead(
         source=stat.source,
-        stats=stat.stats,
+        stats=public_stats,
         fantasy_points=fantasy_points,
         updated_at=stat.updated_at,
     )

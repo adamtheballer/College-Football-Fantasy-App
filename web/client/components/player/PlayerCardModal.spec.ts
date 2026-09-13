@@ -30,13 +30,13 @@ describe("PlayerCardModal helpers", () => {
       "Summary", "News", "Game Log", "Alerts", "Projections", "History", "Value",
     ]);
   });
-  it("keeps punt-return stats at the end of position-specific Game Logs", () => {
+  it("omits punt-return stats from position-specific Game Logs", () => {
     expect(gameLogColumnsForPosition("TE").map(([label]) => label)).toEqual([
-      "FPTS", "TAR", "REC", "REC YDS", "REC TD", "PR YDS", "PR TD",
+      "FPTS", "TAR", "REC", "REC YDS", "REC TD",
     ]);
-    expect(gameLogColumnsForPosition("WR").at(-1)?.[0]).toBe("PR TD");
+    expect(gameLogColumnsForPosition("WR").map(([label]) => label)).not.toContain("PR TD");
+    expect(gameLogColumnsForPosition("WR").map(([label]) => label)).not.toContain("PR YDS");
     expect(isFeaturedCurrentGameStat(["REC TD", []])).toBe(true);
-    expect(isFeaturedCurrentGameStat(["PR TD", []])).toBe(false);
     expect(gameLogOpponentLabel({ location: "away", opponent_name: "Ohio State" })).toBe("at Ohio State");
     expect(formatGameLogDate("2026-09-05")).toBe("Sep 5, 2026 • Time TBD");
   });

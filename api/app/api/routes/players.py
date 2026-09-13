@@ -8,6 +8,7 @@ from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.api.deps import get_optional_current_user, require_admin_user
 from collegefootballfantasy_api.app.crud.player import create_players, get_player, list_players
 from collegefootballfantasy_api.app.crud.player_stat import get_player_stat, upsert_player_stat
+from collegefootballfantasy_api.app.domain.stat_normalization import strip_unscored_return_stats
 from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.integrations.espn import ESPNClient
 from collegefootballfantasy_api.app.integrations.sportsdata import SportsDataClient
@@ -496,7 +497,7 @@ def get_player_card_endpoint(
                 season=row.season,
                 week=row.week,
                 source=row.source,
-                stats=row.stats,
+                stats=strip_unscored_return_stats(row.stats, remove_derived_fantasy_points=True),
                 updated_at=row.updated_at,
             )
             for row in stat_rows
@@ -585,7 +586,7 @@ def get_player_season_stats_endpoint(
             week=week_value,
             source=existing.source,
             cached=True,
-            stats=existing.stats,
+            stats=strip_unscored_return_stats(existing.stats, remove_derived_fantasy_points=True),
         )
 
     if not settings.sportsdata_api_key and not existing:
@@ -671,7 +672,7 @@ def get_player_season_stats_endpoint(
         week=week_value,
         source=stored.source,
         cached=not refreshed,
-        stats=stored.stats,
+        stats=strip_unscored_return_stats(stored.stats, remove_derived_fantasy_points=True),
         message=stale_fallback_message,
     )
 
@@ -714,7 +715,7 @@ def get_player_stats_endpoint(
             week=week_value,
             source=existing.source,
             cached=True,
-            stats=existing.stats,
+            stats=strip_unscored_return_stats(existing.stats, remove_derived_fantasy_points=True),
         )
 
     if not player.external_id and not existing:
@@ -793,6 +794,6 @@ def get_player_stats_endpoint(
         week=week_value,
         source=stored.source,
         cached=not refreshed,
-        stats=stored.stats,
+        stats=strip_unscored_return_stats(stored.stats, remove_derived_fantasy_points=True),
         message=stale_fallback_message,
     )

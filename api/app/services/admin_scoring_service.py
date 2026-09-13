@@ -3,6 +3,7 @@ from __future__ import annotations
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.domain.stat_normalization import strip_unscored_return_stats
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.matchup import Matchup
@@ -83,7 +84,11 @@ def preview_stat_correction(db: Session, payload: AdminCorrectionRequest) -> Cor
         .all()
     }
     projected_scores: dict[int, float] = {}
-    normalized_stats = normalize_player_stats(payload.stats)
+    sanitized_stats = strip_unscored_return_stats(
+        payload.stats,
+        remove_derived_fantasy_points=True,
+    )
+    normalized_stats = normalize_player_stats(sanitized_stats)
     for league_id in affected_league_ids:
         league = db.get(League, league_id)
         if not league:
@@ -100,7 +105,7 @@ def preview_stat_correction(db: Session, payload: AdminCorrectionRequest) -> Cor
         week=payload.week,
         affected_league_ids=affected_league_ids,
         before_stats=stat_row.stats if stat_row else None,
-        after_stats=payload.stats,
+        after_stats=sanitized_stats,
         before_scores={league_id: before_scores.get(league_id) for league_id in affected_league_ids},
         projected_scores=projected_scores,
     )
@@ -142,15 +147,19 @@ def apply_stat_correction(db: Session, payload: AdminCorrectionRequest, actor: U
     preview = preview_stat_correction(db, payload)
     before_state = preview.model_dump(mode="json")
     stat_row = _current_player_stat(db, payload.player_id, payload.season, payload.week)
+    sanitized_stats = strip_unscored_return_stats(
+        payload.stats,
+        remove_derived_fantasy_points=True,
+    )
     if stat_row:
-        stat_row.stats = payload.stats
+        stat_row.stats = sanitized_stats
     else:
         stat_row = PlayerStat(
             player_id=payload.player_id,
             season=payload.season,
             week=payload.week,
             source="admin_correction",
-            stats=payload.stats,
+            stats=sanitized_stats,
         )
         db.add(stat_row)
         db.flush()

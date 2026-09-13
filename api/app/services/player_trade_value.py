@@ -17,6 +17,7 @@ from collegefootballfantasy_api.app.services.injury_value import injury_value_mu
 from collegefootballfantasy_api.app.services.fantasy_week_finality import (
     week_is_authoritatively_finalized,
 )
+from collegefootballfantasy_api.app.scoring import calculate_fantasy_points
 
 # Preserve the published policy identifier for existing histories. Official
 # availability is a controlled adjustment within that preseason policy, not a
@@ -98,14 +99,14 @@ def _apply_current_value(
     player.value_input_json = inputs
 
 
-def _stat_points(stats: dict | None) -> float | None:
+def _stat_points(stats: dict | None, *, position: str) -> float | None:
     if not stats:
         return None
     for key in ("fantasy_points", "fantasyPoints", "fpts"):
         value = stats.get(key)
-        if isinstance(value, (int, float)):
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
             return float(value)
-    return None
+    return calculate_fantasy_points(stats, position=position)
 
 
 def _percentile(value: float | None, values: list[float], fallback: float = 35.0) -> float:
@@ -238,12 +239,12 @@ def calculate_player_trade_value(db: Session, *, player_id: int, season: int, we
     pool = _position_pool(db, player.position)
     rating_score = _percentile(player.raw_cfb27_rating, [float(row.raw_cfb27_rating) for row in pool if row.raw_cfb27_rating is not None])
     player_stats = db.query(PlayerStat).filter(PlayerStat.player_id == player.id, PlayerStat.season == season, PlayerStat.week.between(1, max(week, 1)), PlayerStat.verified.is_(True)).order_by(PlayerStat.week.asc()).all()
-    points = [value for value in (_stat_points(row.stats) for row in player_stats) if value is not None]
+    points = [value for value in (_stat_points(row.stats, position=player.position) for row in player_stats) if value is not None]
     performance_raw = (sum(points) / len(points)) if points else None
     position_performance: list[float] = []
     for candidate in pool:
         scores = db.query(PlayerStat).filter(PlayerStat.player_id == candidate.id, PlayerStat.season == season, PlayerStat.week.between(1, max(week, 1)), PlayerStat.verified.is_(True)).all()
-        values = [value for value in (_stat_points(row.stats) for row in scores) if value is not None]
+        values = [value for value in (_stat_points(row.stats, position=candidate.position) for row in scores) if value is not None]
         if values: position_performance.append(sum(values) / len(values))
     performance_score = _percentile(performance_raw, position_performance, fallback=rating_score)
     projection = db.scalar(
