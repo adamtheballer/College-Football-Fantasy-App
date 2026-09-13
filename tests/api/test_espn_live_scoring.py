@@ -1227,7 +1227,7 @@ def test_transient_provider_failures_have_a_bounded_retry_delay():
     assert retry_seconds == MAX_TRANSIENT_GAME_RETRY_SECONDS
 
 
-def test_empty_or_partial_summary_preserves_last_verified_cumulative_totals(db_session):
+def test_empty_summary_preserves_last_verified_cumulative_totals_and_partial_live_summary_advances(db_session):
     arch, wingo = _verified_players(db_session)
     client = FakeLiveESPN()
     _make_public_promotion_ready(db_session, at=NOW)
@@ -1254,7 +1254,7 @@ def test_empty_or_partial_summary_preserves_last_verified_cumulative_totals(db_s
     assert poll.status == "delayed"
     assert db_session.query(PlayerStat).filter_by(player_id=arch.id, season=2026, week=1).one().stats["pass_yards"] == first_arch
 
-    partial_summary = deepcopy(espn_summary_payload())
+    partial_summary = _summary_at(period=2, clock="04:00", pass_yards=275)
     # Remove every provider category for Wingo rather than relying on fixture
     # indexes; special-teams categories can be added independently.
     for category in partial_summary["boxscore"]["players"][0]["statistics"]:
@@ -1262,6 +1262,7 @@ def test_empty_or_partial_summary_preserves_last_verified_cumulative_totals(db_s
             category["athletes"] = []
     poll.next_poll_at = NOW + timedelta(seconds=MIN_GAME_POLL_INTERVAL_SECONDS * 2)
     db_session.commit()
+    _make_public_promotion_ready(db_session, at=NOW + timedelta(seconds=MIN_GAME_POLL_INTERVAL_SECONDS * 2))
     partial = run_espn_scoring_cycle(
         db_session,
         season=2026,
@@ -1271,7 +1272,12 @@ def test_empty_or_partial_summary_preserves_last_verified_cumulative_totals(db_s
         now=NOW + timedelta(seconds=MIN_GAME_POLL_INTERVAL_SECONDS * 2),
         relevant_team_names={"texas"},
     )
-    assert partial.failed_games == 1
+    assert partial.successful_games == 1
+    assert partial.failed_games == 0
+    # The present player advances from the fresh live row, while the omitted
+    # player retains their last verified cumulative total instead of freezing
+    # the entire game or being zeroed.
+    assert db_session.query(PlayerStat).filter_by(player_id=arch.id, season=2026, week=1).one().stats["pass_yards"] == 275
     assert db_session.query(PlayerStat).filter_by(player_id=wingo.id, season=2026, week=1).one().stats["rec_yards"] == first_wingo
 
 

@@ -19,14 +19,16 @@ from collegefootballfantasy_api.app.domain.stat_normalization import normalize_p
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.live_player_projection import LivePlayerProjection
 from collegefootballfantasy_api.app.models.player import Player
-from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGameSnapshot
+from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll, ProviderGameSnapshot
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 
-LIVE_PROJECTION_V1 = "live_projection_v1"
+LIVE_PROJECTION_V2 = "live_projection_v2"
 LIVE_WEIGHT_START = 0.10
 LIVE_WEIGHT_MAX = 0.85
 USAGE_MIN, USAGE_MAX = 0.60, 1.50
 EFFICIENCY_MIN, EFFICIENCY_MAX = 0.75, 1.25
+PACE_ADJUSTMENT_START = 0.20
+PACE_ADJUSTMENT_MAX = 0.50
 REGULATION_SECONDS = 60 * 60
 
 STAT_FIELDS = (
@@ -35,6 +37,7 @@ STAT_FIELDS = (
     "fumble_return_tds", "fg_made_0_30", "fg_made_31_40", "fg_made_41_50",
     "fg_made_51_60", "fg_made_61_plus", "xp_made", "fg_missed",
 )
+PACE_ADJUSTED_YARD_FIELDS = {"pass_yards", "rush_yards", "rec_yards"}
 
 
 def _number(value: Any) -> float:
@@ -86,7 +89,10 @@ def _live_usage(raw: Mapping[str, Any], position: str | None, expected_key: str 
     # labelled lower-fidelity fallback for pass-catcher targets.
     aliases = {
         "targets": ("targets", "Targets"),
-        "rush_attempts": ("rush_attempts", "rushingAttempts", "RushingAttempts"),
+        # Cached ESPN rows use ``rushing_attempts`` while a few provider
+        # variants use the shorter/camel-cased forms. Preserve all of them
+        # so live RB workload is not silently discarded.
+        "rush_attempts": ("rush_attempts", "rushing_attempts", "rushingAttempts", "RushingAttempts"),
         "pass_attempts": ("pass_attempts", "passingAttempts", "PassingAttempts"),
     }
     if expected_key:
@@ -105,6 +111,21 @@ def _efficiency_multiplier(position: str | None, pregame: Mapping[str, float], c
         observed = current.get("rec_yards", 0) / max(current.get("receptions", 0), 1)
         return _clamp(1 + 0.25 * ((observed / max(expected, 1)) - 1), EFFICIENCY_MIN, EFFICIENCY_MAX), "yards_per_reception"
     return 1.0, None
+
+
+def _pace_adjustment_weight(progress: float) -> float:
+    """Return a capped confidence weight for a positive live yardage pace.
+
+    A single early explosive play should not be treated as a full-game rate.
+    Once a game has meaningful clock elapsed, blend a bounded share of the
+    observed pace into only the remaining yardage forecast. The player keeps
+    all completed production, while touchdowns and other high-variance events
+    stay fully regressed to the pregame expectation.
+    """
+    if progress < PACE_ADJUSTMENT_START:
+        return 0.0
+    normalized = (progress - PACE_ADJUSTMENT_START) / (1 - PACE_ADJUSTMENT_START)
+    return _clamp(0.20 + 0.30 * normalized, 0.0, PACE_ADJUSTMENT_MAX)
 
 
 @dataclass(frozen=True)
@@ -170,13 +191,28 @@ def project_live_player(
     efficiency_multiplier, efficiency_source = _efficiency_multiplier(position, pregame_stats, current)
     remaining_fraction = 1 - progress
     remaining: dict[str, float] = {}
+    pace_adjustment_weight = _pace_adjustment_weight(progress)
+    pace_adjusted_fields: dict[str, float] = {}
     for field in STAT_FIELDS:
         multiplier = usage_multiplier if field in {"pass_yards", "rush_yards", "rec_yards", "receptions"} else 1.0
         if field in {"pass_yards", "rush_yards", "rec_yards"}:
             multiplier *= efficiency_multiplier
         # TDs, INTs, conversions and kick makes retain strongly regressed
         # pregame rates; actual events already live in current stats.
-        remaining[field] = max(0.0, prior[field] * remaining_fraction * multiplier)
+        baseline_remaining = max(0.0, prior[field] * remaining_fraction * multiplier)
+        remaining[field] = baseline_remaining
+        if field not in PACE_ADJUSTED_YARD_FIELDS or pace_adjustment_weight <= 0 or current[field] <= 0:
+            continue
+        # The rate is used only as a bounded positive adjustment. If live
+        # production is trailing the pregame pace, the regular opportunity
+        # model remains authoritative rather than compounding a cold start.
+        observed_remaining_at_current_pace = current[field] * remaining_fraction / max(progress, 0.01)
+        if observed_remaining_at_current_pace <= baseline_remaining:
+            continue
+        remaining[field] = baseline_remaining + (
+            observed_remaining_at_current_pace - baseline_remaining
+        ) * pace_adjustment_weight
+        pace_adjusted_fields[field] = round(remaining[field] - baseline_remaining, 4)
     raw_final = {field: current[field] + remaining[field] for field in STAT_FIELDS}
     alpha = _clamp(0.35 + 0.50 * progress, 0.35, 0.85)
     # Kickoff initializes from the pregame prior. Do not smooth the first
@@ -194,7 +230,7 @@ def project_live_player(
         round(_clamp(0.25 + progress * 0.6, 0.0, 0.9), 3),
         "usage_unavailable" if observed_usage is None else None,
         None,
-        {"live_weight": round(live_weight, 4), "usage_source": usage_source, "expected_usage": expected_usage or None, "observed_usage": observed_usage, "usage_ratio": usage_ratio, "usage_multiplier": round(usage_multiplier, 4), "efficiency_source": efficiency_source, "efficiency_multiplier": round(efficiency_multiplier, 4), "raw_remaining_fraction": remaining_fraction, "smoothing_alpha": alpha},
+        {"live_weight": round(live_weight, 4), "usage_source": usage_source, "expected_usage": expected_usage or None, "observed_usage": observed_usage, "usage_ratio": usage_ratio, "usage_multiplier": round(usage_multiplier, 4), "efficiency_source": efficiency_source, "efficiency_multiplier": round(efficiency_multiplier, 4), "raw_remaining_fraction": remaining_fraction, "pace_adjustment_weight": round(pace_adjustment_weight, 4), "pace_adjusted_fields": pace_adjusted_fields, "smoothing_alpha": alpha},
     )
 
 
@@ -237,9 +273,14 @@ def persist_live_projections_for_snapshot(db: Session, *, snapshot: ProviderGame
             continue
         raw_stats = normalized.get("stats") if isinstance(normalized.get("stats"), dict) else {}
         prior = weekly_projection_stats(pregame)
-        input_hash = _hash_input({"snapshot": snapshot.snapshot_hash, "projection": pregame.id, "prior": prior, "stats": raw_stats, "progress": progress, "status": snapshot.event_state})
+        input_hash = _hash_input({"model": LIVE_PROJECTION_V2, "snapshot": snapshot.snapshot_hash, "projection": pregame.id, "prior": prior, "stats": raw_stats, "progress": progress, "status": snapshot.event_state})
         existing = db.query(LivePlayerProjection).filter_by(player_id=player_id, game_id=game.id, provider_snapshot_hash=snapshot.snapshot_hash).one_or_none()
-        if existing is not None:
+        # A model revision must refresh the newest accepted snapshot in place.
+        # Snapshot identity is unique in the database, so appending a second
+        # row would fail and leave a live game on the old forecast until ESPN
+        # emits another play. Reusing the exact accepted snapshot keeps the
+        # read path deterministic while publishing the corrected model now.
+        if existing is not None and existing.model_version == LIVE_PROJECTION_V2 and existing.input_hash == input_hash:
             continue
         earlier = previous.get(player_id)
         result = project_live_player(
@@ -252,21 +293,70 @@ def persist_live_projections_for_snapshot(db: Session, *, snapshot: ProviderGame
             previous_game_progress=earlier.game_progress if earlier else None,
             pregame_fantasy_points=_number(pregame.fantasy_points),
         )
-        db.add(LivePlayerProjection(
-            player_id=player_id, game_id=game.id, pregame_projection_id=pregame.id,
-            season=snapshot.season, week=snapshot.week, provider=snapshot.provider,
-            provider_snapshot_hash=snapshot.snapshot_hash, provider_snapshot_at=snapshot_at,
-            model_version=LIVE_PROJECTION_V1, projection_status=result.projection_status,
-            game_period=snapshot.event_period, game_clock=snapshot.event_clock,
-            # Scoring normalization intentionally omits non-scoring box-score
-            # fields such as carries. Keep them for roster/player displays.
-            game_progress=result.game_progress, current_stats_json={**raw_stats, **normalize_player_stats(raw_stats, player.position)},
-            projected_final_stats_json=result.projected_final_stats, projected_remaining_stats_json=result.projected_remaining_stats,
-            projected_remaining_fantasy_points=result.projected_remaining_fantasy_points,
-            observability_json=result.observability, confidence=result.confidence, fallback_reason=result.fallback_reason,
-            input_hash=input_hash, calculated_at=datetime.now(timezone.utc),
-        ))
+        projection_row = existing or LivePlayerProjection(
+            player_id=player_id,
+            game_id=game.id,
+            provider_snapshot_hash=snapshot.snapshot_hash,
+        )
+        projection_row.pregame_projection_id = pregame.id
+        projection_row.season = snapshot.season
+        projection_row.week = snapshot.week
+        projection_row.provider = snapshot.provider
+        projection_row.provider_snapshot_at = snapshot_at
+        projection_row.model_version = LIVE_PROJECTION_V2
+        projection_row.projection_status = result.projection_status
+        projection_row.game_period = snapshot.event_period
+        projection_row.game_clock = snapshot.event_clock
+        projection_row.game_progress = result.game_progress
+        # Scoring normalization intentionally omits non-scoring box-score
+        # fields such as carries. Keep them for roster/player displays.
+        projection_row.current_stats_json = {
+            **raw_stats,
+            **normalize_player_stats(raw_stats, player.position),
+        }
+        projection_row.projected_final_stats_json = result.projected_final_stats
+        projection_row.projected_remaining_stats_json = result.projected_remaining_stats
+        projection_row.projected_remaining_fantasy_points = result.projected_remaining_fantasy_points
+        projection_row.observability_json = result.observability
+        projection_row.confidence = result.confidence
+        projection_row.fallback_reason = result.fallback_reason
+        projection_row.input_hash = input_hash
+        projection_row.calculated_at = datetime.now(timezone.utc)
+        if existing is None:
+            db.add(projection_row)
         persisted += 1
     if persisted:
         db.flush()
     return persisted
+
+
+def refresh_accepted_live_projection_model(
+    db: Session,
+    *,
+    season: int,
+    week: int,
+) -> int:
+    """Refresh outdated rows from the latest accepted live snapshots only.
+
+    A deployment can revise the forecast formula while ESPN has not emitted a
+    new play. Replaying just each poll's currently accepted live snapshot lets
+    that revision take effect immediately without a provider call, broad
+    history rewrite, or any use of rejected/stale captures.
+    """
+    snapshots = (
+        db.query(ProviderGameSnapshot)
+        .join(
+            ProviderGamePoll,
+            (ProviderGamePoll.provider == ProviderGameSnapshot.provider)
+            & (ProviderGamePoll.provider_game_id == ProviderGameSnapshot.provider_game_id)
+            & (ProviderGamePoll.accepted_snapshot_hash == ProviderGameSnapshot.snapshot_hash),
+        )
+        .filter(
+            ProviderGameSnapshot.season == season,
+            ProviderGameSnapshot.week == week,
+            ProviderGameSnapshot.event_state == "live",
+            ProviderGameSnapshot.accepted.is_(True),
+        )
+        .all()
+    )
+    return sum(persist_live_projections_for_snapshot(db, snapshot=snapshot) for snapshot in snapshots)

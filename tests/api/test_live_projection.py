@@ -6,12 +6,13 @@ from collegefootballfantasy_api.app.domain.scoring_engine import calculate_playe
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.live_player_projection import LivePlayerProjection
 from collegefootballfantasy_api.app.models.player import Player
-from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGameSnapshot
+from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll, ProviderGameSnapshot
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.services.live_projection import (
-    LIVE_PROJECTION_V1,
+    LIVE_PROJECTION_V2,
     persist_live_projections_for_snapshot,
     project_live_player,
+    refresh_accepted_live_projection_model,
     regulation_game_progress,
 )
 
@@ -67,6 +68,31 @@ def test_overperformance_can_raise_a_projection_without_extrapolating_rates():
     )
     assert _points(result.projected_final_stats) > 28.9
     assert result.projected_remaining_stats["rec_tds"] <= 1.0
+
+
+def test_first_half_rb_breakout_lifts_yardage_projection_without_pace_extrapolating_touchdowns():
+    baseline = project_live_player(
+        pregame_stats={"rush_attempts": 18, "rush_yards": 65, "rush_tds": 0},
+        live_stats={"rushing_attempts": 8, "rush_yards": 40, "rush_tds": 1},
+        position="RB",
+        game_status="live",
+        game_progress=0.45,
+    )
+    breakout = project_live_player(
+        pregame_stats={"rush_attempts": 18, "rush_yards": 65, "rush_tds": 0},
+        live_stats={"rushing_attempts": 8, "rush_yards": 88, "rush_tds": 1},
+        position="RB",
+        game_status="live",
+        game_progress=0.45,
+    )
+
+    # The fast yardage start earns a conservative remaining-yards lift, but
+    # its touchdown does not create a pace-extrapolated future touchdown.
+    assert breakout.projected_remaining_stats["rush_yards"] > baseline.projected_remaining_stats["rush_yards"]
+    assert breakout.observability["pace_adjusted_fields"]["rush_yards"] > 0
+    assert breakout.observability["usage_source"] == "rush_attempts"
+    assert breakout.projected_remaining_stats["rush_tds"] == pytest.approx(0)
+    assert _points(breakout.projected_final_stats) < 30
 
 
 def test_final_and_missing_clock_follow_explicit_safe_paths():
@@ -146,7 +172,7 @@ def test_accepted_snapshot_persists_one_idempotent_model_result(db_session):
     assert persist_live_projections_for_snapshot(db_session, snapshot=snapshot) == 1
     assert persist_live_projections_for_snapshot(db_session, snapshot=snapshot) == 0
     row = db_session.query(LivePlayerProjection).one()
-    assert row.model_version == LIVE_PROJECTION_V1
+    assert row.model_version == LIVE_PROJECTION_V2
     assert row.projection_status == "LIVE"
     assert row.game_progress == 0.25
 
@@ -172,6 +198,44 @@ def test_live_rb_cache_preserves_carries_without_changing_fantasy_scoring(db_ses
     assert cached.current_stats_json["rushing_attempts"] == 5
     assert calculate_player_fantasy_points(cached.current_stats_json, {}, "RB")[0] == pytest.approx(9.4)
     assert persist_live_projections_for_snapshot(db_session, snapshot=snapshot) == 0
+
+
+def test_model_revision_recomputes_the_existing_accepted_snapshot_in_place(db_session):
+    player = Player(name="Live Revision RB", school="Test", position="RB")
+    game = Game(external_id="revision-rb", season=2026, week=1, home_team="Test", away_team="Rival")
+    db_session.add_all([player, game])
+    db_session.flush()
+    snapshot = ProviderGameSnapshot(
+        provider="espn", provider_game_id=game.external_id, season=2026, week=1,
+        status="live", event_state="live", event_period=2, event_clock="03:00",
+        accepted=True, snapshot_hash="d" * 64, captured_at=datetime.now(timezone.utc),
+        normalized_rows=[{
+            "player_id": player.id,
+            "stats": {"rushing_attempts": 8, "rush_yards": 88, "rush_tds": 1},
+        }],
+    )
+    poll = ProviderGamePoll(
+        provider="espn", provider_game_id=game.external_id, season=2026, week=1,
+        status="live", accepted_snapshot_hash=snapshot.snapshot_hash,
+    )
+    db_session.add_all([snapshot, poll, WeeklyProjection(
+        player_id=player.id, season=2026, week=1, fantasy_points=18.4,
+        rush_attempts=18, rush_yards=65, rush_tds=0,
+    )])
+    db_session.commit()
+
+    assert refresh_accepted_live_projection_model(db_session, season=2026, week=1) == 1
+    row = db_session.query(LivePlayerProjection).one()
+    first_remaining = row.projected_remaining_stats_json["rush_yards"]
+    row.model_version = "live_projection_v1"
+    row.input_hash = "legacy-input"
+    db_session.commit()
+
+    assert persist_live_projections_for_snapshot(db_session, snapshot=snapshot) == 1
+    rows = db_session.query(LivePlayerProjection).all()
+    assert len(rows) == 1
+    assert rows[0].model_version == LIVE_PROJECTION_V2
+    assert rows[0].projected_remaining_stats_json["rush_yards"] == pytest.approx(first_remaining)
 
 
 def test_cached_snapshot_replay_evolves_from_kickoff_through_final_without_provider_io(db_session):
