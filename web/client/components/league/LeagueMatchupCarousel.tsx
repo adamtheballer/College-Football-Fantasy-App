@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, Trophy } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 
 import { WinChanceBar, formatDisplayedProbabilityPair, validProbability } from "@/components/league/WinChanceMeter";
 import type { LeagueDetail } from "@/types/league";
@@ -155,16 +155,13 @@ export function LeagueMatchupCarousel({
     }, 120);
   }, [hasLoop, normalizeLoopPosition, syncScrollProgress, syncVisibleLeague]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setVisibleLeagueIndex(0);
-    const animationFrame = window.requestAnimationFrame(() => {
-      if (hasLoop) scrollToCard(1);
-      syncVisibleLeague();
-      syncScrollProgress();
-    });
+    if (hasLoop) scrollToCard(1);
+    syncVisibleLeague();
+    syncScrollProgress();
     window.addEventListener("resize", syncVisibleLeague);
     return () => {
-      window.cancelAnimationFrame(animationFrame);
       if (loopResetTimeoutRef.current !== null) window.clearTimeout(loopResetTimeoutRef.current);
       window.removeEventListener("resize", syncVisibleLeague);
     };

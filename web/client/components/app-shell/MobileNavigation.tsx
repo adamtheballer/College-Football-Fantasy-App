@@ -68,6 +68,9 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut, guidedN
             const Icon = item.icon;
             const isActive = isCurrentRoute(pathname, item.path);
             const isGuided = guidedNavItem === item.name;
+            const badgeDescription = item.name === "CHATS"
+              ? `${item.badge} unread chat messages`
+              : `${item.badge} notifications`;
 
             return (
               <Link
@@ -75,7 +78,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut, guidedN
                 to={item.path}
                 data-nav-item="true"
                 data-guide-nav={item.name}
-                aria-label={item.badge ? `${item.name}: ${item.badge} notifications` : item.name}
+                aria-label={item.badge ? `${item.name}: ${badgeDescription}` : item.name}
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
                   "font-ui relative flex min-h-[54px] min-w-0 flex-col items-center justify-center gap-1 rounded-sm px-0.5 text-[11px] font-semibold leading-none transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-transparent",
