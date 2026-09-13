@@ -1226,30 +1226,74 @@ def record_espn_game_failure(
     return row
 
 
-def _assert_complete_espn_summary(
-    db: Session,
-    *,
-    claim: ClaimedGame,
-    summary: dict[str, Any],
-    normalized_rows: list[dict[str, Any]],
-) -> None:
-    """Reject empty or regressive snapshots before they can replace scores."""
+def _assert_complete_espn_summary(*, summary: dict[str, Any]) -> None:
+    """Reject a provider response that has no usable player box score.
+
+    A transient omission of one player from an otherwise-live ESPN response is
+    handled separately by :func:`_carry_forward_missing_live_player_rows`.
+    That lets the rest of a game advance while preserving the omitted
+    player's last verified totals. An entirely empty box score remains unsafe
+    and must never be interpreted as a zero-score update.
+    """
 
     # A game summary with no player rows is not a valid zero-score response.
     # Treat it as degraded provider data and preserve the prior canonical rows.
     if not extract_player_box_score_stats(summary):
         raise ProviderDataIncompleteError("ESPN summary contains no player box-score rows")
-    row = db.get(ProviderGamePoll, claim.id)
-    previous_snapshot = _accepted_snapshot(db, row) if row is not None else None
-    previous_ids = {
-        int(item["player_id"])
+
+
+def _carry_forward_missing_live_player_rows(
+    db: Session,
+    *,
+    claim: ClaimedGame,
+    summary: dict[str, Any],
+    normalized_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Keep a partial live ESPN response from freezing an entire game.
+
+    ESPN can temporarily omit one or more athletes from an in-progress
+    boxscore while still supplying fresh rows for everyone else. Previously we
+    rejected the entire response, which left every player's score stale until
+    the provider corrected itself. For a live game only, retain the last
+    accepted row for each omitted verified player and apply the new rows for
+    everyone present. This never manufactures a zero and is deliberately not
+    used for final games, where official stat removals are reconciled as real
+    corrections.
+    """
+
+    if _summary_status(summary, "scheduled") != "live":
+        return normalized_rows
+
+    poll = db.get(ProviderGamePoll, claim.id)
+    previous_snapshot = _accepted_snapshot(db, poll) if poll is not None else None
+    if previous_snapshot is None:
+        return normalized_rows
+
+    previous_rows = [
+        item
         for item in (previous_snapshot.normalized_rows or [])
+        if isinstance(item, dict) and item.get("player_id") is not None and isinstance(item.get("stats"), dict)
+    ]
+    if not previous_rows:
+        return normalized_rows
+
+    current_ids = {
+        int(item["player_id"])
+        for item in normalized_rows
         if isinstance(item, dict) and item.get("player_id") is not None
-    } if previous_snapshot else set()
-    current_ids = {int(item["player_id"]) for item in normalized_rows}
-    required_previous_ids = previous_ids - _unrostered_kicker_ids(db, season=claim.season, player_ids=previous_ids)
-    if required_previous_ids and not required_previous_ids.issubset(current_ids):
-        raise ProviderDataIncompleteError("ESPN summary is missing a previously verified player row")
+    }
+    unrostered_kicker_ids = _unrostered_kicker_ids(
+        db,
+        season=claim.season,
+        player_ids={int(item["player_id"]) for item in previous_rows},
+    )
+    carried_rows = [
+        {"player_id": int(previous["player_id"]), "stats": dict(previous["stats"])}
+        for previous in previous_rows
+        if int(previous["player_id"]) not in current_ids
+        and int(previous["player_id"]) not in unrostered_kicker_ids
+    ]
+    return [*normalized_rows, *carried_rows]
 
 
 def _reconcile_finally_removed_player_rows(
@@ -1630,11 +1674,14 @@ def run_espn_scoring_cycle(
                 summary=summary,
                 normalized_rows=normalized,
             )
-            _assert_complete_espn_summary(
+            normalized = _carry_forward_missing_live_player_rows(
                 db,
                 claim=claim,
                 summary=summary,
                 normalized_rows=normalized,
+            )
+            _assert_complete_espn_summary(
+                summary=summary,
             )
             poll = db.get(ProviderGamePoll, claim.id)
             previous_snapshot = _accepted_snapshot(db, poll) if poll is not None else None
@@ -1750,6 +1797,17 @@ def run_espn_scoring_cycle(
             week=week,
             limit=1,
         ):
+            db.commit()
+
+        # A live-model deployment must be able to refresh the already accepted
+        # in-progress snapshot even when ESPN has not emitted another play.
+        # The helper is snapshot-bound and idempotent, so it never performs
+        # provider I/O or replaces an accepted provider state.
+        from collegefootballfantasy_api.app.services.live_projection import (
+            refresh_accepted_live_projection_model,
+        )
+
+        if refresh_accepted_live_projection_model(db, season=season, week=week):
             db.commit()
 
     if mode == "enabled" and pending_promotion and week > 0:
