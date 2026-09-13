@@ -25,11 +25,11 @@ describe("PlayerTrajectoryChart", () => {
 
     expect(screen.getByText("Preweek baseline — actual fantasy points publish after each game")).toBeTruthy();
     expect(screen.getByText("Preweek")).toBeTruthy();
-    expect(screen.getByText("Preweek baseline")).toBeTruthy();
-    expect(screen.getByText("Actual fantasy points")).toBeTruthy();
+    expect(screen.getByText("Weekly projection")).toBeTruthy();
+    expect(screen.getByText("Final fantasy points")).toBeTruthy();
     expect(screen.getByText("W13")).toBeTruthy();
     expect(screen.getByRole("img", { name: "Projection trajectory" }).querySelectorAll("path[stroke='#5ee7ff']")).toHaveLength(0);
-    expect(screen.getByRole("img", { name: "Projection trajectory" }).querySelectorAll("circle[fill='#ffffff']")).toHaveLength(1);
+    expect(screen.getByRole("img", { name: "Projection trajectory" }).querySelectorAll("circle[fill='#5ee7ff']")).toHaveLength(1);
   });
 
   it("connects only consecutive published weekly records", () => {
@@ -50,13 +50,26 @@ describe("PlayerTrajectoryChart", () => {
     expect(chart.querySelector("title")?.textContent).toContain("actual fantasy points");
   });
 
-  it("keeps the published pregame point and the final total visible for the same week", () => {
+  it("replaces a completed week's pregame estimate with its one final total", () => {
     renderChart([{ week: 1, value: 18.4, actualValue: 25.2, source: "published" }]);
 
     const chart = screen.getByRole("img", { name: "Projection trajectory" });
-    expect(chart.querySelectorAll("circle[fill='#ffffff']")).toHaveLength(1);
+    expect(chart.querySelectorAll("circle[fill='#5ee7ff']")).toHaveLength(0);
     expect(chart.querySelectorAll("circle[fill='#2f80ff']")).toHaveLength(1);
-    expect(chart.querySelectorAll("title")[1]?.textContent).toContain("actual fantasy points");
+    expect(chart.querySelector("title")?.textContent).toBe("Week 1 actual fantasy points: 25.2 pts");
+  });
+
+  it("keeps each final total under the week that produced it", () => {
+    renderChart([
+      { week: 1, value: 20.0, actualValue: 17.1, source: "published" },
+      { week: 2, value: 19.0, actualValue: 4.2, source: "published" },
+    ]);
+
+    const weekOne = screen.getByTestId("trajectory-point-actual-1-0");
+    const weekTwo = screen.getByTestId("trajectory-point-actual-2-1");
+    expect(weekOne.getAttribute("cx")).not.toBe(weekTwo.getAttribute("cx"));
+    expect(weekOne.getAttribute("aria-label")).toContain("Week 1 actual fantasy points: 17.1 pts");
+    expect(weekTwo.getAttribute("aria-label")).toContain("Week 2 actual fantasy points: 4.2 pts");
   });
 
   it("shows a precise value on hover and lets touch users toggle that value", () => {

@@ -36,6 +36,18 @@ export function PlayerTrajectoryChart({
   const [hoveredPointKey, setHoveredPointKey] = useState<string | null>(null);
   const [selectedPointKey, setSelectedPointKey] = useState<string | null>(null);
   const ordered = [...points].sort((left, right) => left.week - right.week);
+  const isProjection = seriesKind === "projection";
+  // A final score supersedes the model estimate for its own week. The API
+  // retains both values for auditability, but a weekly chart must render one
+  // fantasy-points dot per week.
+  const displayPoints: TrajectoryPoint[] = isProjection
+    ? ordered.map((point) => {
+      const finalPoints = point.source === "actual" ? point.value : point.actualValue;
+      return typeof finalPoints === "number" && Number.isFinite(finalPoints)
+        ? { ...point, value: finalPoints, actualValue: null, source: "actual" }
+        : point;
+    })
+    : ordered;
   const plotWidth = CHART_WIDTH - PADDING.left - PADDING.right;
   const plotHeight = CHART_HEIGHT - PADDING.top - PADDING.bottom;
   const horizontalTicks = yMax === 100 ? [0, 25, 50, 75, 100] : [0, 10, 20, 30];
@@ -44,12 +56,12 @@ export function PlayerTrajectoryChart({
   const y = (value: number) => PADDING.top + (1 - Math.min(finiteValue(value), yMax) / yMax) * plotHeight;
   // Do not visually bridge weeks that have not produced a published snapshot.
   // A preseason card therefore renders one Week 0 dot, not a fictitious line.
-  const numericPoints: PlottedPoint[] = ordered.flatMap((point, index) => (
+  const numericPoints: PlottedPoint[] = displayPoints.flatMap((point, index) => (
     point.source !== "actual" && typeof point.value === "number" && Number.isFinite(point.value)
       ? [{ ...point, value: point.value, renderKey: `baseline-${point.week}-${index}` }]
       : []
   ));
-  const actualPoints: PlottedPoint[] = ordered.flatMap((point, index) => {
+  const actualPoints: PlottedPoint[] = displayPoints.flatMap((point, index) => {
     const value = point.source === "actual" ? point.value : point.actualValue;
     return typeof value === "number" && Number.isFinite(value)
       ? [{ ...point, value, source: "actual" as const, renderKey: `actual-${point.week}-${index}` }]
@@ -65,7 +77,6 @@ export function PlayerTrajectoryChart({
   const peak = plottedPoints.reduce((best, point) => point.value > best.value ? point : best, plottedPoints[0] ?? { week: 0, value: 0 });
   const isPreseasonOnly = ordered.length === 1 && ordered[0]?.week === 0;
   const isCurrentProjectionOnly = isPreseasonOnly && ordered[0]?.source === "current";
-  const isProjection = seriesKind === "projection";
   const activePointKey = hoveredPointKey ?? selectedPointKey;
   const activePoint = plottedPoints.find((point) => point.renderKey === activePointKey) ?? null;
 
@@ -78,7 +89,10 @@ export function PlayerTrajectoryChart({
   };
 
   const pointColor = (point: TrajectoryPoint) => {
-    if (isProjection) return point.source === "actual" ? "#2f80ff" : "#ffffff";
+    // A completed week is a final fantasy total; an upcoming week is a model
+    // projection. Keeping those two states visually distinct prevents the
+    // chart from suggesting that a player has two fantasy scores in one week.
+    if (isProjection) return point.source === "actual" ? "#2f80ff" : "#5ee7ff";
     return point.source === "published" ? "#ffffff" : "#5ee7ff";
   };
 
@@ -165,7 +179,7 @@ export function PlayerTrajectoryChart({
               />
             </g>
           ))}
-          {ordered.filter((point) => point.source === "bye").map((point) => (
+          {displayPoints.filter((point) => point.source === "bye").map((point) => (
             <g key={`empty-${point.week}`}>
               <title>{pointLabel(point)}: BYE</title>
               <text x={x(point.week)} y={y(0) - 8} textAnchor="middle" fill="rgba(226,232,240,0.62)" fontSize="9" fontWeight="800">BYE</text>
@@ -212,8 +226,8 @@ export function PlayerTrajectoryChart({
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-bold text-white/50">
         {isProjection ? (
           <>
-            <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-white" />Preweek baseline</span>
-            <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-blue-500" />Actual fantasy points</span>
+            <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-cyan-300" />Weekly projection</span>
+            <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-blue-500" />Final fantasy points</span>
           </>
         ) : (
           <>
