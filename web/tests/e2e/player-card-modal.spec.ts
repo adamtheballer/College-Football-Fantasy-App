@@ -336,6 +336,25 @@ test.describe("player card modal", () => {
         });
         return;
       }
+      if (url.pathname.endsWith("/players/1/trajectory")) {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            player_id: 1,
+            season: 2026,
+            preseason_projection_points: 315.5,
+            projection: [
+              { week: 1, points: 18.4, actual_points: 21.6, source: "published", projection_status: "final" },
+              { week: 2, points: 19.8, actual_points: 24.1, source: "published", projection_status: "final" },
+              { week: 3, points: 20.3, source: "published", projection_status: "published" },
+              { week: 4, points: 19.1, source: "published", projection_status: "published" },
+            ],
+            value: [],
+          }),
+        });
+        return;
+      }
       if (url.pathname.endsWith("/players/1")) {
         await route.fulfill({
           status: 200,
@@ -442,6 +461,15 @@ test.describe("player card modal", () => {
     expect(summaryValueStyles).not.toContain(null);
     expect(summaryValueStyles.every((whiteSpace) => whiteSpace === "nowrap")).toBe(true);
 
+    await dialog.getByRole("button", { name: "Projections", exact: true }).click();
+    const projectionChart = dialog.getByRole("img", { name: /projected fantasy points by week/i });
+    await expect(projectionChart).toBeVisible();
+    await expect(projectionChart.getByTestId("trajectory-projection-line")).toHaveAttribute("stroke", "#ffffff");
+    await expect(projectionChart.getByTestId("trajectory-projection-line")).toHaveAttribute("stroke-dasharray", "7 7");
+    await expect(projectionChart.getByTestId("trajectory-actual-line")).toHaveAttribute("stroke", "#2f80ff");
+    await expect(projectionChart.getByTestId("trajectory-actual-line")).not.toHaveAttribute("stroke-dasharray");
+
+    await dialog.getByRole("button", { name: "Game Log", exact: true }).click();
     await dialog.getByLabel("Game log season").selectOption("2025");
     await expect(dialog.getByLabel("2025 season summary")).toBeVisible();
     await expect(dialog.getByText(/No game log is available for 2025/i)).toHaveCount(0);
