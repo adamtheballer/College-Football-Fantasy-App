@@ -170,6 +170,7 @@ export default function Index() {
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [alertsLoaded, setAlertsLoaded] = useState(false);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
+  const [leagueCarouselProgress, setLeagueCarouselProgress] = useState(0);
 
   const selectedLeague = useMemo(() => {
     if (!leagues.length) return null;
@@ -246,6 +247,7 @@ export default function Index() {
           eyebrow="League dashboard"
           title={`Good to see you, ${user?.firstName ?? "Manager"}.`}
           description="Your current league, matchup, and time-sensitive decisions."
+          accentProgress={leagueCarouselProgress}
         />
         {leaguesLoading ? (
           <SkeletonState rows={1} label="Loading your league matchups" />
@@ -260,6 +262,7 @@ export default function Index() {
           <LeagueMatchupCarousel
             leagues={dashboardLeagues}
             activeLeagueId={selectedLeague?.id}
+            onProgressChange={setLeagueCarouselProgress}
             onOpenLeague={(leagueId) => {
               setActiveLeagueId(leagueId);
               navigate(`/league/${leagueId}/matchup`);

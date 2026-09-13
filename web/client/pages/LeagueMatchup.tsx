@@ -204,15 +204,12 @@ function CompactMatchupScoreboard({
   onPreviousMatchup: () => void;
   onNextMatchup: () => void;
 }) {
-  // The API normally supplies probabilities. A neutral fallback keeps an
-  // incomplete/injured lineup from replacing the matchup with an unavailable
-  // message while fresh roster totals are loading.
-  const winChance = probabilityPair(myTeam?.win_probability, opponentTeam?.win_probability) ?? { my: 50, opponent: 50 };
-  const displayedWinChance = displayedProbabilityPair(winChance.my, winChance.opponent);
-  const myTeamIsLeading = Boolean(winChance && winChance.my >= winChance.opponent);
+  const winChance = probabilityPair(myTeam?.win_probability, opponentTeam?.win_probability);
+  const displayedWinChance = winChance ? displayedProbabilityPair(winChance.my, winChance.opponent) : null;
+  const myTeamIsLeading = winChance ? winChance.my >= winChance.opponent : null;
 
   return (
-    <section className="relative border-b border-cfb-border-subtle bg-cfb-surface-raised/50 px-3 pb-3 pt-6 sm:px-5 sm:pb-4 sm:pt-7">
+    <section className="sticky top-0 z-20 relative border-b border-cfb-border-subtle bg-cfb-surface-raised/95 px-3 pb-3 pt-6 shadow-[0_10px_18px_rgba(2,6,23,0.16)] backdrop-blur-sm sm:px-5 sm:pb-4 sm:pt-7">
       <h2 className="sr-only">
         {managerTeamName(myTeam, "Your team")} vs {managerTeamName(opponentTeam, "Opponent")}
       </h2>
@@ -236,7 +233,7 @@ function CompactMatchupScoreboard({
         <div className="absolute left-1/2 top-2 hidden -translate-x-1/2 items-center gap-1 md:flex">
           <button
             type="button"
-            aria-label="Previous matchup"
+            aria-label="Previous league matchup"
             onClick={onPreviousMatchup}
             className="cfb-icon-button h-7 w-7"
           >
@@ -244,7 +241,7 @@ function CompactMatchupScoreboard({
           </button>
           <button
             type="button"
-            aria-label="Next matchup"
+            aria-label="Next league matchup"
             onClick={onNextMatchup}
             className="cfb-icon-button h-7 w-7"
           >
@@ -265,13 +262,15 @@ function CompactMatchupScoreboard({
           <span className="font-ui text-[8px] font-bold uppercase tracking-[0.06em] text-cfb-text-primary">Week {displayWeek} matchup</span>
           <span className="mt-0.5 font-ui text-[8px] font-bold uppercase tracking-[0.06em] text-cfb-text-muted">Win chance</span>
           <div className="mt-0.5 flex items-center gap-1 whitespace-nowrap text-[10px] font-black tabular-nums sm:text-xs">
-            <span className={myTeamIsLeading ? "text-emerald-300" : "text-cfb-crimson"}>
-              {`${displayedWinChance.my.toFixed(1)}%`}
-            </span>
-            <span className="text-cfb-text-muted">VS</span>
-            <span className={myTeamIsLeading ? "text-cfb-crimson" : "text-emerald-300"}>
-              {`${displayedWinChance.opponent.toFixed(1)}%`}
-            </span>
+            {displayedWinChance && myTeamIsLeading !== null ? (
+              <>
+                <span className={myTeamIsLeading ? "text-emerald-300" : "text-cfb-crimson"}>{`${displayedWinChance.my.toFixed(1)}%`}</span>
+                <span className="text-cfb-text-muted">VS</span>
+                <span className={myTeamIsLeading ? "text-cfb-crimson" : "text-emerald-300"}>{`${displayedWinChance.opponent.toFixed(1)}%`}</span>
+              </>
+            ) : (
+              <span className="text-cfb-text-muted">Awaiting data</span>
+            )}
           </div>
         </div>
 
@@ -284,11 +283,25 @@ function CompactMatchupScoreboard({
         />
       </div>
 
-      <div className="mt-3 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-t border-cfb-border-subtle pt-2 text-[9px] font-bold uppercase tracking-[0.12em] text-cfb-text-muted">
-        <span>{`${displayedWinChance.my.toFixed(1)}%`}</span>
-        <WinChanceBar myPercent={winChance.my} opponentPercent={winChance.opponent} className="h-2" testIdPrefix="scoreboard-win-chance" />
-        <span>{`${displayedWinChance.opponent.toFixed(1)}%`}</span>
-      </div>
+      {winChance && displayedWinChance ? (
+        <div className="mt-3 grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 border-t border-cfb-border-subtle pt-2 text-[9px] font-bold uppercase tracking-[0.12em] text-cfb-text-muted">
+          <span>{`${displayedWinChance.my.toFixed(1)}%`}</span>
+          <WinChanceBar myPercent={winChance.my} opponentPercent={winChance.opponent} className="h-2" testIdPrefix="scoreboard-win-chance" />
+          <span>{`${displayedWinChance.opponent.toFixed(1)}%`}</span>
+        </div>
+      ) : (
+        <p className="mt-3 border-t border-cfb-border-subtle pt-2 text-center text-[9px] font-bold uppercase tracking-[0.12em] text-cfb-text-muted">Win chance unavailable</p>
+      )}
+      {matchupCount > 1 ? (
+        <div className="mt-3 flex justify-center gap-2 md:hidden">
+          <button type="button" aria-label="Previous matchup" onClick={onPreviousMatchup} className="cfb-control inline-flex min-h-10 items-center gap-1.5 px-3 text-[10px] font-black uppercase tracking-[0.12em] text-cfb-text-secondary">
+            <ChevronLeft className="h-4 w-4" aria-hidden="true" /> Previous
+          </button>
+          <button type="button" aria-label="Next matchup" onClick={onNextMatchup} className="cfb-control inline-flex min-h-10 items-center gap-1.5 px-3 text-[10px] font-black uppercase tracking-[0.12em] text-cfb-text-secondary">
+            Next <ChevronRight className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -332,7 +345,7 @@ export default function LeagueMatchup() {
   const scheduledMatchups = scoreboardQuery.data?.data ?? [];
   const activeMatchupId = selectedMatchupId ?? data?.matchup_id;
   const activeMatchupIndex = Math.max(0, scheduledMatchups.findIndex((matchup) => matchup.matchup_id === activeMatchupId));
-  const swipeStartX = useRef<number | null>(null);
+  const swipeStart = useRef<{ x: number; y: number; interactive: boolean } | null>(null);
   const presentationStatus = rosteredPlayerIsLive && !["final", "stat_corrected", "corrected"].includes((data?.status ?? "").toLowerCase())
     ? "live"
     : data?.status ?? "projected";
@@ -389,7 +402,7 @@ export default function LeagueMatchup() {
       <main className="relative mx-auto w-full max-w-[1320px] px-0 py-4 sm:px-6 sm:py-8">
         <ErrorState
           title="Unable to load league"
-          message="The league could not be loaded. Confirm the backend is available, then try again."
+          message="We couldn't load this league right now. Your saved lineup and scores have not changed. Try again in a moment."
           retryLabel="Try Again"
           onRetry={() => void leagueQuery.refetch()}
         />
@@ -427,7 +440,7 @@ export default function LeagueMatchup() {
       {matchupQuery.isError ? (
         <ErrorState
           title="Unable to load matchup"
-          message="The matchup API did not return a usable response for this league and week."
+          message="We couldn't load this matchup right now. Your saved lineup and scores have not changed. Try again in a moment."
           retryLabel="Try Again"
           onRetry={() => void matchupQuery.refetch()}
         />
@@ -449,17 +462,27 @@ export default function LeagueMatchup() {
           <div
             data-testid="matchup-swipe-surface"
             onTouchStart={(event) => {
-              swipeStartX.current = event.touches[0]?.clientX ?? null;
+              const touch = event.touches[0];
+              swipeStart.current = touch
+                ? {
+                    x: touch.clientX,
+                    y: touch.clientY,
+                    interactive: event.target instanceof Element && Boolean(event.target.closest("button, a, input, select, textarea")),
+                  }
+                : null;
             }}
             onTouchEnd={(event) => {
-              const startX = swipeStartX.current;
-              swipeStartX.current = null;
-              const endX = event.changedTouches[0]?.clientX;
-              if (startX === null || typeof endX !== "number" || Math.abs(endX - startX) < 48) return;
-              selectAdjacentMatchup(endX < startX ? 1 : -1);
+              const start = swipeStart.current;
+              swipeStart.current = null;
+              const end = event.changedTouches[0];
+              if (!start || !end || start.interactive) return;
+              const horizontalDistance = end.clientX - start.x;
+              const verticalDistance = end.clientY - start.y;
+              if (Math.abs(horizontalDistance) < 48 || Math.abs(horizontalDistance) <= Math.abs(verticalDistance)) return;
+              selectAdjacentMatchup(horizontalDistance < 0 ? 1 : -1);
             }}
             onTouchCancel={() => {
-              swipeStartX.current = null;
+              swipeStart.current = null;
             }}
           >
             {data.postseason ? (

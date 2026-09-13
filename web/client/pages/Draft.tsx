@@ -465,6 +465,7 @@ export default function Draft() {
     isLoading: playersLoading,
     isError: playersError,
     error: playersErrorObject,
+    refetch: refetchPlayerPool,
   } = useDraftPlayerPool({
     league_id: parsedLeagueId,
     // Keep the full board in memory and remove drafted players below.  Rebuilding
@@ -1385,8 +1386,11 @@ export default function Draft() {
                 <Loader2 className="h-5 w-5 animate-spin" /> Loading real player board...
               </div>
             ) : playersError ? (
-              <div className="flex min-h-40 items-center justify-center px-6 text-center text-[10px] font-black uppercase tracking-[0.22em] text-red-300">
-                {formatApiError(playersErrorObject, "Unable to load players. Start the backend API and try again.")}
+              <div className="flex min-h-40 flex-col items-center justify-center gap-3 px-6 text-center text-[10px] font-black uppercase tracking-[0.22em] text-red-300" role="alert">
+                <p>{formatApiError(playersErrorObject, "We couldn't load the player board. Try again in a moment.")}</p>
+                <Button type="button" variant="outline" className="h-9 rounded-md text-[9px]" onClick={() => void refetchPlayerPool()}>
+                  Try again
+                </Button>
               </div>
             ) : visiblePlayers.length === 0 ? (
               <div className="flex min-h-40 items-center justify-center px-6 text-center text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">

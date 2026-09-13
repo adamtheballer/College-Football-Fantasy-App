@@ -95,6 +95,9 @@ const NATIVE_TOP_SAFE_AREA_FALLBACK = 59;
 const TOOLTIP_RESERVED_HEIGHT = 380;
 const NATIVE_BOTTOM_SAFE_AREA = 34;
 
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
 export const getTourTooltipTop = (targetTop: number, viewportHeight: number, isNativeShell: boolean): number => {
   const minimumTop = isNativeShell ? NATIVE_TOP_SAFE_AREA_FALLBACK : 16;
   const bottomInset = isNativeShell ? NATIVE_BOTTOM_SAFE_AREA : 16;
@@ -195,15 +198,11 @@ export function AppOnboardingTour({ isOpen, userId, onClose, onStepChange }: App
 
         if (elementTop < containerTop + margin || elementBottom > containerBottom - margin) {
           const targetTop = Math.max(0, elementTop - sidebarNav.clientHeight * 0.25);
-          sidebarNav.scrollTo({ top: targetTop, left: 0, behavior: "smooth" });
+          sidebarNav.scrollTo({ top: targetTop, left: 0, behavior: prefersReducedMotion() ? "auto" : "smooth" });
         }
       } else {
-        element.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+        element.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "center", inline: "nearest" });
       }
-      if (!element.hasAttribute("tabindex")) {
-        element.setAttribute("tabindex", "-1");
-      }
-      element.focus({ preventScroll: true });
 
       const rect = element.getBoundingClientRect();
       setTargetRect(rect);

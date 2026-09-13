@@ -68,12 +68,20 @@ describe("LeagueMatchupCarousel", () => {
         },
       },
     ];
-    render(<LeagueMatchupCarousel leagues={multipleLeagues} activeLeagueId={17} onOpenLeague={vi.fn()} />);
+    const onProgressChange = vi.fn();
+    render(
+      <LeagueMatchupCarousel
+        leagues={multipleLeagues}
+        activeLeagueId={17}
+        onOpenLeague={vi.fn()}
+        onProgressChange={onProgressChange}
+      />,
+    );
 
     const rail = screen.getByLabelText("Swipe through your league matchups");
     Object.defineProperty(rail, "clientWidth", { configurable: true, value: 320 });
     Object.defineProperty(rail, "scrollLeft", { configurable: true, writable: true, value: 340 });
-    const cards = screen.getAllByRole("button", { name: /Saturday Legends|Midnight Managers/i });
+    const cards = Array.from(document.querySelectorAll<HTMLButtonElement>("[data-testid^='league-carousel-card-']"));
     cards.forEach((card, index) => {
       Object.defineProperty(card, "offsetLeft", { configurable: true, value: index * 340 });
       Object.defineProperty(card, "offsetWidth", { configurable: true, value: 320 });
@@ -83,12 +91,14 @@ describe("LeagueMatchupCarousel", () => {
     await waitFor(() => {
       expect(screen.getByTestId("league-carousel-pagination").getAttribute("aria-label")).toBe("Showing league 1 of 2");
     });
+    expect(onProgressChange).toHaveBeenLastCalledWith(0);
 
     rail.scrollLeft = 680;
     fireEvent.scroll(rail);
     await waitFor(() => {
       expect(screen.getByTestId("league-carousel-pagination").getAttribute("aria-label")).toBe("Showing league 2 of 2");
     });
+    expect(onProgressChange).toHaveBeenLastCalledWith(1);
     expect(screen.getAllByTestId("league-carousel-pagination").flatMap((pagination) => Array.from(pagination.children)).map((dot) => dot.getAttribute("data-active"))).toEqual(["false", "true"]);
   });
 
@@ -104,7 +114,7 @@ describe("LeagueMatchupCarousel", () => {
     Object.defineProperty(rail, "scrollLeft", { configurable: true, writable: true, value: 1020 });
     const scrollTo = vi.fn();
     Object.defineProperty(rail, "scrollTo", { configurable: true, value: scrollTo });
-    screen.getAllByRole("button", { name: /Saturday Legends|Midnight Managers/i }).forEach((card, index) => {
+    Array.from(document.querySelectorAll<HTMLButtonElement>("[data-testid^='league-carousel-card-']")).forEach((card, index) => {
       Object.defineProperty(card, "offsetLeft", { configurable: true, value: index * 340 });
       Object.defineProperty(card, "offsetWidth", { configurable: true, value: 320 });
     });
@@ -126,6 +136,20 @@ describe("LeagueMatchupCarousel", () => {
     fireEvent.click(screen.getByRole("button", { name: /Saturday Legends/i }));
 
     expect(onOpenLeague).toHaveBeenCalledWith(17);
+  });
+
+  it("keeps loop clones out of the accessibility tree and provides explicit league controls", () => {
+    const multipleLeagues = [
+      ...leagues,
+      { ...leagues[0], id: 18, name: "Midnight Managers" },
+    ];
+    render(<LeagueMatchupCarousel leagues={multipleLeagues} onOpenLeague={vi.fn()} />);
+
+    expect(screen.getByRole("button", { name: "Previous league" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Next league" })).toBeTruthy();
+    const clone = screen.getByTestId("league-carousel-card-18-0");
+    expect(clone.getAttribute("aria-hidden")).toBe("true");
+    expect(clone.getAttribute("tabindex")).toBe("-1");
   });
 
   it("replaces a failed league image with the default trophy icon", () => {

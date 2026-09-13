@@ -11,6 +11,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Register the carousel-driven header marker so a scroll update glides rather
+ * than snapping its glow to the next league position. */
+@property --cfb-page-accent-progress {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
 @keyframes pick-reveal {
   from { transform: translateY(-100%); }
   to { transform: translateY(0); }
@@ -410,7 +418,10 @@
     bottom: -1px;
     left: 0;
     height: 1px;
-    background: linear-gradient(90deg, hsl(45 84% 59% / 0.72), hsl(207 90% 63% / 0.42) 34%, transparent 72%);
+    background:
+      radial-gradient(48px 4px at calc(var(--cfb-page-accent-progress, 0) * 100%) 50%, hsl(207 90% 63% / 0.92), hsl(207 90% 63% / 0.38) 42%, transparent 74%),
+      linear-gradient(90deg, hsl(45 84% 59% / 0.72), hsl(207 90% 63% / 0.42) 34%, transparent 72%);
+    transition: --cfb-page-accent-progress 180ms ease-out;
   }
 
   .cfb-stat-card {
