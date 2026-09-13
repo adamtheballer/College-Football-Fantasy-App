@@ -67,12 +67,16 @@ export function PlayerTrajectoryChart({
       ? [{ ...point, value, source: "actual" as const, renderKey: `actual-${point.week}-${index}` }]
       : [];
   });
-  const connectedLine = numericPoints.reduce((path, point, index) => {
-    const previous = numericPoints[index - 1];
+  const connectedPath = (series: PlottedPoint[]) => series.reduce((path, point, index) => {
+    const previous = series[index - 1];
     const command = previous && point.week === previous.week + 1 ? "L" : "M";
     return `${path}${command}${x(point.week)} ${y(point.value)} `;
   }, "");
-  const hasConnectedWeeks = numericPoints.some((point, index) => index > 0 && point.week === numericPoints[index - 1].week + 1);
+  const hasConnectedWeeks = (series: PlottedPoint[]) => series.some((point, index) => index > 0 && point.week === series[index - 1].week + 1);
+  const projectionLine = connectedPath(numericPoints);
+  const actualLine = connectedPath(actualPoints);
+  const hasConnectedProjectionWeeks = hasConnectedWeeks(numericPoints);
+  const hasConnectedActualWeeks = hasConnectedWeeks(actualPoints);
   const plottedPoints = [...numericPoints, ...actualPoints];
   const peak = plottedPoints.reduce((best, point) => point.value > best.value ? point : best, plottedPoints[0] ?? { week: 0, value: 0 });
   const isPreseasonOnly = ordered.length === 1 && ordered[0]?.week === 0;
@@ -92,7 +96,7 @@ export function PlayerTrajectoryChart({
     // A completed week is a final fantasy total; an upcoming week is a model
     // projection. Keeping those two states visually distinct prevents the
     // chart from suggesting that a player has two fantasy scores in one week.
-    if (isProjection) return point.source === "actual" ? "#2f80ff" : "#5ee7ff";
+    if (isProjection) return point.source === "actual" ? "#2f80ff" : "#ffffff";
     return point.source === "published" ? "#ffffff" : "#5ee7ff";
   };
 
@@ -150,7 +154,35 @@ export function PlayerTrajectoryChart({
           <text x={PADDING.left + plotWidth / 2} y={CHART_HEIGHT - 1} textAnchor="middle" fill="rgba(226,232,240,0.72)" fontSize="11" fontWeight="800">
             Week
           </text>
-          {hasConnectedWeeks ? <path d={connectedLine} fill="none" stroke="#5ee7ff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" /> : null}
+          {isProjection ? (
+            <>
+              {hasConnectedProjectionWeeks ? (
+                <path
+                  data-testid="trajectory-projection-line"
+                  d={projectionLine}
+                  fill="none"
+                  stroke="#ffffff"
+                  strokeDasharray="7 7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="3"
+                />
+              ) : null}
+              {hasConnectedActualWeeks ? (
+                <path
+                  data-testid="trajectory-actual-line"
+                  d={actualLine}
+                  fill="none"
+                  stroke="#2f80ff"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="4"
+                />
+              ) : null}
+            </>
+          ) : hasConnectedProjectionWeeks ? (
+            <path d={projectionLine} fill="none" stroke="#5ee7ff" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
+          ) : null}
           {numericPoints.map((point) => (
             <g key={point.renderKey}>
               <title>{pointLabel(point)}: {pointValueText(point)}</title>
@@ -226,8 +258,8 @@ export function PlayerTrajectoryChart({
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] font-bold text-white/50">
         {isProjection ? (
           <>
-            <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-cyan-300" />Weekly projection</span>
-            <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-blue-500" />Final fantasy points</span>
+            <span><span className="mr-1 inline-block w-3 border-t-2 border-dashed border-white align-middle" />Weekly projection</span>
+            <span><span className="mr-1 inline-block w-3 border-t-2 border-blue-500 align-middle" />Final fantasy points</span>
           </>
         ) : (
           <>

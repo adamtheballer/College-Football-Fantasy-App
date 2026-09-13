@@ -28,8 +28,9 @@ describe("PlayerTrajectoryChart", () => {
     expect(screen.getByText("Weekly projection")).toBeTruthy();
     expect(screen.getByText("Final fantasy points")).toBeTruthy();
     expect(screen.getByText("W13")).toBeTruthy();
-    expect(screen.getByRole("img", { name: "Projection trajectory" }).querySelectorAll("path[stroke='#5ee7ff']")).toHaveLength(0);
-    expect(screen.getByRole("img", { name: "Projection trajectory" }).querySelectorAll("circle[fill='#5ee7ff']")).toHaveLength(1);
+    expect(screen.queryByTestId("trajectory-projection-line")).toBeNull();
+    expect(screen.queryByTestId("trajectory-actual-line")).toBeNull();
+    expect(screen.getByRole("img", { name: "Projection trajectory" }).querySelectorAll("circle[fill='#ffffff']")).toHaveLength(1);
   });
 
   it("connects only consecutive published weekly records", () => {
@@ -39,7 +40,10 @@ describe("PlayerTrajectoryChart", () => {
     ]);
 
     expect(screen.getByText("Preweek baseline — actual fantasy points publish after each game")).toBeTruthy();
-    expect(screen.getByRole("img", { name: "Projection trajectory" }).querySelectorAll("path[stroke='#5ee7ff']")).toHaveLength(1);
+    const projectionLine = screen.getByTestId("trajectory-projection-line");
+    expect(projectionLine.getAttribute("stroke")).toBe("#ffffff");
+    expect(projectionLine.getAttribute("stroke-dasharray")).toBe("7 7");
+    expect(screen.getByTestId("trajectory-point-baseline-1-0").getAttribute("fill")).toBe("#ffffff");
   });
 
   it("uses blue only for actual fantasy-point totals", () => {
@@ -48,6 +52,18 @@ describe("PlayerTrajectoryChart", () => {
     const chart = screen.getByRole("img", { name: "Projection trajectory" });
     expect(chart.querySelectorAll("circle[fill='#2f80ff']")).toHaveLength(1);
     expect(chart.querySelector("title")?.textContent).toContain("actual fantasy points");
+  });
+
+  it("connects consecutive actual fantasy totals with a solid blue line", () => {
+    renderChart([
+      { week: 1, value: 17.1, source: "actual" },
+      { week: 2, value: 24.2, source: "actual" },
+    ]);
+
+    const actualLine = screen.getByTestId("trajectory-actual-line");
+    expect(actualLine.getAttribute("stroke")).toBe("#2f80ff");
+    expect(actualLine.getAttribute("stroke-dasharray")).toBeNull();
+    expect(screen.queryByTestId("trajectory-projection-line")).toBeNull();
   });
 
   it("replaces a completed week's pregame estimate with its one final total", () => {
