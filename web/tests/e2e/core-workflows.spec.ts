@@ -1812,8 +1812,10 @@ test.describe("critical browser workflows", () => {
     const swipeSurface = page.getByTestId("matchup-swipe-surface");
     await expect(swipeSurface).toBeVisible();
     await expect(
-      page.getByLabel("Matchup 1 of 2. Use the previous and next controls or swipe to view another matchup."),
+      page.getByLabel("Matchup 1 of 2. Swipe horizontally to view another matchup."),
     ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Previous matchup" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Next matchup" })).toHaveCount(0);
     await expect(page.getByLabel("Swipe through league matchups")).toHaveCount(0);
     const appViewport = page.locator("[data-app-viewport='true']");
     const appScroll = page.locator("main[data-app-scroll='true']");
