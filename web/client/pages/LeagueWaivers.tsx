@@ -913,10 +913,10 @@ export default function LeagueWaivers() {
                   <th className="w-40 px-3 py-3">Opponent</th>
                   <th className="w-20 px-3 py-3">POS</th>
                   <th className="w-24 px-3 py-3">POS RK</th>
-                  <th className={`w-40 px-3 py-3 ${playerBoardScope === "all" ? "text-left" : "text-right"}`}>
+                  <th className={`w-40 whitespace-nowrap px-3 py-3 ${playerBoardScope === "all" ? "text-left" : "text-right"}`}>
                     Week {displayWeek} Pts
                   </th>
-                  <th className="w-32 px-4 py-3 text-right">Action</th>
+                  <th className="w-48 px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-cfb-border-subtle">
@@ -988,16 +988,16 @@ export default function LeagueWaivers() {
                           {waiverPositionRankLabel(player)}
                         </span>
                       </td>
-                      <td className={`w-40 px-3 py-3 align-middle ${playerBoardScope === "all" ? "text-left" : "text-right"}`}>
+                      <td className={`w-40 whitespace-nowrap px-3 py-3 align-middle ${playerBoardScope === "all" ? "text-left" : "text-right"}`}>
                         <span
                           data-testid={`waiver-week-points-${player.id}`}
-                          className={`text-lg font-semibold tabular-nums ${waiverWeekPointsClassName(weekPoints)}`}
+                          className={`inline-block min-w-[3.25rem] whitespace-nowrap text-lg font-semibold tabular-nums ${waiverWeekPointsClassName(weekPoints)}`}
                         >
                           {weekPoints.label}
                         </span>
                       </td>
-                      <td className="px-4 py-3 align-middle">
-                        <div className="flex items-center justify-end gap-2">
+                      <td className="w-48 px-4 py-3 align-middle">
+                        <div className="flex min-w-[8.75rem] items-center justify-end gap-2">
                           <Button
                             type="button"
                             variant="outline"

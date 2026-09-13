@@ -3196,6 +3196,17 @@ test.describe("critical browser workflows", () => {
     });
     expect(allPlayersScoreLayout).toEqual(expect.objectContaining({ textAlign: "left" }));
     expect(allPlayersScoreLayout?.width).toBeGreaterThanOrEqual(150);
+    const desktopScoreActionClearance = await page.getByTestId("waiver-week-points-801").evaluate((score) => {
+      const row = score.closest("tr");
+      const action = row?.querySelector("td:last-child button");
+      if (!action) return null;
+      return {
+        scoreRight: score.getBoundingClientRect().right,
+        actionLeft: action.getBoundingClientRect().left,
+      };
+    });
+    expect(desktopScoreActionClearance).not.toBeNull();
+    expect(desktopScoreActionClearance?.scoreRight).toBeLessThanOrEqual((desktopScoreActionClearance?.actionLeft ?? 0) - 8);
 
     const boardScopeTabs = page.getByRole("tab", { name: /Waiver Wire|All Players|Hot Pickups/ });
     await expect(boardScopeTabs).toHaveCount(3);
