@@ -881,7 +881,14 @@ export function PlayerCardModal({
                     ) : null}
                     <PlayerTrajectoryChart
                       ariaLabel={`${player.name} projected fantasy points by week`}
-                      points={trajectoryQuery.data.projection.map((point) => ({ ...point, value: point.points, actualValue: point.actual_points }))}
+                      points={trajectoryQuery.data.projection.map((point) => (
+                        // A completed game owns its week. Do not overlay the
+                        // old pregame estimate with a second point, which can
+                        // look like two fantasy totals for one matchup.
+                        typeof point.actual_points === "number"
+                          ? { ...point, value: point.actual_points, actualValue: null, source: "actual" as const }
+                          : { ...point, value: point.points, actualValue: null }
+                      ))}
                       yLabel="Points"
                       yMax={30}
                       valueFormatter={(value) => `${value.toFixed(1)} pts`}
