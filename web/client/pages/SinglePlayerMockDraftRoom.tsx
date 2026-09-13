@@ -823,7 +823,7 @@ export default function SinglePlayerMockDraftRoom() {
             </Button>
           </div>
 
-          {draftState.status !== "complete" ? <div className="pointer-events-none order-3 flex w-full justify-center sm:fixed sm:left-1/2 sm:top-12 sm:z-[1250] sm:w-auto sm:-translate-x-1/2">
+          {draftState.status !== "complete" ? <div data-testid="mock-draft-room-timer" className="pointer-events-none order-3 flex w-full justify-center sm:fixed sm:left-1/2 sm:top-24 sm:z-[1250] sm:w-auto sm:-translate-x-1/2">
             <div
               className={cn(
                   "rounded-3xl border border-cfb-border-subtle bg-cfb-surface-raised/95 px-6 py-3 text-center shadow-[0_10px_24px_rgba(0,0,0,0.30)] backdrop-blur-sm transition sm:px-8",

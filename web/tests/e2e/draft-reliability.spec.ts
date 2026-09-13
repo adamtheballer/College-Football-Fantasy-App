@@ -103,6 +103,36 @@ test("confirmed pick animates once without moving list; next timer keeps running
   await expect(page.getByTestId("pick-confirmation")).toHaveCount(0);
 });
 
+test("desktop timer stays clear of the fixed last-pick header and confirmation", async ({ page }) => {
+  await fixture(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/league/77/draft");
+
+  await page.getByRole("button", { name: "Draft Arch Manning", exact: true }).click();
+  await expect(page.getByTestId("pick-confirmation")).toHaveAttribute("data-phase", "hold");
+
+  const layout = await page.evaluate(() => {
+    const timer = document.querySelector<HTMLElement>("[data-testid='real-draft-room-timer']");
+    const header = document.querySelector<HTMLElement>("[data-testid='pick-context-strip']");
+    const confirmation = document.querySelector<HTMLElement>("[data-testid='pick-confirmation']");
+    const thumbnail = confirmation?.querySelector<HTMLElement>("[aria-hidden='true']");
+    if (!timer || !header || !confirmation || !thumbnail) return null;
+
+    return {
+      timerPosition: getComputedStyle(timer).position,
+      timerTop: timer.getBoundingClientRect().top,
+      headerBottom: header.getBoundingClientRect().bottom,
+      confirmationBottom: confirmation.getBoundingClientRect().bottom,
+      thumbnailBottom: thumbnail.getBoundingClientRect().bottom,
+    };
+  });
+
+  expect(layout).not.toBeNull();
+  expect(layout?.timerPosition).toBe("fixed");
+  expect(layout?.timerTop).toBeGreaterThanOrEqual((layout?.headerBottom ?? 0) + 16);
+  expect(layout?.timerTop).toBeGreaterThanOrEqual((layout?.thumbnailBottom ?? 0) + 16);
+});
+
 test("poll failure retains board, disables picks and recovers; conflicts never celebrate", async ({ page }) => {
   const state = await fixture(page);
   await page.goto("/league/77/draft");
