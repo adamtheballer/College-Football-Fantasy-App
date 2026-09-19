@@ -296,6 +296,17 @@ export const formatGameLogDate = (value?: string | null, kickoffAt?: string | nu
 export const gameLogResultLabel = (row: { result?: string | null; game_status: string }) =>
   row.result ?? (row.game_status === "active" ? "Live" : row.game_status === "final" ? "Final" : "—");
 
+const isLiveGameLog = (row: { result?: string | null; game_status: string }) =>
+  row.game_status === "active" || gameLogResultLabel(row).trim().toLowerCase() === "live";
+
+const LiveGameIndicator = () => (
+  <span
+    aria-hidden="true"
+    data-testid="live-game-indicator"
+    className="inline-block h-2 w-2 shrink-0 rounded-full bg-red-500 shadow-[0_0_0_2px_rgba(239,68,68,0.18)]"
+  />
+);
+
 /**
  * Availability updates are reported against the product's primary audience in
  * Eastern time.  Do not infer a report date when the source did not provide
@@ -645,7 +656,10 @@ export function PlayerCardModal({
             <div className="w-full">
               {currentGame && ["completed", "live", "awaiting_live"].includes(currentGame.state) ? (
                 <section className="mb-3 rounded-md border border-cfb-border-subtle bg-cfb-surface-raised p-4 sm:p-5" aria-label={currentGame.state === "completed" ? "Current player game result" : "Current player game"}>
-                  <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>{currentGame.state === "completed" ? "Latest verified game" : currentGame.state === "live" ? "Live game" : "Current game · awaiting live update"}</p>
+                  <p className={cn("flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>
+                    {currentGame.state === "live" ? <LiveGameIndicator /> : null}
+                    {currentGame.state === "completed" ? "Latest verified game" : currentGame.state === "live" ? "Live game" : "Current game · awaiting live update"}
+                  </p>
                   <p className="mt-2 text-sm font-black text-white">Week {currentGame.week} vs. {currentGame.opponent_name ?? "opponent"}</p>
                   <p className="mt-1 text-xs font-bold text-white/55">{currentGame.kickoff_at ? formatGameLogDate(undefined, currentGame.kickoff_at) : "Time TBD"}</p>
                   {currentGameStats.length ? (
@@ -806,6 +820,8 @@ export function PlayerCardModal({
                     <tbody className="divide-y divide-white/10">
                       {selectedGameLogData.games.map((row) => {
                         const stats = row.stats ? { ...row.stats.stats, fantasy_points: row.stats.fantasy_points } : undefined;
+                        const resultLabel = gameLogResultLabel(row);
+                        const isLive = isLiveGameLog(row);
                         return (
                           <tr key={row.schedule_id} className="text-xs font-bold text-white/75 sm:text-sm">
                             <td className="px-3 py-3.5 font-black tabular-nums text-white sm:px-4 sm:py-4">{row.week}</td>
@@ -817,7 +833,12 @@ export function PlayerCardModal({
                               <p className="mt-1 hidden text-[10px] font-bold text-white/40 sm:block">{formatGameLogDate(row.date, row.kickoff_at)}</p>
                             </td>
                             <td className="whitespace-nowrap px-3 py-3.5 text-[9px] font-black uppercase tracking-[0.13em] text-white/55 sm:px-4 sm:py-4 sm:text-[10px] sm:tracking-[0.16em]">{row.location_label}</td>
-                            <td className="whitespace-nowrap px-3 py-3.5 text-[11px] font-black tabular-nums text-white/70 sm:px-4 sm:py-4 sm:text-xs">{gameLogResultLabel(row)}</td>
+                            <td className="whitespace-nowrap px-3 py-3.5 text-[11px] font-black tabular-nums text-white/70 sm:px-4 sm:py-4 sm:text-xs">
+                              <span className="inline-flex items-center gap-2">
+                                {isLive ? <LiveGameIndicator /> : null}
+                                {resultLabel}
+                              </span>
+                            </td>
                             {selectedGameLogColumns.map(([label, keys]) => {
                               const value = row.location === "bye" ? null : gameLogStatValue(stats, keys);
                               return (
