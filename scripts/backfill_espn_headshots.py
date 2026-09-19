@@ -48,7 +48,10 @@ def parse_args() -> argparse.Namespace:
 def players_missing_headshots(db: Session, *, rostered_only: bool, limit: int | None) -> list[Player]:
     query = db.query(Player).filter(or_(Player.image_url.is_(None), Player.espn_headshot_url.is_(None)))
     if rostered_only:
-        query = query.join(RosterEntry, RosterEntry.player_id == Player.id).distinct()
+        # Do not use SELECT DISTINCT on the whole Player row: PostgreSQL
+        # cannot compare the registry's JSON fields. The ID subquery gives us
+        # the same rostered-only set without touching those JSON columns.
+        query = query.filter(Player.id.in_(db.query(RosterEntry.player_id)))
     query = query.order_by(Player.sheet_adp.asc().nullslast(), Player.id.asc())
     if limit is not None:
         query = query.limit(max(0, limit))
