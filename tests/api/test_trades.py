@@ -137,6 +137,34 @@ def trade_payload() -> dict:
     }
 
 
+def test_trade_offer_player_image_follows_the_existing_photo_runtime_flag(client, db_session, monkeypatch):
+    proposing_token = create_user_and_token(client, "trade-image-proposing")
+    receiving_token = create_user_and_token(client, "trade-image-receiving")
+    league = create_league(client, proposing_token, "trade-image")
+    join_league(client, receiving_token, league["id"])
+    seed = seed_trade_rosters(db_session, league["id"])
+    image_url = "https://a.espncdn.com/i/headshots/college-football/players/full/1234.png"
+    seed["give"].espn_headshot_url = image_url
+    db_session.commit()
+
+    monkeypatch.setattr(trade_service.settings, "player_headshots_enabled", False)
+    created = client.post(
+        f"/leagues/{league['id']}/trades",
+        json=trade_offer_payload(seed),
+        headers=auth_headers(proposing_token),
+    )
+    assert created.status_code == 201
+    assert created.json()["items"][0]["player_image_url"] is None
+
+    monkeypatch.setattr(trade_service.settings, "player_headshots_enabled", True)
+    listed = client.get(
+        f"/leagues/{league['id']}/trades",
+        headers=auth_headers(receiving_token),
+    )
+    assert listed.status_code == 200
+    assert listed.json()["data"][0]["items"][0]["player_image_url"] == image_url
+
+
 def test_trade_offer_contract_uses_canonical_lifecycle_fields():
     canonical_fields = {
         "created_by_user_id",

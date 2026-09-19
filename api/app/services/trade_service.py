@@ -8,6 +8,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
+from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_member import LeagueMember
@@ -514,6 +515,11 @@ def _serialize_offer(offer: TradeOffer) -> TradeOfferRead:
             player_name=item.player.name if item.player else None,
             player_position=item.player.position if item.player else None,
             player_school=item.player.school if item.player else None,
+            player_image_url=(
+                item.player.espn_headshot_url or item.player.image_url
+                if settings.player_headshots_enabled and item.player
+                else None
+            ),
         )
         for item in sorted(offer.items, key=lambda row: row.id)
     ]

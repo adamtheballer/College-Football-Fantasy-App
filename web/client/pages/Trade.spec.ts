@@ -42,12 +42,17 @@ describe("toTradeRows", () => {
           name: "Healthy Runner",
           position: "RB",
           school: "Example University",
+          image_url: "https://a.espncdn.com/i/headshots/college-football/players/full/7.png",
         },
       },
     ] as unknown as RosterEntry[]);
 
     expect(rows).toEqual([
-      expect.objectContaining({ playerId: 7, position: "RB" }),
+      expect.objectContaining({
+        playerId: 7,
+        position: "RB",
+        imageUrl: "https://a.espncdn.com/i/headshots/college-football/players/full/7.png",
+      }),
     ]);
   });
 });

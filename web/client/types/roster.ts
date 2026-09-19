@@ -3,6 +3,7 @@ export interface RosterPlayer {
   name: string;
   position: string;
   school: string;
+  image_url?: string | null;
 }
 
 export interface RosterEntry {
