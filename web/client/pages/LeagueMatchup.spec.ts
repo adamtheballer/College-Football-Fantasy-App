@@ -172,8 +172,10 @@ describe("league matchup scoreboard", () => {
     expect(screen.getByRole("heading", { name: "Updated Adam's Team vs Taylor's Team" })).toBeTruthy();
     expect(screen.queryByRole("region", { name: "League matchups" })).toBeNull();
     expect(screen.getByLabelText("Matchup 1 of 2. Swipe horizontally to view another matchup.")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Previous matchup" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Next matchup" })).toBeNull();
+    const desktopNavigation = screen.getByTestId("desktop-matchup-navigation");
+    expect(desktopNavigation.contains(screen.getByRole("button", { name: "Previous matchup" }))).toBe(true);
+    expect(desktopNavigation.contains(screen.getByRole("button", { name: "Next matchup" }))).toBe(true);
+    expect(scoreboard.contains(desktopNavigation)).toBe(false);
     expect(
       screen
         .queryAllByText("Projected", { exact: true })
@@ -265,10 +267,24 @@ describe("league matchup scoreboard", () => {
     expect(nextParams.toString()).toBe("week=1&matchup=2");
   });
 
-  it("uses swipe navigation without rendering controls over the team avatars", () => {
+  it("lets a Mac trackpad scroll horizontally through same-league matchups", () => {
     render(createElement(LeagueMatchup));
 
-    expect(screen.queryByRole("button", { name: "Previous matchup" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "Next matchup" })).toBeNull();
+    const swipeSurface = screen.getByTestId("matchup-swipe-surface");
+    fireEvent.wheel(swipeSurface, { deltaX: 80, deltaY: 0 });
+
+    expect(routerMocks.setSearchParams).toHaveBeenCalledTimes(1);
+    const nextParams = routerMocks.setSearchParams.mock.calls[0][0] as URLSearchParams;
+    expect(nextParams.toString()).toBe("week=1&matchup=2");
+  });
+
+  it("keeps desktop matchup controls outside the scorecard and team avatars", () => {
+    render(createElement(LeagueMatchup));
+
+    const scoreboard = screen.getByTestId("matchup-scoreboard");
+    const desktopNavigation = screen.getByTestId("desktop-matchup-navigation");
+    expect(scoreboard.contains(desktopNavigation)).toBe(false);
+    expect(scoreboard.contains(screen.getByRole("button", { name: "Previous matchup" }))).toBe(false);
+    expect(scoreboard.contains(screen.getByRole("button", { name: "Next matchup" }))).toBe(false);
   });
 });

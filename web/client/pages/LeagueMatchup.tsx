@@ -1,4 +1,4 @@
-import { Bell, Clock3, MessageCircle, ShieldAlert } from "lucide-react";
+import { Bell, ChevronLeft, ChevronRight, Clock3, MessageCircle, ShieldAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
@@ -310,6 +310,7 @@ export default function LeagueMatchup() {
   const activeMatchupIndex = Math.max(0, scheduledMatchups.findIndex((matchup) => matchup.matchup_id === activeMatchupId));
   const swipeStartX = useRef<number | null>(null);
   const swipeStartY = useRef<number | null>(null);
+  const desktopScrollCooldownRef = useRef(false);
   const presentationStatus = rosteredPlayerIsLive && !["final", "stat_corrected", "corrected"].includes((data?.status ?? "").toLowerCase())
     ? "live"
     : data?.status ?? "projected";
@@ -349,6 +350,17 @@ export default function LeagueMatchup() {
     if (scheduledMatchups.length < 2) return;
     const nextIndex = (activeMatchupIndex + direction + scheduledMatchups.length) % scheduledMatchups.length;
     updateSelection(displayWeek, scheduledMatchups[nextIndex]?.matchup_id);
+  };
+  const selectMatchupFromDesktopScroll = (direction: -1 | 1) => {
+    // Trackpads emit many wheel events during a single horizontal gesture.
+    // Advance exactly one matchup per gesture, rather than skipping a matchup
+    // or firing competing URL updates while the next matchup loads.
+    if (desktopScrollCooldownRef.current || scheduledMatchups.length < 2) return;
+    desktopScrollCooldownRef.current = true;
+    selectAdjacentMatchup(direction);
+    window.setTimeout(() => {
+      desktopScrollCooldownRef.current = false;
+    }, 350);
   };
 
   if (leagueQuery.isLoading) {
@@ -401,6 +413,36 @@ export default function LeagueMatchup() {
         <LeagueTabs leagueId={parsedLeagueId} draftStatus={leagueQuery.data?.draft?.status} leagueStatus={leagueQuery.data?.status} />
       </div>
 
+      {scheduledMatchups.length > 1 ? (
+        <nav
+          aria-label="Browse league matchups"
+          className="mx-5 mt-3 hidden items-center justify-end gap-2 md:flex"
+          data-testid="desktop-matchup-navigation"
+        >
+          <span className="mr-1 text-[10px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">
+            Matchup {activeMatchupIndex + 1} of {scheduledMatchups.length}
+          </span>
+          <button
+            type="button"
+            aria-label="Previous matchup"
+            onClick={() => selectAdjacentMatchup(-1)}
+            title="Previous matchup"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-cfb-border-subtle bg-cfb-surface text-cfb-text-secondary transition-colors hover:border-cfb-brand/60 hover:text-cfb-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand"
+          >
+            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            aria-label="Next matchup"
+            onClick={() => selectAdjacentMatchup(1)}
+            title="Next matchup"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-cfb-border-subtle bg-cfb-surface text-cfb-text-secondary transition-colors hover:border-cfb-brand/60 hover:text-cfb-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand"
+          >
+            <ChevronRight className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </nav>
+      ) : null}
+
       {matchupQuery.isError ? (
         <ErrorState
           title="Unable to load matchup"
@@ -448,6 +490,14 @@ export default function LeagueMatchup() {
             onTouchCancel={() => {
               swipeStartX.current = null;
               swipeStartY.current = null;
+            }}
+            onWheel={(event) => {
+              // Preserve normal vertical page scrolling. Horizontal wheel and
+              // trackpad gestures on desktop cycle through the week's other
+              // matchups, matching the mobile swipe interaction.
+              if (Math.abs(event.deltaX) < 36 || Math.abs(event.deltaX) <= Math.abs(event.deltaY)) return;
+              event.preventDefault();
+              selectMatchupFromDesktopScroll(event.deltaX > 0 ? 1 : -1);
             }}
           >
             {data.postseason ? (
