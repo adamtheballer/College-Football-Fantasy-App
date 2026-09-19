@@ -78,6 +78,7 @@ type TradeOfferItem = {
   player_name?: string | null;
   player_position?: string | null;
   player_school?: string | null;
+  player_image_url?: string | null;
 };
 
 type TradeOffer = {
@@ -137,6 +138,7 @@ type TradeRow = {
   name: string;
   position: string;
   school: string;
+  imageUrl?: string | null;
   slot: string;
   projectedPoints?: number;
 };
@@ -164,6 +166,7 @@ export const toTradeRows = (entries: RosterEntry[] | undefined): TradeRow[] => {
           name: player.name,
           position,
           school: player.school ?? "",
+          imageUrl: player.image_url ?? null,
           slot: (entry.slot || "BENCH").toUpperCase(),
         },
       ];
@@ -370,12 +373,17 @@ const TradeList = ({
                 {row.slot}
               </span>
               <div className="min-w-0">
-                <p className="truncate text-sm font-black text-foreground">
-                  {row.name}
-                </p>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                  {row.position} · {row.school || "School unavailable"}
-                </p>
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <TradePlayerAvatar name={row.name} imageUrl={row.imageUrl} />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-black text-foreground">
+                      {row.name}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {row.position} · {row.school || "School unavailable"}
+                    </p>
+                  </div>
+                </div>
               </div>
               <div className="flex items-center justify-end gap-2">
                 <span className="hidden text-sm font-black tabular-nums text-foreground md:block">
@@ -394,6 +402,43 @@ const TradeList = ({
     </Card>
   );
 };
+
+function TradePlayerAvatar({
+  name,
+  imageUrl,
+}: {
+  name: string;
+  imageUrl?: string | null;
+}) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [imageUrl]);
+  const initials = name
+    .split(/\s+/)
+    .map((part) => part.charAt(0))
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  if (imageUrl && !failed) {
+    return (
+      <img
+        src={imageUrl}
+        alt=""
+        onError={() => setFailed(true)}
+        className="h-9 w-9 shrink-0 rounded-full border border-cfb-border-subtle bg-cfb-surface object-cover"
+      />
+    );
+  }
+
+  return (
+    <span
+      aria-hidden
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-cfb-border-subtle bg-cfb-surface text-[10px] font-black text-muted-foreground"
+    >
+      {initials || "?"}
+    </span>
+  );
+}
 
 type TradeBuilderStep = "mine" | "opponent" | "review";
 
@@ -1084,11 +1129,14 @@ export default function Trade() {
                   </div>
                   <div className="divide-y divide-cfb-border-subtle">
                     {selectedGiveRows.map((row) => (
-                      <div key={row.playerId} className="px-4 py-3">
-                        <p className="font-black text-foreground">{row.name}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {row.position} · {row.school || "School unavailable"}
-                        </p>
+                      <div key={row.playerId} className="flex items-center gap-2.5 px-4 py-3">
+                        <TradePlayerAvatar name={row.name} imageUrl={row.imageUrl} />
+                        <div className="min-w-0">
+                          <p className="truncate font-black text-foreground">{row.name}</p>
+                          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                            {row.position} · {row.school || "School unavailable"}
+                          </p>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1107,11 +1155,14 @@ export default function Trade() {
                   </div>
                   <div className="divide-y divide-cfb-border-subtle">
                     {selectedReceiveRows.map((row) => (
-                      <div key={row.playerId} className="px-4 py-3">
-                        <p className="font-black text-foreground">{row.name}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {row.position} · {row.school || "School unavailable"}
-                        </p>
+                      <div key={row.playerId} className="flex items-center gap-2.5 px-4 py-3">
+                        <TradePlayerAvatar name={row.name} imageUrl={row.imageUrl} />
+                        <div className="min-w-0">
+                          <p className="truncate font-black text-foreground">{row.name}</p>
+                          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                            {row.position} · {row.school || "School unavailable"}
+                          </p>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1247,17 +1298,23 @@ export default function Trade() {
                             proposingSends.map((item) => (
                               <div
                                 key={item.id}
-                                className="rounded-xl border border-white/10 bg-black/10 px-4 py-3"
+                                className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-black/10 px-4 py-3"
                               >
-                                <p className="font-black text-foreground">
-                                  {item.player_name ??
-                                    `Player ${item.player_id ?? ""}`}
-                                </p>
-                                <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
-                                  {[item.player_position, item.player_school]
-                                    .filter(Boolean)
-                                    .join(" · ") || "League asset"}
-                                </p>
+                                <TradePlayerAvatar
+                                  name={item.player_name ?? `Player ${item.player_id ?? ""}`}
+                                  imageUrl={item.player_image_url}
+                                />
+                                <div className="min-w-0">
+                                  <p className="truncate font-black text-foreground">
+                                    {item.player_name ??
+                                      `Player ${item.player_id ?? ""}`}
+                                  </p>
+                                  <p className="mt-1 truncate text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                                    {[item.player_position, item.player_school]
+                                      .filter(Boolean)
+                                      .join(" · ") || "League asset"}
+                                  </p>
+                                </div>
                               </div>
                             ))
                           ) : (
@@ -1276,17 +1333,23 @@ export default function Trade() {
                             receivingSends.map((item) => (
                               <div
                                 key={item.id}
-                                className="rounded-xl border border-white/10 bg-black/10 px-4 py-3"
+                                className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-black/10 px-4 py-3"
                               >
-                                <p className="font-black text-foreground">
-                                  {item.player_name ??
-                                    `Player ${item.player_id ?? ""}`}
-                                </p>
-                                <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
-                                  {[item.player_position, item.player_school]
-                                    .filter(Boolean)
-                                    .join(" · ") || "League asset"}
-                                </p>
+                                <TradePlayerAvatar
+                                  name={item.player_name ?? `Player ${item.player_id ?? ""}`}
+                                  imageUrl={item.player_image_url}
+                                />
+                                <div className="min-w-0">
+                                  <p className="truncate font-black text-foreground">
+                                    {item.player_name ??
+                                      `Player ${item.player_id ?? ""}`}
+                                  </p>
+                                  <p className="mt-1 truncate text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                                    {[item.player_position, item.player_school]
+                                      .filter(Boolean)
+                                      .join(" · ") || "League asset"}
+                                  </p>
+                                </div>
                               </div>
                             ))
                           ) : (

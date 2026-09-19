@@ -107,6 +107,10 @@ class TradeOfferItemRead(BaseModel):
     player_name: str | None = None
     player_position: str | None = None
     player_school: str | None = None
+    # This is intentionally runtime-gated by the trade serializer, matching
+    # the existing player-card image policy. Historical offer snapshots never
+    # persist a third-party image URL.
+    player_image_url: str | None = None
 
 
 class TradeReviewRead(BaseModel):
