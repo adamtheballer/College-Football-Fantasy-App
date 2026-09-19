@@ -604,6 +604,9 @@ class RosterTabEntryRead(BaseModel):
     player_name: str | None = None
     player_school: str | None = None
     player_position: str | None = None
+    # Kept nullable so roster slots remain stable even when a verified portrait
+    # has not yet been supplied by the licensed provider.
+    image_url: str | None = None
     school: str | None = None
     position: str | None = None
     projected_points: float | None = None
