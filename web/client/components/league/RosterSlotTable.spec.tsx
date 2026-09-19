@@ -56,6 +56,7 @@ const projectedReceiver: LeagueRosterPlayer = {
   fantasy_team_name: "Adam's Team",
   player_id: 99,
   player_name: "A Very Long Receiver Name That Must Stay Compact",
+  image_url: "https://a.espncdn.com/i/headshots/college-football/players/full/99.png",
   school: "Ohio State",
   position: "WR",
   slot: "WR",
@@ -84,6 +85,9 @@ describe("RosterSlotTable", () => {
     expect(screen.getByText("A Very Long Receiver Name That Must Stay Compact")).toBeTruthy();
     expect(screen.getByText("Ohio State · vs Michigan")).toBeTruthy();
     expect(screen.getByText("18.4")).toBeTruthy();
+    expect(container.querySelector("img")?.getAttribute("src")).toBe(
+      "https://a.espncdn.com/i/headshots/college-football/players/full/99.png",
+    );
   });
 
   it("does not duplicate the position badge beneath a roster player's name", () => {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Lock } from "lucide-react";
+import { Lock, UserRound } from "lucide-react";
 
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { PlayerPopularityMetrics } from "@/components/league/PlayerPopularityMetrics";
@@ -480,7 +480,21 @@ export function RosterSlotTable({
                   disabled={!isRealPlayer}
                   className="flex min-w-0 flex-col gap-1 text-left focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/50 disabled:cursor-not-allowed"
                 >
-                  <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-cfb-border-subtle bg-cfb-surface-raised text-cfb-brand">
+                      {player.image_url ? (
+                        <img
+                          src={player.image_url}
+                          alt=""
+                          className="h-full w-full object-cover"
+                          onError={(event) => {
+                            event.currentTarget.style.display = "none";
+                          }}
+                        />
+                      ) : (
+                        <UserRound aria-hidden="true" className="h-4 w-4" />
+                      )}
+                    </span>
                     <PlayerAvailabilityIndicator status={player.injury_status}>
                       <span className="truncate font-black text-cfb-text-primary">{isRealPlayer ? player.player_name : "N/A"}</span>
                     </PlayerAvailabilityIndicator>

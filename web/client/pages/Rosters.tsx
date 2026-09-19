@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
-import { ClipboardList, Trophy, ArrowRight, Users, ShieldAlert } from "lucide-react";
+import { ClipboardList, Trophy, ArrowRight, Users, ShieldAlert, UserRound } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -65,13 +65,29 @@ const RosterTable = ({ entries }: { entries: RosterEntry[] }) => {
           <span className="inline-flex w-fit rounded-md border border-cfb-border-subtle bg-cfb-surface-raised px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-cfb-brand">
             {entry.slot}
           </span>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-black tracking-tight text-cfb-text-primary">
-              {entry.player.name}
-            </p>
-            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">
-              {entry.player.position}
-            </p>
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-cfb-border-subtle bg-cfb-surface-raised text-cfb-brand">
+              {entry.player.image_url ? (
+                <img
+                  src={entry.player.image_url}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  onError={(event) => {
+                    event.currentTarget.style.display = "none";
+                  }}
+                />
+              ) : (
+                <UserRound aria-hidden="true" className="h-4 w-4" />
+              )}
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-black tracking-tight text-cfb-text-primary">
+                {entry.player.name}
+              </p>
+              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">
+                {entry.player.position}
+              </p>
+            </div>
           </div>
           <span className="truncate text-right text-[9px] font-black uppercase tracking-[0.1em] text-cfb-text-secondary sm:text-left">
             {entry.status}

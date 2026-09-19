@@ -239,6 +239,7 @@ export interface LeagueRosterPlayer {
   player_name: string | null;
   player_school?: string | null;
   player_position?: string | null;
+  image_url?: string | null;
   school?: string | null;
   position?: string | null;
   slot?: string | null;

@@ -749,6 +749,9 @@ def _serialize_roster_entry(
         player_name=entry.player.name if entry and entry.player else None,
         player_school=_display_school_name(entry.player.school) if entry and entry.player else None,
         player_position=entry.player.position if entry and entry.player else None,
+        image_url=(entry.player.espn_headshot_url or entry.player.image_url)
+        if entry and entry.player and app_settings.player_headshots_enabled
+        else None,
         school=_display_school_name(entry.player.school) if entry and entry.player else None,
         position=entry.player.position if entry and entry.player else None,
         projected_points=projected,
