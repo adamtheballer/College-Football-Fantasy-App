@@ -568,29 +568,6 @@
     opacity: 0.8;
   }
 
-  /* A warm nested edge and shallow paper layer make the existing player image
-   * feel applied to the artwork without touching its crop or outer size. */
-  .cfb-player-sticker-frame {
-    isolation: isolate;
-    position: relative;
-    box-shadow:
-      0 0 0 1px hsl(45 84% 86% / 0.34),
-      0 3px 0 -1px hsl(45 66% 76% / 0.18),
-      0 7px 13px rgb(2 6 23 / 0.24),
-      inset 0 0 0 1px hsl(45 84% 94% / 0.34);
-  }
-
-  .cfb-player-sticker-frame::after {
-    content: "";
-    pointer-events: none;
-    position: absolute;
-    inset: 2px;
-    z-index: 1;
-    border: 1px solid hsl(45 84% 91% / 0.24);
-    border-radius: inherit;
-    box-shadow: inset 0 0 10px rgb(255 250 234 / 0.07);
-  }
-
   .cfb-school-grid {
     background-image: none;
   }

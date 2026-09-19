@@ -147,7 +147,7 @@ export function PlayerCardHeader({
         <div className="relative z-10 min-w-0">
           <p className="hidden text-[10px] font-black uppercase tracking-[0.28em] text-white/65 sm:block">{title}</p>
           <div className="flex min-w-0 items-center gap-3 sm:mt-4 sm:gap-5">
-            <div className="cfb-player-sticker-frame flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-white/25 bg-white/10 sm:h-[5.75rem] sm:w-[5.75rem]">
+            <div data-testid="player-card-portrait" className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-950/15 shadow-[0_12px_24px_rgba(2,6,23,0.18)] sm:h-[5.75rem] sm:w-[5.75rem]">
                 {card?.about.headshot_url && !headshotFailed ? (
                   <img src={card.about.headshot_url} alt={player.name} className="h-full w-full object-cover" onError={() => setHeadshotFailed(true)} />
                 ) : (

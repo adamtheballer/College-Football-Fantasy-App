@@ -85,9 +85,11 @@ describe("RosterSlotTable", () => {
     expect(screen.getByText("A Very Long Receiver Name That Must Stay Compact")).toBeTruthy();
     expect(screen.getByText("Ohio State · vs Michigan")).toBeTruthy();
     expect(screen.getByText("18.4")).toBeTruthy();
-    expect(container.querySelector("img")?.getAttribute("src")).toBe(
+    const portrait = container.querySelector("[data-roster-player-portrait]");
+    expect(portrait?.querySelector("img")?.getAttribute("src")).toBe(
       "https://a.espncdn.com/i/headshots/college-football/players/full/99.png",
     );
+    expect(portrait?.className).toContain("h-10");
   });
 
   it("does not duplicate the position badge beneath a roster player's name", () => {
@@ -97,6 +99,12 @@ describe("RosterSlotTable", () => {
       name: "Open A Very Long Receiver Name That Must Stay Compact player card",
     });
     expect(within(playerCardButton).queryByText("WR")).toBeNull();
+  });
+
+  it("uses the larger player portrait beside the roster slot instead of a decorative dot", () => {
+    const { container } = render(<RosterSlotTable title="Starters" players={[projectedReceiver]} />);
+
+    expect(container.querySelectorAll("[data-roster-player-portrait]")).toHaveLength(1);
   });
 
   it("swaps eligible players with two position-badge taps while preserving the player card route", async () => {

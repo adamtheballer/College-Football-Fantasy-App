@@ -164,13 +164,38 @@ const isRealRosterPlayer = (player: LeagueRosterPlayer) =>
 const rosterRowStyle = {
   pill: "border-cfb-border-subtle bg-cfb-surface text-cfb-text-secondary",
   row: "hover:bg-cfb-surface-hover",
-  dot: "bg-cfb-brand",
   text: "text-cfb-text-primary",
 };
 
 const getPositionStyle = () => rosterRowStyle;
 
 type RosterSlotTableTone = "default" | "bench";
+
+function RosterPlayerPortrait({ imageUrl, name }: { imageUrl?: string | null; name: string }) {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => setImageFailed(false), [imageUrl]);
+
+  return (
+    <span
+      role="img"
+      aria-label={`${name} headshot`}
+      data-roster-player-portrait
+      className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-cfb-surface-raised shadow-[0_5px_14px_rgba(2,6,23,0.24)] ring-1 ring-white/10 md:h-11 md:w-11"
+    >
+      {imageUrl && !imageFailed ? (
+        <img
+          src={imageUrl}
+          alt=""
+          className="h-full w-full object-cover object-top"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        <UserRound aria-hidden="true" className="h-5 w-5 text-cfb-brand md:h-6 md:w-6" />
+      )}
+    </span>
+  );
+}
 
 type OwnedRosterActions = {
   teamId: number;
@@ -426,6 +451,7 @@ export function RosterSlotTable({
                 data-has-possession={hasPossession ? "true" : "false"}
                 data-in-red-zone={hasRedZone ? "true" : "false"}
               >
+                {/** The portrait intentionally replaces the former decorative position dot. */}
                 {isRealPlayer && quickSwapEnabled ? (() => {
                   const isQuickSwapSource = quickSwapPlayer?.id === player.id;
                   const targetEligible = !quickSwapPlayer || isQuickSwapSource || canSwapPlayers(quickSwapPlayer, player, ownedRosterActions!);
@@ -455,7 +481,7 @@ export function RosterSlotTable({
                       >
                         {slotLabel(player)}
                       </span>
-                      <span className={cn("hidden h-2.5 w-2.5 rounded-full md:block", style.dot)} />
+                      <RosterPlayerPortrait imageUrl={player.image_url} name={player.player_name ?? "Player"} />
                     </button>
                   );
                 })() : (
@@ -468,7 +494,7 @@ export function RosterSlotTable({
                     >
                       {slotLabel(player)}
                     </span>
-                    <span className={cn("hidden h-2.5 w-2.5 rounded-full md:block", style.dot)} />
+                    {isRealPlayer ? <RosterPlayerPortrait imageUrl={player.image_url} name={player.player_name ?? "Player"} /> : null}
                   </span>
                 )}
                 <button
@@ -480,21 +506,7 @@ export function RosterSlotTable({
                   disabled={!isRealPlayer}
                   className="flex min-w-0 flex-col gap-1 text-left focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/50 disabled:cursor-not-allowed"
                 >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-cfb-border-subtle bg-cfb-surface-raised text-cfb-brand">
-                      {player.image_url ? (
-                        <img
-                          src={player.image_url}
-                          alt=""
-                          className="h-full w-full object-cover"
-                          onError={(event) => {
-                            event.currentTarget.style.display = "none";
-                          }}
-                        />
-                      ) : (
-                        <UserRound aria-hidden="true" className="h-4 w-4" />
-                      )}
-                    </span>
+                  <span className="flex min-w-0 items-center">
                     <PlayerAvailabilityIndicator status={player.injury_status}>
                       <span className="truncate font-black text-cfb-text-primary">{isRealPlayer ? player.player_name : "N/A"}</span>
                     </PlayerAvailabilityIndicator>
