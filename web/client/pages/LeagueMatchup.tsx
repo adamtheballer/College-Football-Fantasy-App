@@ -426,18 +426,18 @@ export default function LeagueMatchup() {
             type="button"
             aria-label="Previous matchup"
             onClick={() => selectAdjacentMatchup(-1)}
-            className="inline-flex h-9 items-center gap-1 rounded-lg border border-cfb-border-subtle bg-cfb-surface px-3 text-[10px] font-black uppercase tracking-[0.12em] text-cfb-text-secondary transition-colors hover:border-cfb-brand/60 hover:text-cfb-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand"
+            title="Previous matchup"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-cfb-border-subtle bg-cfb-surface text-cfb-text-secondary transition-colors hover:border-cfb-brand/60 hover:text-cfb-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand"
           >
             <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-            Previous
           </button>
           <button
             type="button"
             aria-label="Next matchup"
             onClick={() => selectAdjacentMatchup(1)}
-            className="inline-flex h-9 items-center gap-1 rounded-lg border border-cfb-border-subtle bg-cfb-surface px-3 text-[10px] font-black uppercase tracking-[0.12em] text-cfb-text-secondary transition-colors hover:border-cfb-brand/60 hover:text-cfb-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand"
+            title="Next matchup"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-cfb-border-subtle bg-cfb-surface text-cfb-text-secondary transition-colors hover:border-cfb-brand/60 hover:text-cfb-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand"
           >
-            Next
             <ChevronRight className="h-4 w-4" aria-hidden="true" />
           </button>
         </nav>
