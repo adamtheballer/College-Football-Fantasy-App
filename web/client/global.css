@@ -12,15 +12,15 @@
 @tailwind utilities;
 
 @keyframes pick-reveal {
-  from { transform: translateY(-100%); }
-  to { transform: translateY(0); }
+  from { opacity: 0; transform: translateY(-108%); }
+  to { opacity: 1; transform: translateY(0); }
 }
 @keyframes pick-retract {
-  from { transform: translateY(0); }
-  to { transform: translateY(-100%); }
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-108%); }
 }
-.animate-pick-reveal { animation: pick-reveal 240ms ease-out both; }
-.animate-pick-retract { animation: pick-retract 240ms ease-in both; }
+.animate-pick-reveal { animation: pick-reveal 300ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-pick-retract { animation: pick-retract 260ms cubic-bezier(0.7, 0, 0.84, 0) both; }
 
 @layer base {
   /**
