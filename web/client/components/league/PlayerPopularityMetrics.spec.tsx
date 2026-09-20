@@ -6,10 +6,10 @@ import { describe, expect, it } from "vitest";
 import { PlayerPopularityMetrics } from "./PlayerPopularityMetrics";
 
 describe("PlayerPopularityMetrics", () => {
-  it("distinguishes unavailable values from a truthful zero", () => {
-    render(<PlayerPopularityMetrics popularity={{ rostered_percent: 0, start_percent: null }} />);
+  it("shows the start rate without rendering a rostered percentage", () => {
+    render(<PlayerPopularityMetrics popularity={{ start_percent: 0 }} />);
 
-    expect(screen.getByText("Rostered 0.0%")).toBeTruthy();
-    expect(screen.getByText("Start —")).toBeTruthy();
+    expect(screen.getByText("Start 0.0%")).toBeTruthy();
+    expect(screen.queryByText(/Rostered/)).toBeNull();
   });
 });

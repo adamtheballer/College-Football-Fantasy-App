@@ -59,6 +59,9 @@ from collegefootballfantasy_api.app.services.league_player_history import (
     append_league_player_event,
 )
 from collegefootballfantasy_api.app.services.live_scoring_readiness import ensure_official_acquisition_identity
+from collegefootballfantasy_api.app.services.player_pool_filters import (
+    is_player_in_league_conference_scope,
+)
 
 router = APIRouter()
 
@@ -193,6 +196,14 @@ def _ensure_player_exists(db: Session, player_id: int) -> Player:
 
 
 def _ensure_player_available(db: Session, league_id: int, player_id: int) -> None:
+    league = db.get(League, league_id)
+    player = _ensure_player_exists(db, player_id)
+    settings_row = _league_settings(db, league_id)
+    if not league or not is_player_in_league_conference_scope(player, settings_row.conference_codes):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="player is outside this league's selected conference pool",
+        )
     existing = (
         db.query(RosterEntry)
         .join(Team, Team.id == RosterEntry.team_id)

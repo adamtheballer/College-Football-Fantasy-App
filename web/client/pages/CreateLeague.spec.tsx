@@ -79,12 +79,14 @@ describe("CreateLeague standard rules", () => {
     expect(pickTimer?.value).toBe("45");
   });
 
-  it("shows only the configurable playoff and waiver rules on the settings step", () => {
+  it("shows conference mixing alongside the configurable playoff and waiver rules", () => {
     renderPage();
     fireEvent.click(screen.getByRole("button", { name: "Continue to Settings" }));
 
     expect(screen.getByText("Playoff teams")).toBeTruthy();
     expect(screen.getByText("Waiver system")).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Conference player pool" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Big Ten/i }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.queryByText("Trade review")).toBeNull();
     expect(screen.queryByText("Roster format")).toBeNull();
     expect(screen.queryByText("Scoring settings")).toBeNull();
@@ -134,6 +136,7 @@ describe("CreateLeague standard rules", () => {
         expect.objectContaining({
           basics: expect.objectContaining({ is_private: true }),
           settings: expect.objectContaining({
+            conference_codes: ["SEC", "BIG10", "BIG12", "ACC", "INDEPENDENT"],
             roster_slots_json: {
               QB: 1,
               RB: 2,

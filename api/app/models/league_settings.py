@@ -25,6 +25,13 @@ class LeagueSettings(TimestampMixin, Base):
     scoring_snapshot_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     scoring_locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     roster_slots_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    # A league may mix any supported Power 4 conferences plus the approved
+    # independent pool. New and legacy leagues default to the full universe.
+    conference_codes: Mapped[list[str]] = mapped_column(
+        JSON,
+        nullable=False,
+        default=lambda: ["SEC", "BIG10", "BIG12", "ACC", "INDEPENDENT"],
+    )
     playoff_teams: Mapped[int] = mapped_column(Integer, default=4)
     waiver_type: Mapped[str] = mapped_column(String(50), nullable=False, default="faab")
     waiver_period_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=24)

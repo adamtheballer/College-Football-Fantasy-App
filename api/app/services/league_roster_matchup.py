@@ -78,7 +78,10 @@ from collegefootballfantasy_api.app.services.matchup_probability import (
     calculate_matchup_win_probability,
 )
 from collegefootballfantasy_api.app.services.player_lock_service import as_utc, game_context_for_players
-from collegefootballfantasy_api.app.services.player_pool_filters import canonical_fantasy_player_filter
+from collegefootballfantasy_api.app.services.player_pool_filters import (
+    canonical_fantasy_player_filter,
+    league_conference_player_filter,
+)
 from collegefootballfantasy_api.app.services.player_season_rank import season_positional_ranks
 from collegefootballfantasy_api.app.services.power4 import canonical_school_name, normalize_school
 from collegefootballfantasy_api.app.services.roster_slots import CanonicalRosterSlot, build_team_roster_slots
@@ -1425,7 +1428,11 @@ def build_waivers_view(
     # while they are still rostered; once dropped, they re-enter the league's
     # waiver/free-agent lifecycle. Excluding every DraftPick here made the UI
     # show a different pool than the claim service validates.
-    player_query = db.query(Player).filter(canonical_fantasy_player_filter(league.season_year))
+    settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
+    player_query = db.query(Player).filter(
+        canonical_fantasy_player_filter(league.season_year),
+        league_conference_player_filter(settings.conference_codes if settings else None),
+    )
     if scope == "waiver":
         # The normal Waiver Wire remains the complete league-scoped free-agent
         # pool.  All Players is a separate, read-only discovery mode.
@@ -1483,7 +1490,6 @@ def build_waivers_view(
     roster = []
     waiver_priority = None
     faab_remaining = None
-    settings = db.query(LeagueSettings).filter(LeagueSettings.league_id == league.id).first()
     final_score_by_player = _final_waiver_score_map(
         db,
         season=league.season_year,

@@ -55,7 +55,7 @@ type AvailablePlayerRow = {
   rostered_by_team_name: string | null;
   availability_state: string;
   available_at: string | null;
-  popularity?: { rostered_percent: number | null; start_percent: number | null } | null;
+  popularity?: { start_percent: number | null } | null;
   hot_pickup_count?: number | null;
   rank: number;
   projection?: PlayerStats | null;

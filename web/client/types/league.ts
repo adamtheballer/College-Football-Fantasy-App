@@ -5,6 +5,7 @@ export interface LeagueSettings {
   scoring_snapshot_json?: Record<string, number | string | boolean> | null;
   scoring_locked_at?: string | null;
   roster_slots_json: Record<string, number>;
+  conference_codes: string[];
   playoff_teams: number;
   waiver_type: string;
   waiver_period_hours: number;
@@ -293,7 +294,6 @@ export interface LeagueRosterPlayer {
 }
 
 export interface PlayerPopularity {
-  rostered_percent: number | null;
   start_percent: number | null;
 }
 

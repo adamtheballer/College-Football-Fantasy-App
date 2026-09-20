@@ -125,7 +125,7 @@ export function PlayerCardHeader({
         <div aria-hidden="true" className="cfb-player-card-grain-layer pointer-events-none absolute inset-0" />
         <div
           data-testid="player-card-hero-portrait"
-          className="pointer-events-none absolute bottom-[-2.75rem] left-1/2 z-[5] h-52 w-52 -translate-x-1/2 sm:bottom-[-3.5rem] sm:h-64 sm:w-64 lg:left-[68%]"
+          className="pointer-events-none absolute bottom-[-1.75rem] right-[-1.5rem] z-[5] h-44 w-44 sm:bottom-[-2.5rem] sm:right-0 sm:h-56 sm:w-56 lg:bottom-[-3.5rem] lg:right-[5%] lg:h-64 lg:w-64"
         >
           {card?.about.headshot_url && !headshotFailed ? (
             <img
@@ -161,10 +161,10 @@ export function PlayerCardHeader({
           ))}
         </div>
         <div aria-hidden="true" className="cfb-player-card-ink-edge pointer-events-none absolute inset-x-0 bottom-0 z-20 h-px" />
-        <div className="relative z-10 flex min-h-[10rem] min-w-0 flex-col justify-end pr-12 sm:min-h-[12rem] sm:pr-48 lg:pr-72">
+        <div className="relative z-10 flex min-h-[10rem] min-w-0 flex-col justify-end pr-0 sm:min-h-[12rem]">
           <p className="hidden text-[10px] font-black uppercase tracking-[0.28em] text-white/65 sm:block">{title}</p>
-          <div className="min-w-0">
-            <h2 id="player-card-title" className="max-w-2xl break-words text-[1.85rem] font-semibold leading-[0.98] tracking-tight text-white [text-shadow:0_2px_16px_rgba(2,6,23,0.7)] sm:text-5xl">
+          <div className="min-w-0 max-w-[56%] sm:max-w-[55%] lg:max-w-2xl">
+            <h2 id="player-card-title" className="break-words text-[1.85rem] font-semibold leading-[0.98] tracking-tight text-white [text-shadow:0_2px_16px_rgba(2,6,23,0.7)] sm:text-5xl">
               {player.name}
             </h2>
             <p className="mt-2 truncate text-[10px] font-black uppercase tracking-[0.15em] text-white/80 sm:mt-3 sm:text-xs sm:tracking-[0.18em]">

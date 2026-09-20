@@ -42,6 +42,15 @@ const waiverOptions = [
     description: "Claims process in waiver order. A successful claim moves the team to the back.",
   },
 ];
+const conferenceOptions = [
+  { code: "SEC", label: "SEC", detail: "16 schools" },
+  { code: "BIG10", label: "Big Ten", detail: "18 schools" },
+  { code: "BIG12", label: "Big 12", detail: "16 schools" },
+  { code: "ACC", label: "ACC", detail: "17 schools" },
+  { code: "INDEPENDENT", label: "Independent", detail: "Notre Dame" },
+] as const;
+type ConferenceCode = (typeof conferenceOptions)[number]["code"];
+const defaultConferenceCodes: ConferenceCode[] = conferenceOptions.map((conference) => conference.code);
 const timezoneOptions = [
   { label: "Eastern Time", value: "America/New_York" },
   { label: "Central Time", value: "America/Chicago" },
@@ -380,6 +389,7 @@ function CreateLeagueForm() {
   const [settings, setSettings] = useState({
     playoff_teams: 4,
     waiver_type: "faab",
+    conference_codes: defaultConferenceCodes,
   });
 
   const [draft, setDraft] = useState({
@@ -423,11 +433,32 @@ function CreateLeagueForm() {
     if (step === 0) {
       return basics.name.trim().length > 2 && basics.max_teams > 0;
     }
+    if (step === 1) {
+      return settings.conference_codes.length > 0;
+    }
     if (step === 2) {
       return draftTimeError === null;
     }
     return true;
-  }, [basics.name, basics.max_teams, draftTimeError, step]);
+  }, [basics.name, basics.max_teams, draftTimeError, settings.conference_codes.length, step]);
+
+  const toggleConference = (conferenceCode: ConferenceCode) => {
+    setSettings((current) => {
+      const selected = current.conference_codes.includes(conferenceCode);
+      if (selected && current.conference_codes.length === 1) {
+        return current;
+      }
+      return {
+        ...current,
+        conference_codes: selected
+          ? current.conference_codes.filter((code) => code !== conferenceCode)
+          : conferenceOptions
+              .map((conference) => conference.code)
+              .filter((code) => current.conference_codes.includes(code) || code === conferenceCode),
+      };
+    });
+    setFieldErrors((current) => ({ ...current, "settings.conference_codes": "" }));
+  };
 
   const nextStepLabel = step < steps.length - 1 ? `Continue to ${steps[step + 1]}` : "Create League";
 
@@ -484,6 +515,7 @@ function CreateLeagueForm() {
         settings: {
           scoring_json: createLeagueScoringToApi(standardScoring),
           roster_slots_json: standardRosterSlots,
+          conference_codes: settings.conference_codes,
           playoff_teams: settings.playoff_teams,
           waiver_type: settings.waiver_type,
           ...managedWaiverSchedule,
@@ -645,7 +677,7 @@ function CreateLeagueForm() {
         <section className={cn(cardClass, "relative overflow-hidden border-[#60A5FA]/15")}>
           <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#67E8F9] via-[#FCD34D] to-[#F43F8E]" />
           <PlaybookDecor className="opacity-20" />
-          <div className="relative z-10 p-5 md:p-8 lg:p-10">
+          <div className="relative z-10 p-4 sm:p-6 md:p-8 lg:p-10">
             {step === 0 && (
               <div className="space-y-8">
                 <SectionHeader
@@ -712,10 +744,10 @@ function CreateLeagueForm() {
               <div className="space-y-8">
                 <SectionHeader
                   title="League Settings"
-                  description="Choose your playoff, waiver, and trade-review rules. Standard roster, scoring, and processing rules apply to every league."
+                  description="Choose the eligible football conferences, then set the playoff and waiver rules. The selected player pool applies everywhere in this league."
                 />
 
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                   <Field label="Playoff teams" error={fieldErrors["settings.playoff_teams"]}>
                     <Select
                       value={String(settings.playoff_teams)}
@@ -752,6 +784,44 @@ function CreateLeagueForm() {
                       </SelectContent>
                     </Select>
                   </Field>
+                  <Field
+                    label="Conference player pool"
+                    helper="Mix conferences freely. Draft boards, waivers, and available-player lists include only these schools."
+                    error={fieldErrors["settings.conference_codes"]}
+                    className="md:col-span-2"
+                  >
+                    <div
+                      role="group"
+                      aria-label="Conference player pool"
+                      className="grid grid-cols-1 gap-2 rounded-[12px] border border-white/[0.08] bg-[#0B1322]/70 p-2 sm:grid-cols-2 lg:grid-cols-5"
+                    >
+                      {conferenceOptions.map((conference) => {
+                        const selected = settings.conference_codes.includes(conference.code);
+                        const onlySelection = selected && settings.conference_codes.length === 1;
+                        return (
+                          <Button
+                            key={conference.code}
+                            type="button"
+                            variant="outline"
+                            aria-pressed={selected}
+                            disabled={onlySelection}
+                            onClick={() => toggleConference(conference.code)}
+                            className={cn(
+                              "h-auto min-h-16 justify-start rounded-[10px] border px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-100",
+                              selected
+                                ? "border-[#60A5FA]/65 bg-[#60A5FA]/15 text-[#E0F2FE] hover:bg-[#60A5FA]/20"
+                                : "border-white/[0.08] bg-[#161E2E] text-[#94A3B8] hover:border-white/20 hover:bg-[#1E293B] hover:text-[#F8FAFC]",
+                            )}
+                          >
+                            <span className="block">
+                              <span className="block text-sm font-bold">{conference.label}</span>
+                              <span className="mt-0.5 block text-[11px] font-medium text-current/70">{conference.detail}</span>
+                            </span>
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </Field>
                 </div>
               </div>
             )}
@@ -769,7 +839,7 @@ function CreateLeagueForm() {
                   </div>
                 ) : null}
 
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
                   <Field label="Draft date" error={fieldErrors["draft.draft_datetime_utc"]}>
                     <Input
                       type="date"
@@ -805,7 +875,7 @@ function CreateLeagueForm() {
                   </Field>
                 </div>
 
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
                   <Field label="Draft type" error={fieldErrors["draft.draft_type"]}>
                     <Select
                       value={draft.draft_type}
@@ -882,6 +952,13 @@ function CreateLeagueForm() {
                   <ReviewItem label="Commissioner" value="You" />
                   <ReviewItem label="Roster" value={standardRosterSummary} />
                   <ReviewItem label="Scoring" value={standardScoringSummary} />
+                  <ReviewItem
+                    label="Player pool"
+                    value={conferenceOptions
+                      .filter((conference) => settings.conference_codes.includes(conference.code))
+                      .map((conference) => conference.label)
+                      .join(" · ")}
+                  />
                 </div>
                 <div className="rounded-[16px] border border-[#60A5FA]/30 bg-[#60A5FA]/10 p-5">
                   <div className="flex items-start gap-3">

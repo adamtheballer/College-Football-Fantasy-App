@@ -32,6 +32,8 @@ from collegefootballfantasy_api.app.services.notification_service import queue_n
 from collegefootballfantasy_api.app.services.player_pool_filters import (
     canonical_fantasy_player_filter,
     is_canonical_fantasy_player,
+    is_player_in_league_conference_scope,
+    league_conference_player_filter,
 )
 from collegefootballfantasy_api.app.services.live_scoring_readiness import ensure_official_acquisition_identity
 from collegefootballfantasy_api.app.services.roster_legality import (
@@ -396,6 +398,7 @@ def _select_auto_pick_player(
             Player.id.not_in(drafted_player_ids),
             Player.id.not_in(rostered_player_ids),
             canonical_fantasy_player_filter(league.season_year),
+            league_conference_player_filter(settings_row.conference_codes),
         )
         .order_by(
             rank_bucket.asc(),
@@ -461,6 +464,11 @@ def _record_draft_pick(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="player is not in this season's approved draft pool",
+        )
+    if not is_player_in_league_conference_scope(player, settings_row.conference_codes):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="player is outside this league's selected conference pool",
         )
     ensure_official_acquisition_identity(db, league=league, player=player)
 

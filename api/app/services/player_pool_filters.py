@@ -3,9 +3,11 @@ from sqlalchemy import and_, func, or_
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.services.power4 import (
     CANONICAL_POWER4_TEAMS,
+    PLAYOFF_ELIGIBLE_INDEPENDENTS,
     SCHOOL_ALIASES,
     is_power4_school,
     normalize_school,
+    resolve_power4_school,
 )
 
 
@@ -27,6 +29,16 @@ _APPROVED_SCHOOLS = {
 }
 _APPROVED_SCHOOL_KEYS = tuple(sorted(school.strip().lower() for school in _APPROVED_SCHOOLS))
 ELIGIBLE_FANTASY_POSITIONS = ("QB", "RB", "WR", "TE", "K")
+LEAGUE_CONFERENCE_CODES = ("SEC", "BIG10", "BIG12", "ACC", "INDEPENDENT")
+DEFAULT_LEAGUE_CONFERENCE_CODES = LEAGUE_CONFERENCE_CODES
+_CONFERENCE_CODE_ALIASES = {
+    "BIG TEN": "BIG10",
+    "BIGTEN": "BIG10",
+    "B1G": "BIG10",
+    "BIG 12": "BIG12",
+    "INDEPENDENTS": "INDEPENDENT",
+    "NOTRE DAME": "INDEPENDENT",
+}
 CANONICAL_PRESEASON_SOURCE_PREFIX = "canonical-preseason:"
 CANONICAL_CORRECTION_SOURCE_PREFIX = "canonical-correction:"
 LEGACY_CANONICAL_PRESEASON_SOURCE_PREFIX = "legacy-canonical-preseason:"
@@ -35,6 +47,74 @@ LEGACY_CANONICAL_PRESEASON_SOURCE_PREFIX = "legacy-canonical-preseason:"
 def approved_school_player_filter():
     """SQL predicate for the canonical Power 4 + Notre Dame player universe."""
     return func.lower(func.trim(Player.school)).in_(_APPROVED_SCHOOL_KEYS)
+
+
+def normalize_league_conference_codes(values: list[str] | tuple[str, ...] | None) -> list[str]:
+    """Return a stable, validated conference-pool selection for one league.
+
+    ``None`` is deliberately the legacy-compatible full fantasy pool. An
+    explicit empty selection is rejected so a commissioner cannot create a
+    league with no legal draft or waiver players.
+    """
+
+    if values is None:
+        return list(DEFAULT_LEAGUE_CONFERENCE_CODES)
+    normalized: set[str] = set()
+    for raw_value in values:
+        value = str(raw_value).strip().upper()
+        value = _CONFERENCE_CODE_ALIASES.get(value, value)
+        if value not in LEAGUE_CONFERENCE_CODES:
+            raise ValueError(f"unsupported conference: {raw_value}")
+        normalized.add(value)
+    if not normalized:
+        raise ValueError("select at least one conference")
+    return [code for code in LEAGUE_CONFERENCE_CODES if code in normalized]
+
+
+def _schools_for_league_conference_codes(values: list[str] | tuple[str, ...] | None) -> tuple[str, ...]:
+    codes = set(normalize_league_conference_codes(values))
+    schools: set[str] = {
+        school
+        for conference, conference_schools in CANONICAL_POWER4_TEAMS.items()
+        if conference in codes
+        for school in conference_schools
+    }
+    if "INDEPENDENT" in codes:
+        schools.update(PLAYOFF_ELIGIBLE_INDEPENDENTS)
+    # Player sources may use a supported alias. Include it only when its
+    # canonical school belongs to the selected conference pool.
+    schools.update(
+        alias
+        for alias, canonical in SCHOOL_ALIASES.items()
+        if canonical in schools
+    )
+    return tuple(sorted(school.strip().lower() for school in schools))
+
+
+def league_conference_player_filter(values: list[str] | tuple[str, ...] | None):
+    """SQL predicate that confines a player query to a league's pool."""
+
+    return func.lower(func.trim(Player.school)).in_(_schools_for_league_conference_codes(values))
+
+
+def is_player_in_league_conference_scope(
+    player: Player,
+    values: list[str] | tuple[str, ...] | None,
+) -> bool:
+    """Instance-level equivalent used by draft and transaction write paths."""
+
+    if not player.school:
+        return False
+    canonical_school = resolve_power4_school(player.school)
+    if not canonical_school:
+        return False
+    allowed = set(normalize_league_conference_codes(values))
+    if canonical_school in PLAYOFF_ELIGIBLE_INDEPENDENTS:
+        return "INDEPENDENT" in allowed
+    for conference, schools in CANONICAL_POWER4_TEAMS.items():
+        if canonical_school in schools:
+            return conference in allowed
+    return False
 
 
 def canonical_preseason_player_filter(season: int):

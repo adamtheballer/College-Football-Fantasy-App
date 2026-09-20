@@ -8,7 +8,7 @@ import { formatPlayerCardPositionRank, PlayerCardHeader, resolvePlayerCardStatus
 afterEach(cleanup);
 
 describe("PlayerCardHeader injury status", () => {
-  it("uses a larger unfenced hero portrait with a faded edge", () => {
+  it("uses a right-aligned, unfenced hero portrait with a faded edge", () => {
     render(
       <PlayerCardHeader
         card={{
@@ -37,6 +37,8 @@ describe("PlayerCardHeader injury status", () => {
     const portrait = screen.getByTestId("player-card-hero-portrait");
     expect(portrait.className).not.toContain("cfb-player-sticker-frame");
     expect(portrait.className).not.toContain("rounded");
+    expect(portrait.className).toContain("right-");
+    expect(portrait.className).not.toContain("left-1/2");
     expect(portrait.querySelector("img")?.className).toContain("mask-image");
   });
 

@@ -58,6 +58,7 @@ def create_league(
     name: str = "Test League",
     max_teams: int = 12,
     is_private: bool = True,
+    conference_codes: list[str] | None = None,
 ) -> dict:
     # The default must remain future-dated: durable reminder assertions rely
     # on a scheduled draft, and a fixed calendar timestamp eventually turns
@@ -75,6 +76,7 @@ def create_league(
         "settings": {
             "scoring_json": {"ppr": 1},
             "roster_slots_json": {"QB": 1},
+            **({"conference_codes": conference_codes} if conference_codes is not None else {}),
             "playoff_teams": 2 if max_teams == 2 else 4,
             "waiver_type": "faab",
             "trade_review_type": "commissioner",
@@ -118,6 +120,51 @@ def test_create_league_normalizes_legacy_public_requests_to_invite_only(client):
     created = create_league(client, token, name="Legacy Public Request", is_private=False)
 
     assert created["is_private"] is True
+
+
+def test_create_league_persists_selected_conference_player_pool(client):
+    token = create_user_and_token(client, "conference-pool")
+
+    created = create_league(
+        client,
+        token,
+        name="SEC and Big Ten only",
+        conference_codes=["BIG10", "SEC"],
+    )
+
+    assert created["settings"]["conference_codes"] == ["SEC", "BIG10"]
+
+
+def test_create_league_rejects_an_empty_conference_player_pool(client):
+    token = create_user_and_token(client, "empty-conference-pool")
+    draft_time = datetime.now(timezone.utc).replace(microsecond=0) + timedelta(days=7)
+    response = client.post(
+        "/leagues",
+        json={
+            "basics": {"name": "No Player Pool", "season_year": 2026, "max_teams": 4, "is_private": True},
+            "settings": {
+                "scoring_json": {"ppr": 1},
+                "roster_slots_json": {"QB": 1},
+                "conference_codes": [],
+                "playoff_teams": 2,
+                "waiver_type": "faab",
+                "trade_review_type": "commissioner",
+                "superflex_enabled": False,
+                "kicker_enabled": True,
+                "defense_enabled": False,
+            },
+            "draft": {
+                "draft_datetime_utc": draft_time.isoformat(),
+                "timezone": "America/New_York",
+                "draft_type": "snake",
+                "pick_timer_seconds": 90,
+            },
+        },
+        headers=auth_headers(token),
+    )
+
+    assert response.status_code == 422
+    assert "select at least one conference" in str(response.json()["detail"])
 
 
 def test_create_league_allows_fourteen_teams_but_rejects_larger_sizes(client):
