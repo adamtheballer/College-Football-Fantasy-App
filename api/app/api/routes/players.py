@@ -38,6 +38,7 @@ from collegefootballfantasy_api.app.schemas.player_trade_value import PlayerTrad
 from collegefootballfantasy_api.app.schemas.player_trajectory import PlayerTrajectoryRead
 from collegefootballfantasy_api.app.services.espn_player_lookup import (
     persist_espn_player_profile,
+    refresh_espn_headshot_if_due,
     resolve_espn_player_by_name,
 )
 from collegefootballfantasy_api.app.services.historical_stats import (
@@ -349,6 +350,20 @@ def get_player_card_endpoint(
     profile_message: str | None = None
     espn_client = ESPNClient()
     espn_id = resolve_espn_player_id(db, player)
+    # A verified ESPN identity can exist before ESPN publishes (or we ingest)
+    # its portrait.  Repair that stale, nullable data on a card view using the
+    # exact mapped ID only; no URL is constructed and failures retain the
+    # neutral fallback without blocking the card itself.
+    if not refresh and espn_id:
+        try:
+            refresh_espn_headshot_if_due(
+                db,
+                player,
+                provider_player_id=espn_id,
+                client=espn_client,
+            )
+        except Exception:
+            db.rollback()
     if refresh and not espn_id and settings.espn_historical_stats_enabled:
         try:
             resolved = resolve_espn_player_by_name(db, player, client=espn_client)
