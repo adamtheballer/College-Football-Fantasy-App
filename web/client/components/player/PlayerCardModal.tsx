@@ -119,66 +119,71 @@ const positionPalettes: Record<
   }
 > = {
   QB: {
-    headerBase: "from-[#262967] via-[#1d4c86] to-[#0a2138]",
-    markerA: "rgba(96,165,250,0.28)",
-    markerB: "rgba(14,165,233,0.22)",
-    markerC: "rgba(15,23,42,0.34)",
+    headerBase: "from-[#173F63] via-[#12334f] to-[#081827]",
+    markerA: "rgba(134,188,229,0.24)",
+    markerB: "rgba(23,63,99,0.36)",
+    markerC: "rgba(4,14,25,0.46)",
     glow: "shadow-[0_18px_48px_rgba(0,0,0,0.46)]",
-    accent: "text-blue-100",
+    accent: "text-[#86BCE5]",
     pill: "border-blue-200/45 bg-blue-200/15 text-blue-50",
     silhouette: "from-blue-200/35 via-blue-100/20 to-transparent",
   },
   RB: {
-    headerBase: "from-[#064b3c] via-[#0d6552] to-[#092d32]",
-    markerA: "rgba(52,211,153,0.24)",
-    markerB: "rgba(20,184,166,0.20)",
-    markerC: "rgba(6,78,59,0.42)",
+    headerBase: "from-[#104B3F] via-[#0d3c34] to-[#081a23]",
+    markerA: "rgba(138,212,181,0.24)",
+    markerB: "rgba(16,75,63,0.34)",
+    markerC: "rgba(3,20,25,0.46)",
     glow: "shadow-[0_18px_48px_rgba(0,0,0,0.46)]",
-    accent: "text-emerald-100",
+    accent: "text-[#8AD4B5]",
     pill: "border-emerald-200/45 bg-emerald-200/15 text-emerald-50",
     silhouette: "from-emerald-200/35 via-emerald-100/20 to-transparent",
   },
   WR: {
-    headerBase: "from-[#42206c] via-[#603791] to-[#211840]",
-    markerA: "rgba(167,139,250,0.28)",
-    markerB: "rgba(217,70,239,0.18)",
-    markerC: "rgba(76,29,149,0.42)",
+    headerBase: "from-[#392C55] via-[#302443] to-[#171426]",
+    markerA: "rgba(189,166,229,0.24)",
+    markerB: "rgba(57,44,85,0.34)",
+    markerC: "rgba(12,9,24,0.46)",
     glow: "shadow-[0_18px_48px_rgba(0,0,0,0.46)]",
-    accent: "text-violet-100",
+    accent: "text-[#BDA6E5]",
     pill: "border-violet-200/45 bg-violet-200/15 text-violet-50",
     silhouette: "from-violet-200/35 via-violet-100/20 to-transparent",
   },
   TE: {
-    headerBase: "from-[#65410c] via-[#805213] to-[#35220d]",
-    markerA: "rgba(251,191,36,0.26)",
-    markerB: "rgba(249,115,22,0.24)",
-    markerC: "rgba(120,53,15,0.42)",
+    headerBase: "from-[#594018] via-[#453114] to-[#211b10]",
+    markerA: "rgba(231,182,91,0.25)",
+    markerB: "rgba(89,64,24,0.34)",
+    markerC: "rgba(28,19,8,0.46)",
     glow: "shadow-[0_18px_48px_rgba(0,0,0,0.46)]",
-    accent: "text-amber-100",
+    accent: "text-[#E7B65B]",
     pill: "border-amber-200/45 bg-amber-200/15 text-amber-50",
     silhouette: "from-amber-200/35 via-amber-100/20 to-transparent",
   },
   K: {
-    headerBase: "from-[#2b3e55] via-[#334e67] to-[#162434]",
-    markerA: "rgba(203,213,225,0.18)",
-    markerB: "rgba(100,116,139,0.22)",
-    markerC: "rgba(15,23,42,0.45)",
+    headerBase: "from-[#414953] via-[#303842] to-[#151d27]",
+    markerA: "rgba(210,215,222,0.22)",
+    markerB: "rgba(65,73,83,0.36)",
+    markerC: "rgba(13,19,28,0.46)",
     glow: "shadow-[0_18px_48px_rgba(0,0,0,0.46)]",
-    accent: "text-slate-100",
+    accent: "text-[#D2D7DE]",
     pill: "border-slate-200/40 bg-slate-200/15 text-slate-50",
     silhouette: "from-slate-200/30 via-slate-100/18 to-transparent",
   },
 };
 
 const defaultPalette = {
-  headerBase: "from-[#134f64] via-[#1b6681] to-[#0b2b3d]",
-  markerA: "rgba(34,211,238,0.24)",
-  markerB: "rgba(59,130,246,0.20)",
-  markerC: "rgba(14,116,144,0.42)",
+  headerBase: "from-[#17364f] via-[#102b40] to-[#081827]",
+  markerA: "rgba(141,184,214,0.22)",
+  markerB: "rgba(23,54,79,0.34)",
+  markerC: "rgba(4,14,25,0.46)",
   glow: "shadow-[0_18px_48px_rgba(0,0,0,0.46)]",
-  accent: "text-cyan-100",
+  accent: "text-[#8db8d6]",
   pill: "border-cyan-200/45 bg-cyan-200/15 text-cyan-50",
   silhouette: "from-cyan-200/35 via-cyan-100/20 to-transparent",
+};
+
+const normalizePlayerCardPosition = (position?: string | null) => {
+  const normalized = (position ?? "").trim().toUpperCase();
+  return ["PK", "KICKER", "PLACEKICKER"].includes(normalized) ? "K" : normalized;
 };
 
 export const formatPlayerCardValue = (value: unknown, fallback = "—") => {
@@ -207,7 +212,7 @@ export const draftHistorySummary = (event: { event_type: string; metadata?: Reco
 };
 
 export const getPlayerCardPalette = (position?: string | null) =>
-  positionPalettes[(position ?? "").toUpperCase()] ?? defaultPalette;
+  positionPalettes[normalizePlayerCardPosition(position)] ?? defaultPalette;
 
 const getStatValue = (stats: Record<string, unknown> | null | undefined, keys: readonly string[]) => {
   if (!stats) return null;

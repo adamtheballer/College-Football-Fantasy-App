@@ -558,6 +558,24 @@
     opacity: 0.075;
   }
 
+  /* Sparse halftone and a single short brush underline complete the printed
+   * card treatment without entering the portrait, type, or controls layer. */
+  .cfb-player-card-halftone {
+    background-image: radial-gradient(circle, hsl(45 84% 84% / 0.45) 0 0.7px, transparent 0.95px);
+    background-position: 0 0;
+    background-size: 8px 8px;
+    mask-image: linear-gradient(115deg, transparent 0 55%, black 77% 100%);
+    opacity: 0.055;
+  }
+
+  .cfb-player-card-brush {
+    width: 4.75rem;
+    height: 0.2rem;
+    background: linear-gradient(90deg, hsl(45 84% 59% / 0.72), hsl(45 84% 59% / 0.28) 78%, transparent);
+    clip-path: polygon(0 40%, 86% 0, 100% 42%, 72% 72%, 28% 100%, 0 70%);
+    opacity: 0.6;
+  }
+
   /* A one-pixel, slightly broken print edge separates the illustrated header
    * from the metric rail without changing either surface's dimensions. */
   .cfb-player-card-ink-edge {
