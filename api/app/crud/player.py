@@ -5,6 +5,7 @@ from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.models.draft import Draft
 from collegefootballfantasy_api.app.models.draft_pick import DraftPick
 from collegefootballfantasy_api.app.models.league import League
+from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.team import Team
@@ -13,6 +14,7 @@ from collegefootballfantasy_api.app.services.player_pool_filters import (
     approved_school_player_filter,
     canonical_fantasy_player_filter,
     generated_test_player_filter,
+    league_conference_player_filter,
     retired_canonical_preseason_player_filter,
 )
 
@@ -66,6 +68,11 @@ def list_players(
             if league_season is not None:
                 season = int(league_season)
         stmt = stmt.where(canonical_fantasy_player_filter(season))
+    if league_id is not None:
+        conference_codes = db.scalar(
+            select(LeagueSettings.conference_codes).where(LeagueSettings.league_id == league_id)
+        )
+        stmt = stmt.where(league_conference_player_filter(conference_codes))
     if position:
         requested_positions = [value.strip().upper() for value in position.split(",") if value.strip()]
         if len(requested_positions) == 1:

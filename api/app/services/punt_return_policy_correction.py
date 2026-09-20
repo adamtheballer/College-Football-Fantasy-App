@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.domain.stat_normalization import (
@@ -138,10 +138,20 @@ def apply_punt_return_policy_correction(db: Session) -> PuntReturnPolicyCorrecti
         if changed:
             historical_rows_sanitized += 1
 
-    for row in db.scalars(select(LeagueSettings)).all():
-        cleaned = strip_retired_punt_return_rules(row.scoring_json or {})
-        if cleaned != (row.scoring_json or {}):
-            row.scoring_json = cleaned
+    # This correction is executed by migration 0115. Select only the two
+    # columns that existed at that migration's schema point: importing the
+    # current ORM model must not make an older migration select a future
+    # column before the later migration that creates it has run.
+    for league_id, scoring_json in db.execute(
+        select(LeagueSettings.id, LeagueSettings.scoring_json)
+    ):
+        cleaned = strip_retired_punt_return_rules(scoring_json or {})
+        if cleaned != (scoring_json or {}):
+            db.execute(
+                update(LeagueSettings)
+                .where(LeagueSettings.id == league_id)
+                .values(scoring_json=cleaned)
+            )
             league_settings_sanitized += 1
 
     db.flush()

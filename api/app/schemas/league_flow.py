@@ -4,6 +4,10 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 from collegefootballfantasy_api.app.schemas.waiver import WaiverClaimRead, WaiverDropCandidateRead
+from collegefootballfantasy_api.app.services.player_pool_filters import (
+    DEFAULT_LEAGUE_CONFERENCE_CODES,
+    normalize_league_conference_codes,
+)
 
 
 MIN_LEAGUE_TEAM_COUNT = 2
@@ -48,6 +52,7 @@ class LeagueBasics(BaseModel):
 class LeagueSettingsInput(BaseModel):
     scoring_json: dict
     roster_slots_json: dict
+    conference_codes: list[str] = Field(default_factory=lambda: list(DEFAULT_LEAGUE_CONFERENCE_CODES))
     playoff_teams: int
     waiver_type: str
     waiver_period_hours: int = 24
@@ -78,6 +83,11 @@ class LeagueSettingsInput(BaseModel):
     superflex_enabled: bool
     kicker_enabled: bool
     defense_enabled: bool
+
+    @field_validator("conference_codes")
+    @classmethod
+    def validate_conference_codes(cls, value: list[str]) -> list[str]:
+        return normalize_league_conference_codes(value)
 
     @field_validator("playoff_teams")
     @classmethod
@@ -233,6 +243,7 @@ class LeagueSettingsRead(BaseModel):
     scoring_snapshot_json: dict | None = None
     scoring_locked_at: datetime | None = None
     roster_slots_json: dict
+    conference_codes: list[str] = Field(default_factory=lambda: list(DEFAULT_LEAGUE_CONFERENCE_CODES))
     playoff_teams: int
     waiver_type: str
     waiver_period_hours: int
@@ -263,6 +274,7 @@ class LeagueSettingsRead(BaseModel):
 class LeagueSettingsUpdate(BaseModel):
     scoring_json: dict
     roster_slots_json: dict
+    conference_codes: list[str] | None = None
     playoff_teams: int
     waiver_type: str
     waiver_period_hours: int | None = None
@@ -293,6 +305,11 @@ class LeagueSettingsUpdate(BaseModel):
     superflex_enabled: bool
     kicker_enabled: bool
     defense_enabled: bool
+
+    @field_validator("conference_codes")
+    @classmethod
+    def validate_conference_codes(cls, value: list[str] | None) -> list[str] | None:
+        return normalize_league_conference_codes(value) if value is not None else None
 
     @field_validator("playoff_teams")
     @classmethod

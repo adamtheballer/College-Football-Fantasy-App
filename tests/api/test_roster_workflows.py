@@ -113,6 +113,31 @@ def create_players(client) -> tuple[int, int]:
     return rows[0]["id"], rows[1]["id"]
 
 
+def test_league_conference_pool_blocks_direct_roster_adds_outside_the_selected_pool(client, db_session):
+    token = create_user_and_token(client, "conference-roster-scope")
+    league = create_league(client, token)
+    team = db_session.query(Team).filter(Team.league_id == league["id"]).one()
+    settings = db_session.query(LeagueSettings).filter(LeagueSettings.league_id == league["id"]).one()
+    settings.conference_codes = ["SEC"]
+    db_session.commit()
+    sec_player_id, big_ten_player_id = create_players(client)
+
+    allowed = client.post(
+        f"/teams/{team.id}/roster",
+        json={"player_id": sec_player_id, "slot": "RB", "status": "active"},
+        headers=auth_headers(token),
+    )
+    blocked = client.post(
+        f"/teams/{team.id}/roster",
+        json={"player_id": big_ten_player_id, "slot": "BENCH", "status": "active"},
+        headers=auth_headers(token),
+    )
+
+    assert allowed.status_code == 201
+    assert blocked.status_code == 422
+    assert blocked.json()["detail"] == "player is outside this league's selected conference pool"
+
+
 def create_position_players(client) -> dict[str, int]:
     response = client.post(
         "/players",

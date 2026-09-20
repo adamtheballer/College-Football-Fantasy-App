@@ -36,7 +36,10 @@ from collegefootballfantasy_api.app.schemas.waiver import FreeAgentAdd, FreeAgen
 from collegefootballfantasy_api.app.services.chat_service import create_system_chat_message
 from collegefootballfantasy_api.app.services.league_weeks import current_cfb_week_state
 from collegefootballfantasy_api.app.services.player_lock_service import game_context_for_players, is_player_locked
-from collegefootballfantasy_api.app.services.player_pool_filters import is_canonical_fantasy_player
+from collegefootballfantasy_api.app.services.player_pool_filters import (
+    is_canonical_fantasy_player,
+    is_player_in_league_conference_scope,
+)
 from collegefootballfantasy_api.app.services.live_scoring_readiness import ensure_official_acquisition_identity
 from collegefootballfantasy_api.app.services.roster_slots import first_open_eligible_slot
 
@@ -462,6 +465,18 @@ def _get_or_create_period(
 
 
 def _ensure_player_available(db: Session, league_id: int, player_id: int, *, now: datetime) -> None:
+    league = db.get(League, league_id)
+    player = db.get(Player, player_id)
+    if not league or not player:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="league or player not found")
+    settings = _league_settings(db, league_id)
+    if not is_canonical_fantasy_player(player, league.season_year) or not is_player_in_league_conference_scope(
+        player, settings.conference_codes
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="player is outside this league's selected conference pool",
+        )
     rostered = (
         db.query(RosterEntry.id)
         .filter(RosterEntry.league_id == league_id, RosterEntry.player_id == player_id)

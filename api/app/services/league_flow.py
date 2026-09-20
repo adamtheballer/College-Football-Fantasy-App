@@ -309,6 +309,7 @@ def create_league(
             scoring_snapshot_json=dict(payload.settings.scoring_json) if settings.beta_scoring_lock_enabled else None,
             scoring_locked_at=datetime.now(timezone.utc) if settings.beta_scoring_lock_enabled else None,
             roster_slots_json=payload.settings.roster_slots_json,
+            conference_codes=payload.settings.conference_codes,
             playoff_teams=payload.settings.playoff_teams,
             waiver_type=payload.settings.waiver_type,
             waiver_period_hours=payload.settings.waiver_period_hours,
@@ -477,6 +478,8 @@ def update_league_settings(
         )
     settings_row.scoring_json = payload.scoring_json
     settings_row.roster_slots_json = payload.roster_slots_json
+    if payload.conference_codes is not None:
+        settings_row.conference_codes = payload.conference_codes
     bracket = db.query(PostseasonBracket).filter(
         PostseasonBracket.league_id == league.id,
         PostseasonBracket.season == league.season_year,
