@@ -830,6 +830,72 @@ def test_settings_view_exposes_calculated_points_against(client, db_session):
     assert standings[away_team.id]["points_against"] == 104.25
 
 
+def test_settings_schedule_distinguishes_final_live_and_future_scores(client, db_session):
+    owner_token = create_user_and_token(client, "settings-schedule-owner")
+    member_token = create_user_and_token(client, "settings-schedule-member")
+    league = create_league(client, owner_token, name="Schedule Score States League", max_teams=2)
+    assert client.post(f"/leagues/{league['id']}/join", headers=auth_headers(member_token)).status_code == 200
+
+    home_team, away_team = (
+        db_session.query(Team)
+        .filter(Team.league_id == league["id"])
+        .order_by(Team.id.asc())
+        .all()
+    )
+    db_session.add_all([
+        Matchup(
+            league_id=league["id"], season=2026, week=1,
+            home_team_id=home_team.id, away_team_id=away_team.id,
+            status="final", home_score=104.25, away_score=87.5,
+        ),
+        Matchup(
+            league_id=league["id"], season=2026, week=2,
+            home_team_id=home_team.id, away_team_id=away_team.id,
+            status="live", home_score=31.5, away_score=29.75,
+        ),
+        Matchup(
+            league_id=league["id"], season=2026, week=3,
+            home_team_id=home_team.id, away_team_id=away_team.id,
+            status="projected", home_score=0.0, away_score=0.0,
+        ),
+    ])
+    db_session.commit()
+
+    response = client.get(f"/leagues/{league['id']}/settings-view", headers=auth_headers(owner_token))
+
+    assert response.status_code == 200
+    schedule = {row["week"]: row for row in response.json()["schedule"]}
+    assert {
+        "week": 1,
+        "status": schedule[1]["status"],
+        "home_current_total": schedule[1]["home_current_total"],
+        "away_current_total": schedule[1]["away_current_total"],
+        "home_projected_total": schedule[1]["home_projected_total"],
+        "away_projected_total": schedule[1]["away_projected_total"],
+        "home_result": schedule[1]["home_result"],
+        "away_result": schedule[1]["away_result"],
+    } == {
+        "week": 1,
+        "status": "final",
+        "home_current_total": 104.25,
+        "away_current_total": 87.5,
+        "home_projected_total": None,
+        "away_projected_total": None,
+        "home_result": "W",
+        "away_result": "L",
+    }
+    assert schedule[2]["status"] == "live"
+    assert schedule[2]["home_current_total"] == 31.5
+    assert schedule[2]["away_current_total"] == 29.75
+    assert schedule[2]["home_projected_total"] is None
+    assert schedule[2]["home_result"] is None
+    assert schedule[3]["status"] == "projected"
+    assert schedule[3]["home_current_total"] is None
+    assert schedule[3]["away_current_total"] is None
+    assert schedule[3]["home_projected_total"] == 0.0
+    assert schedule[3]["away_projected_total"] == 0.0
+
+
 def test_settings_view_exposes_only_a_persisted_certified_postseason_calendar(client, db_session):
     owner_token = create_user_and_token(client, "calendar-settings-owner")
     league = create_league(client, owner_token, name="Certified calendar settings", max_teams=2)

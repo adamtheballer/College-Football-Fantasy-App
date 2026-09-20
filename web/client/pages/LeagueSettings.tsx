@@ -22,7 +22,7 @@ import { ErrorState } from "@/components/states";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLeagueDetail, useLeaguePostseasonBracket, useLeagueSettingsTab } from "@/hooks/use-leagues";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
-import { getLeagueScheduleWeeks } from "@/lib/leagueSchedule";
+import { getLeagueScheduleWeeks, getScheduleScoreDisplay } from "@/lib/leagueSchedule";
 import { tradeOfferPath } from "@/lib/trade-links";
 import type { LeagueRosterPlayer, LeagueSettingsTabResponse } from "@/types/league";
 
@@ -466,20 +466,50 @@ export default function LeagueSettings() {
                 <EmptyState message="No matchups are scheduled for this week." />
               ) : (
                 <div className="grid gap-4 md:grid-cols-2">
-                  {selectedScheduleRows.map((row) => (
-                    <div key={row.matchup_id} className="rounded-lg border border-cfb-border-subtle bg-cfb-surface-raised p-4 transition-colors hover:bg-cfb-surface-hover">
-                      <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cfb-brand">Week {row.week}</p>
-                      <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
-                        <p className="text-sm font-black text-cfb-text-primary">{row.home_team_name}</p>
-                        <span className="rounded border border-cfb-border-subtle bg-cfb-canvas px-2 py-1 text-[10px] font-black text-cfb-text-muted">VS</span>
-                        <p className="text-right text-sm font-black text-cfb-text-primary">{row.away_team_name}</p>
+                  {selectedScheduleRows.map((row) => {
+                    const homeScore = getScheduleScoreDisplay(row, "home");
+                    const awayScore = getScheduleScoreDisplay(row, "away");
+                    const formatScore = (score: typeof homeScore) => (
+                      score.total === null ? score.label : `${score.label} ${score.total.toFixed(1)}`
+                    );
+
+                    return (
+                      <div key={row.matchup_id} className="rounded-lg border border-cfb-border-subtle bg-cfb-surface-raised p-4 transition-colors hover:bg-cfb-surface-hover">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-cfb-brand">Week {row.week}</p>
+                        <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+                          <p className="flex items-center gap-2 text-sm font-black text-cfb-text-primary">
+                            <span className="truncate">{row.home_team_name}</span>
+                            {homeScore.result ? (
+                              <span className={[
+                                "rounded px-1.5 py-0.5 text-[10px] font-black",
+                                homeScore.result === "W" ? "bg-emerald-400/15 text-emerald-300" : homeScore.result === "L" ? "bg-rose-400/15 text-rose-300" : "bg-cfb-canvas text-cfb-text-muted",
+                              ].join(" ")}>{homeScore.result}</span>
+                            ) : null}
+                          </p>
+                          <span className="rounded border border-cfb-border-subtle bg-cfb-canvas px-2 py-1 text-[10px] font-black text-cfb-text-muted">VS</span>
+                          <p className="flex items-center justify-end gap-2 text-right text-sm font-black text-cfb-text-primary">
+                            {awayScore.result ? (
+                              <span className={[
+                                "rounded px-1.5 py-0.5 text-[10px] font-black",
+                                awayScore.result === "W" ? "bg-emerald-400/15 text-emerald-300" : awayScore.result === "L" ? "bg-rose-400/15 text-rose-300" : "bg-cfb-canvas text-cfb-text-muted",
+                              ].join(" ")}>{awayScore.result}</span>
+                            ) : null}
+                            <span className="truncate">{row.away_team_name}</span>
+                          </p>
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-3 text-xs font-bold text-cfb-text-secondary">
+                          <span className="inline-flex items-center gap-1.5">
+                            {homeScore.isLive ? <span aria-label="Live" className="h-1.5 w-1.5 rounded-full bg-rose-400" /> : null}
+                            {formatScore(homeScore)}
+                          </span>
+                          <span className="inline-flex items-center justify-end gap-1.5 text-right">
+                            {awayScore.isLive ? <span aria-label="Live" className="h-1.5 w-1.5 rounded-full bg-rose-400" /> : null}
+                            {formatScore(awayScore)}
+                          </span>
+                        </div>
                       </div>
-                      <div className="mt-3 grid grid-cols-2 gap-3 text-xs font-bold text-cfb-text-secondary">
-                        <span>Proj {Number(row.home_projected_total ?? 0).toFixed(1)}</span>
-                        <span className="text-right">Proj {Number(row.away_projected_total ?? 0).toFixed(1)}</span>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
