@@ -430,10 +430,10 @@ test.describe("player card modal", () => {
     const mobileBox = await mobileArticle.boundingBox();
     expect(mobileBox).not.toBeNull();
     if (mobileBox) {
-      // Summary is the default player-card view. It intentionally uses nearly
-      // the full mobile viewport so the game context and canonical bio are
-      // readable together rather than hidden behind an inner scroll region.
-      expect(mobileBox.height).toBeGreaterThan(844 * 0.9);
+      // Mobile cards are a 75%-height sheet. The remaining page context stays
+      // visible while the card's own detail region handles vertical scrolling.
+      expect(mobileBox.height).toBeGreaterThan(844 * 0.74);
+      expect(mobileBox.height).toBeLessThan(844 * 0.76);
       expect(mobileBox.height).toBeLessThanOrEqual(844);
       expect(mobileBox.width).toBeGreaterThan(390 * 0.9);
       expect(mobileBox.width).toBeLessThanOrEqual(390);
