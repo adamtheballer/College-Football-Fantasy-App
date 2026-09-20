@@ -31,6 +31,33 @@ def should_run_at_local_hour(
     return now_utc.astimezone(ZoneInfo(timezone_name)).hour in hours
 
 
+def should_run_at_local_schedule(
+    now_utc: datetime,
+    *,
+    timezone_name: str,
+    hour: int | list[int] | None,
+    weekday: int | list[int] | None,
+) -> bool:
+    """Return whether a cron invocation matches its local time and weekday.
+
+    Railway evaluates cron expressions in UTC. Checking both values in the
+    configured local timezone keeps a paired EST/EDT cron expression from
+    running twice and prevents a manual or misconfigured invocation from
+    refreshing availability reports on an unintended day.
+    """
+
+    local_time = now_utc.astimezone(ZoneInfo(timezone_name))
+    if hour is not None:
+        hours = {hour} if isinstance(hour, int) else set(hour)
+        if local_time.hour not in hours:
+            return False
+    if weekday is not None:
+        weekdays = {weekday} if isinstance(weekday, int) else set(weekday)
+        if local_time.weekday() not in weekdays:
+            return False
+    return True
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Refresh official P4 availability reports once.")
     parser.add_argument("--season", type=int, default=datetime.now().year)
@@ -52,12 +79,26 @@ def main() -> None:
         default="America/New_York",
         help="IANA timezone used with --only-local-hour (default: America/New_York).",
     )
+    parser.add_argument(
+        "--only-local-weekday",
+        type=int,
+        choices=range(7),
+        metavar="WEEKDAY",
+        action="append",
+        help="Exit successfully unless this is a Python weekday in --timezone (Monday=0, Sunday=6).",
+    )
     args = parser.parse_args()
     now_utc = datetime.now(timezone.utc)
-    if not should_run_at_local_hour(now_utc, timezone_name=args.timezone, hour=args.only_local_hour):
+    if not should_run_at_local_schedule(
+        now_utc,
+        timezone_name=args.timezone,
+        hour=args.only_local_hour,
+        weekday=args.only_local_weekday,
+    ):
         print(
             "official availability reports skipped "
-            f"utc={now_utc.isoformat()} timezone={args.timezone} only_local_hour={args.only_local_hour}"
+            f"utc={now_utc.isoformat()} timezone={args.timezone} "
+            f"only_local_hour={args.only_local_hour} only_local_weekday={args.only_local_weekday}"
         )
         return
 
