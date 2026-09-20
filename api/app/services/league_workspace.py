@@ -252,6 +252,7 @@ def build_standings_summary(db: Session, league: League) -> list[LeagueWorkspace
             losses=item.losses,
             ties=item.ties,
             points_for=item.points_for,
+            points_against=item.points_against,
             rank=item.rank,
         )
         for item in ranked

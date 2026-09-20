@@ -609,7 +609,16 @@ export interface LeagueSettingsTabResponse {
   scoring_settings: Record<string, number | string | boolean>;
   roster_settings: Record<string, number>;
   waiver_rules: Record<string, string | number | boolean>;
-  standings: Array<Record<string, string | number>>;
+  standings: Array<{
+    team_id: number;
+    team_name: string;
+    wins: number | null;
+    losses: number | null;
+    ties: number | null;
+    points_for: number | null;
+    points_against: number | null;
+    rank: number | null;
+  }>;
   schedule: LeagueScheduleRow[];
   rosters: LeagueRosterPlayer[];
   trade_history: Array<{

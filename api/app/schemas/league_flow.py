@@ -469,6 +469,7 @@ class LeagueWorkspaceStandingSummaryRead(BaseModel):
     losses: int | None = None
     ties: int | None = None
     points_for: float | None = None
+    points_against: float | None = None
     rank: int | None = None
 
 
@@ -870,7 +871,7 @@ class LeagueSettingsViewRead(BaseModel):
     scoring_settings: dict
     roster_settings: dict[str, int]
     waiver_rules: dict
-    standings: list[dict]
+    standings: list[LeagueWorkspaceStandingSummaryRead]
     schedule: list[LeagueScheduleRowRead]
     rosters: list[RosterTabEntryRead]
     trade_history: list[LeagueTradeHistoryRead]
