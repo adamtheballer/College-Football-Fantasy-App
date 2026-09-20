@@ -324,6 +324,47 @@ def test_player_card_uses_normalized_espn_provider_mapping(client, db_session, m
     assert body["about"]["team"] == "Ohio State Buckeyes"
 
 
+def test_player_card_repairs_a_missing_portrait_from_its_verified_espn_identity(client, db_session, monkeypatch):
+    monkeypatch.setattr(settings, "player_headshots_enabled", True)
+
+    class FakeESPNClient:
+        calls: list[str] = []
+
+        def get_athlete_profile(self, espn_player_id):
+            self.calls.append(espn_player_id)
+            return {
+                "athlete": {
+                    "id": espn_player_id,
+                    "displayName": "Deuce Alexander",
+                    "headshot": {"href": "https://a.espncdn.com/i/headshots/college-football/players/full/5152158.png"},
+                }
+            }
+
+    monkeypatch.setattr(players_route, "ESPNClient", FakeESPNClient)
+    player = Player(name="Deuce Alexander", position="WR", school="Ole Miss")
+    db_session.add(player)
+    db_session.flush()
+    db_session.add(
+        PlayerProviderId(
+            player_id=player.id,
+            provider="espn",
+            provider_player_id="5152158",
+            verification_status="verified",
+            match_confidence=1.0,
+        )
+    )
+    db_session.commit()
+
+    response = client.get(f"/players/{player.id}/card")
+
+    assert response.status_code == 200
+    assert response.json()["about"]["headshot_url"].endswith("/5152158.png")
+    db_session.refresh(player)
+    assert player.espn_headshot_url.endswith("/5152158.png")
+    assert player.image_url.endswith("/5152158.png")
+    assert FakeESPNClient.calls == ["5152158"]
+
+
 def test_player_card_resolves_espn_by_name_and_imports_historical_stats(client, db_session, monkeypatch):
     monkeypatch.setattr(settings, "espn_historical_stats_enabled", True)
 

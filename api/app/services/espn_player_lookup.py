@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -24,6 +24,12 @@ POSITION_ALIASES = {
     "PLACE KICKER": "K",
     "KICKER": "K",
 }
+
+# A missing portrait is not proof that ESPN has no image.  Their profile data
+# can be updated after the identity mapping was first stored, so retry a
+# provider-supplied portrait periodically without turning every card view into
+# an unbounded provider request.
+HEADSHOT_RETRY_INTERVAL = timedelta(hours=24)
 
 
 @dataclass(frozen=True)
@@ -124,6 +130,55 @@ def persist_espn_player_profile(player: Player, profile_payload: dict[str, Any] 
         player.image_url = headshot_url
     player.espn_profile_synced_at = datetime.now(timezone.utc)
     return True
+
+
+def has_licensed_espn_headshot(player: Player) -> bool:
+    """Return whether the player already has a provider-supplied portrait."""
+
+    return bool((player.espn_headshot_url or player.image_url or "").strip())
+
+
+def needs_espn_headshot_refresh(player: Player, *, now: datetime | None = None) -> bool:
+    """Limit a missing-photo retry to one exact ESPN lookup per day.
+
+    The check is intentionally gated by the existing licensed-image setting.
+    It never derives a CDN URL from an ID and only permits the card route to
+    retrieve an image already returned by ESPN for an established identity.
+    """
+
+    if not settings.player_headshots_enabled or has_licensed_espn_headshot(player):
+        return False
+    synced_at = player.espn_profile_synced_at
+    if synced_at is None:
+        return True
+    current = now or datetime.now(timezone.utc)
+    if synced_at.tzinfo is None:
+        synced_at = synced_at.replace(tzinfo=timezone.utc)
+    return synced_at <= current - HEADSHOT_RETRY_INTERVAL
+
+
+def refresh_espn_headshot_if_due(
+    db: Session,
+    player: Player,
+    *,
+    provider_player_id: str | None,
+    client: ESPNClient,
+    now: datetime | None = None,
+) -> bool:
+    """Persist an exact ESPN portrait for a mapped player when the retry is due.
+
+    No name search occurs here: the caller must supply the trusted provider
+    ID.  This makes a card-open refresh safe for public traffic while allowing
+    the offline resolver to remain the path for unmapped legacy records.
+    """
+
+    if not provider_player_id or not needs_espn_headshot_refresh(player, now=now):
+        return False
+    profile_payload = client.get_athlete_profile(provider_player_id)
+    if not persist_espn_player_profile(player, profile_payload):
+        return False
+    db.commit()
+    return has_licensed_espn_headshot(player)
 
 
 def _item_name_matches(item: dict[str, Any], player: Player) -> bool:
