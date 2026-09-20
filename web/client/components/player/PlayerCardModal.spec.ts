@@ -16,6 +16,7 @@ import {
   resolvePlayerCardCfb27Rating,
   resolvePlayerCardCurrentValueRating,
   resolvePlayerCardProjectionStats,
+  playerCardNewsFeedItems,
   visiblePlayerCardAboutMessage,
   visiblePlayerCardTabs,
 } from "./PlayerCardModal";
@@ -24,11 +25,56 @@ import { CURRENT_VALUE_RATING_LABEL, formatCurrentValueRating } from "./PlayerCa
 describe("PlayerCardModal helpers", () => {
   it("always shows the History tab, with league context controlling its contents", () => {
     expect(visiblePlayerCardTabs(false).map((tab) => tab.label)).toEqual([
-      "Summary", "News", "Game Log", "Alerts", "Projections", "History", "Value",
+      "Summary", "News", "Game Log", "Projections", "History", "Value",
     ]);
     expect(visiblePlayerCardTabs(true).map((tab) => tab.label)).toEqual([
-      "Summary", "News", "Game Log", "Alerts", "Projections", "History", "Value",
+      "Summary", "News", "Game Log", "Projections", "History", "Value",
     ]);
+  });
+
+  it("merges reviewed injury records into News without duplicating their matching news event", () => {
+    const feed = playerCardNewsFeedItems({
+      recent_news: [{
+        id: 12,
+        event_type: "AVAILABILITY",
+        status: "OUT",
+        detail: "Missouri reported Hardy would miss the Sept. 19 Troy game.",
+        source: "manual_verified_team_report",
+        published_at: "2026-09-20T08:13:19Z",
+      }],
+      injuries: [{
+        id: 9,
+        season: 2026,
+        week: 3,
+        status: "OUT",
+        notes: "Missouri reported Hardy would miss the Sept. 19 Troy game.",
+        is_game_time_decision: false,
+        is_returning: false,
+        updated_at: "2026-09-20T08:13:19Z",
+      }],
+    } as never);
+
+    expect(feed).toHaveLength(1);
+    expect(feed[0]).toMatchObject({ kind: "News", title: "OUT" });
+  });
+
+  it("keeps an injury record visible in News when no matching news event exists", () => {
+    const feed = playerCardNewsFeedItems({
+      recent_news: [],
+      injuries: [{
+        id: 9,
+        season: 2026,
+        week: 3,
+        status: "QUESTIONABLE",
+        injury: "Shoulder",
+        is_game_time_decision: true,
+        is_returning: false,
+        updated_at: "2026-09-20T08:13:19Z",
+      }],
+    } as never);
+
+    expect(feed).toHaveLength(1);
+    expect(feed[0]).toMatchObject({ kind: "Injury update", title: "QUESTIONABLE", source: "2026 W3" });
   });
   it("omits punt-return stats from position-specific Game Logs", () => {
     expect(gameLogColumnsForPosition("TE").map(([label]) => label)).toEqual([

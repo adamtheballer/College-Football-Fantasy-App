@@ -8,6 +8,7 @@ silently converted into zero points while the weekly import is repaired.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Sequence
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -28,6 +29,7 @@ from collegefootballfantasy_api.app.services.fantasy_game_selection import (
 from collegefootballfantasy_api.app.services.league_weeks import calendar_cfb_week
 from collegefootballfantasy_api.app.services.player_pool_filters import (
     canonical_fantasy_player_filter,
+    league_conference_player_filter,
 )
 
 
@@ -56,19 +58,31 @@ def season_positional_rank_for_player(
     *,
     player: Player,
     season: int,
+    conference_codes: Sequence[str] | None = None,
 ) -> PlayerSeasonPositionalRank | None:
-    return season_positional_ranks(db, position=player.position, season=season).get(player.id)
+    return season_positional_ranks(
+        db,
+        position=player.position,
+        season=season,
+        conference_codes=conference_codes,
+    ).get(player.id)
 
 
 def season_positional_ranks(
-    db: Session, *, position: str, season: int,
+    db: Session,
+    *,
+    position: str,
+    season: int,
+    conference_codes: Sequence[str] | None = None,
 ) -> dict[int, PlayerSeasonPositionalRank]:
     """Return a player's cumulative rank after a finalized fantasy week.
 
     The eligible player universe is the exact canonical public draft/waiver
-    pool.  Within a position, ties are deterministically ordered by player
-    name and id so every eligible player has one ordinal rank from 1 through
-    the size of that position's pool.
+    pool. When a league has selected one or more conferences, that universe
+    is narrowed to its legal player pool before ranks are assigned. Within a
+    position, ties are deterministically ordered by player name and id so
+    every eligible player has one ordinal rank from 1 through the size of the
+    relevant pool.
     """
 
     through_week = min(latest_authoritatively_finalized_week(db, season=season), calendar_cfb_week(season) - 1)
@@ -76,12 +90,13 @@ def season_positional_ranks(
         return {}
 
     position = (position or "").strip().upper()
-    players = db.scalars(
-        select(Player).where(
-            canonical_fantasy_player_filter(season),
-            Player.position == position,
-        )
-    ).all()
+    player_filters = [
+        canonical_fantasy_player_filter(season),
+        Player.position == position,
+    ]
+    if conference_codes is not None:
+        player_filters.append(league_conference_player_filter(conference_codes))
+    players = db.scalars(select(Player).where(*player_filters)).all()
     if not players:
         return {}
 

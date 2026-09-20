@@ -12,6 +12,10 @@ describe("playerCardRequestParams", () => {
   it("delegates the live injury week to the API instead of pinning cards to Week 1", () => {
     expect(playerCardRequestParams(2026)).toEqual({ injury_season: 2026 });
   });
+
+  it("passes a league context so card ranks use that league's player pool", () => {
+    expect(playerCardRequestParams(2026, 42)).toEqual({ injury_season: 2026, league_id: 42 });
+  });
 });
 
 describe("getDraftPlayerPoolBackendLimit", () => {

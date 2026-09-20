@@ -119,13 +119,13 @@ export function PlayerCardHeader({
         <X className="h-5 w-5" />
       </button>
 
-      <header className={cn("relative min-h-[12.5rem] shrink-0 overflow-hidden bg-gradient-to-br px-4 py-5 pr-14 sm:min-h-[15rem] sm:px-8 sm:py-7 sm:pr-24", palette.headerBase)}>
+      <header className={cn("relative min-h-[13.5rem] shrink-0 overflow-hidden bg-gradient-to-br px-4 py-5 sm:min-h-[16rem] sm:px-8 sm:py-7", palette.headerBase)}>
         <div className="absolute inset-0 opacity-50 mix-blend-screen" style={headerStreakStyle} />
         <div className="absolute inset-0 bg-[linear-gradient(112deg,rgba(4,8,18,0.14)_0%,transparent_44%,rgba(2,6,23,0.42)_100%)]" />
         <div aria-hidden="true" className="cfb-player-card-grain-layer pointer-events-none absolute inset-0" />
         <div
           data-testid="player-card-hero-portrait"
-          className="pointer-events-none absolute bottom-[-1.75rem] right-[-1.5rem] z-[5] h-44 w-44 sm:bottom-[-2.5rem] sm:right-0 sm:h-56 sm:w-56 lg:bottom-[-3.5rem] lg:right-[5%] lg:h-64 lg:w-64"
+          className="pointer-events-none absolute left-3 top-3 z-[5] h-20 w-20 sm:left-6 sm:top-5 sm:h-28 sm:w-28"
         >
           {card?.about.headshot_url && !headshotFailed ? (
             <img
@@ -161,9 +161,9 @@ export function PlayerCardHeader({
           ))}
         </div>
         <div aria-hidden="true" className="cfb-player-card-ink-edge pointer-events-none absolute inset-x-0 bottom-0 z-20 h-px" />
-        <div className="relative z-10 flex min-h-[10rem] min-w-0 flex-col justify-end pr-0 sm:min-h-[12rem]">
+        <div className="relative z-10 flex min-h-[10.5rem] min-w-0 flex-col items-center justify-center px-8 pt-16 text-center sm:min-h-[12rem] sm:px-28 sm:pt-20">
           <p className="hidden text-[10px] font-black uppercase tracking-[0.28em] text-white/65 sm:block">{title}</p>
-          <div className="min-w-0 max-w-[56%] sm:max-w-[55%] lg:max-w-2xl">
+          <div className="min-w-0 max-w-xl">
             <h2 id="player-card-title" className="break-words text-[1.85rem] font-semibold leading-[0.98] tracking-tight text-white [text-shadow:0_2px_16px_rgba(2,6,23,0.7)] sm:text-5xl">
               {player.name}
             </h2>

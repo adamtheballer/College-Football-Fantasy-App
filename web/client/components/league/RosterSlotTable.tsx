@@ -297,12 +297,13 @@ export function RosterSlotTable({
   const selectedPosition = selectedPlayer ? positionLabel(selectedPlayer) : null;
   const selectedProjection =
     selectedPlayer?.projected_points ?? selectedPlayer?.weekly_projected_fantasy_points;
+  const numericLeagueId = typeof leagueId === "number" ? leagueId : Number(leagueId);
   const selectedPlayerCardQuery = usePlayerCard(
     selectedPlayer?.player_id,
-    Boolean(selectedPlayer?.player_id)
+    Boolean(selectedPlayer?.player_id),
+    Number.isFinite(numericLeagueId) && numericLeagueId > 0 ? numericLeagueId : undefined,
   );
   const ownedTeamId = ownedRosterActions?.teamId;
-  const numericLeagueId = typeof leagueId === "number" ? leagueId : Number(leagueId);
   const updateLineupMutation = useUpdateLineup(ownedTeamId, Number.isFinite(numericLeagueId) ? numericLeagueId : undefined);
   const dropPlayerMutation = useDropRosterPlayer(ownedTeamId, Number.isFinite(numericLeagueId) ? numericLeagueId : undefined);
   const tableColumns = showPositionColumn

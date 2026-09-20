@@ -570,7 +570,8 @@ export default function Draft() {
   );
   const playerCardQuery = usePlayerCard(
     selectedPlayer?.id,
-    Boolean(selectedPlayer && selectedPlayer.id > 0)
+    Boolean(selectedPlayer && selectedPlayer.id > 0),
+    parsedLeagueId,
   );
 
   const previewTeams = useMemo(

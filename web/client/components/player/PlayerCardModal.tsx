@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Activity, AlertTriangle, CalendarDays, History, Info, Loader2, Newspaper } from "lucide-react";
+import { Activity, CalendarDays, History, Info, Loader2, Newspaper } from "lucide-react";
 
 import { useLeaguePlayerHistory, usePlayerGameLog, usePlayerTradeValues, usePlayerTrajectory, type PlayerCardResponse, type PlayerGameLogResponse } from "@/hooks/use-players";
 import { buildProjectedStats, formatStat, statRowsForPosition, statValue } from "@/lib/playerProjectionStats";
@@ -9,7 +9,7 @@ import type { PlayerStats } from "@/types/player";
 import { PlayerCardHeader, resolvePlayerCardStatus } from "./PlayerCardHeader";
 import { PlayerTrajectoryChart } from "./PlayerTrajectoryChart";
 
-type PlayerCardTab = "news" | "summary" | "game-log" | "alerts" | "projections" | "history" | "value";
+type PlayerCardTab = "news" | "summary" | "game-log" | "projections" | "history" | "value";
 
 export type PlayerCardModalPlayer = {
   id: number;
@@ -37,13 +37,73 @@ const tabConfig: Array<{ id: PlayerCardTab; label: string; icon: typeof Info }> 
   { id: "summary", label: "Summary", icon: Info },
   { id: "news", label: "News", icon: Newspaper },
   { id: "game-log", label: "Game Log", icon: CalendarDays },
-  { id: "alerts", label: "Alerts", icon: AlertTriangle },
   { id: "projections", label: "Projections", icon: Activity },
   { id: "history", label: "History", icon: History },
   { id: "value", label: "Value", icon: Activity },
 ];
 
 export const visiblePlayerCardTabs = (_hasLeagueContext: boolean) => tabConfig;
+
+type PlayerCardNewsFeedItem = {
+  key: string;
+  kind: "News" | "Injury update";
+  title: string;
+  source: string;
+  detail: string;
+  reportedAt: string | null | undefined;
+  sourceUrl?: string | null;
+};
+
+const normalizedNewsText = (value: string | null | undefined) =>
+  (value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+
+/**
+ * The card has one player-information feed.  Injury records are surfaced in
+ * News when they do not already have the matching reviewed news event, so a
+ * manager never has to hunt through a second Alerts tab for the same update.
+ */
+export const playerCardNewsFeedItems = (card?: PlayerCardResponse | null): PlayerCardNewsFeedItem[] => {
+  const injuries = card?.injuries ?? [];
+  const news = card?.recent_news ?? [];
+  const newsItems: PlayerCardNewsFeedItem[] = news.map((item) => ({
+    key: `news-${item.id}`,
+    kind: "News",
+    title: item.status ?? item.event_type.replace(/_/g, " "),
+    source: item.source,
+    detail: [item.detail, item.return_timeline].filter(Boolean).join(" • ") || "Official update",
+    reportedAt: item.published_at,
+    sourceUrl: item.source_url,
+  }));
+  const standaloneInjuryItems = injuries
+    .filter((injury) => {
+      const injuryText = normalizedNewsText([
+        injury.injury,
+        injury.practice_level,
+        injury.return_timeline,
+        injury.notes,
+      ].filter(Boolean).join(" "));
+      return !news.some((item) => {
+        const itemText = normalizedNewsText([item.detail, item.return_timeline].filter(Boolean).join(" "));
+        return Boolean(injuryText && itemText && (injuryText.includes(itemText) || itemText.includes(injuryText)));
+      });
+    })
+    .map((injury) => ({
+      key: `injury-${injury.id}`,
+      kind: "Injury update" as const,
+      title: injury.status,
+      source: `${injury.season} W${injury.week}`,
+      detail: [injury.injury, injury.practice_level, injury.return_timeline, injury.notes]
+        .filter(Boolean)
+        .join(" • ") || "No injury detail provided.",
+      reportedAt: injury.updated_at,
+    }));
+
+  return [...newsItems, ...standaloneInjuryItems].sort((left, right) => {
+    const leftTime = left.reportedAt ? Date.parse(left.reportedAt) : 0;
+    const rightTime = right.reportedAt ? Date.parse(right.reportedAt) : 0;
+    return rightTime - leftTime;
+  });
+};
 
 const positionPalettes: Record<
   string,
@@ -426,6 +486,7 @@ export function PlayerCardModal({
     card,
   );
   const aboutMessage = visiblePlayerCardAboutMessage(card?.about.message);
+  const newsFeedItems = useMemo(() => playerCardNewsFeedItems(card), [card]);
   const cardActions = [...(action ? [action] : []), ...actions];
   const currentGame = card?.current_game;
   const currentGameStats = currentGame && ["completed", "live", "awaiting_live"].includes(currentGame.state) && currentGame.stats
@@ -562,7 +623,7 @@ export function PlayerCardModal({
         ref={dialogRef}
         tabIndex={-1}
         className={cn(
-          "relative mb-[max(0.375rem,env(safe-area-inset-bottom))] flex h-[95dvh] max-h-[calc(100dvh-0.75rem-env(safe-area-inset-bottom))] w-full max-w-5xl flex-col overflow-hidden rounded-md border border-cfb-border-subtle bg-cfb-surface text-cfb-text-primary shadow-[0_16px_44px_rgba(2,6,23,0.46)] sm:mb-0 sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:rounded-lg",
+          "relative mb-[max(0.375rem,env(safe-area-inset-bottom))] flex h-[75dvh] max-h-[calc(100dvh-0.75rem-env(safe-area-inset-bottom))] w-full max-w-4xl flex-col overflow-hidden rounded-md border border-cfb-border-subtle bg-cfb-surface text-cfb-text-primary shadow-[0_16px_44px_rgba(2,6,23,0.46)] sm:mb-0 sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:rounded-lg",
           palette.glow
         )}
         onClick={(event) => event.stopPropagation()}
@@ -577,7 +638,7 @@ export function PlayerCardModal({
           title={title}
         />
 
-        <nav aria-label="Player card sections" className="flex gap-1 overflow-x-auto border-b border-white/10 bg-black/18 px-3 pt-1 sm:gap-3 sm:flex-wrap sm:overflow-visible sm:px-8 sm:pt-2 lg:grid lg:grid-cols-7 lg:gap-0 lg:px-0 lg:pt-0">
+        <nav aria-label="Player card sections" className="flex gap-1 overflow-x-auto border-b border-white/10 bg-black/18 px-3 pt-1 sm:gap-3 sm:flex-wrap sm:overflow-visible sm:px-8 sm:pt-2 lg:grid lg:grid-cols-6 lg:gap-0 lg:px-0 lg:pt-0">
           {visiblePlayerCardTabs(hasLeagueContext).map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -627,29 +688,32 @@ export function PlayerCardModal({
             </div>
           ) : activeTab === "news" ? (
             <section className="rounded-md border border-cfb-border-subtle bg-cfb-surface-raised p-4 sm:p-5">
-              <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Recent news</p>
-              {card?.recent_news?.length ? (
+              <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>News & injury updates</p>
+              {newsFeedItems.length ? (
                 <div className="mt-3 space-y-2">
-                  {card.recent_news.map((item) => (
-                    <article key={item.id} className="rounded-sm border border-cfb-border-subtle bg-cfb-surface p-3">
+                  {newsFeedItems.map((item) => (
+                    <article key={item.key} className="rounded-sm border border-cfb-border-subtle bg-cfb-surface p-3">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-black text-white">{item.status ?? item.event_type}</p>
-                        <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-white/45">{item.source}</p>
+                        <div className="min-w-0">
+                          <p className="text-[9px] font-black uppercase tracking-[0.14em] text-white/45">{item.kind}</p>
+                          <p className="mt-0.5 text-sm font-black text-white">{item.title}</p>
+                        </div>
+                        <p className="shrink-0 text-[9px] font-bold uppercase tracking-[0.14em] text-white/45">{item.source}</p>
                       </div>
                       <p className="mt-1 text-[9px] font-black uppercase tracking-[0.14em] text-white/55">
-                        {formatPlayerNewsReportTime(item.published_at)}
+                        {formatPlayerNewsReportTime(item.reportedAt)}
                       </p>
                       <p className="mt-1 text-xs font-semibold leading-5 text-white/70">
-                        {[item.detail, item.return_timeline].filter(Boolean).join(" • ") || "Official update"}
+                        {item.detail}
                       </p>
-                      {item.source_url ? (
-                        <a href={item.source_url} target="_blank" rel="noreferrer" className={cn("mt-2 inline-block text-[10px] font-black uppercase tracking-[0.14em]", palette.accent)}>View source</a>
+                      {item.sourceUrl ? (
+                        <a href={item.sourceUrl} target="_blank" rel="noreferrer" className={cn("mt-2 inline-block text-[10px] font-black uppercase tracking-[0.14em]", palette.accent)}>View source</a>
                       ) : null}
                     </article>
                   ))}
                 </div>
               ) : (
-                <p className="mt-3 rounded-sm border border-cfb-border-subtle bg-cfb-surface p-3 text-sm font-semibold text-cfb-text-muted">No verified recent news is available.</p>
+                <p className="mt-3 rounded-sm border border-cfb-border-subtle bg-cfb-surface p-3 text-sm font-semibold text-cfb-text-muted">No verified news or injury updates are available.</p>
               )}
             </section>
           ) : activeTab === "summary" ? (
@@ -857,33 +921,6 @@ export function PlayerCardModal({
               ) : null}
                 </>
               ) : null}
-            </section>
-          ) : activeTab === "alerts" ? (
-            <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
-              <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>News / Injury Alerts</p>
-              {card?.injuries.length ? (
-                <div className="mt-5 space-y-3">
-                  {card.injuries.map((injury) => (
-                    <div key={injury.id} className="rounded-2xl border border-white/10 bg-black/20 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-base font-black text-white">{injury.status}</p>
-                        <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/45">
-                          {injury.season} W{injury.week}
-                        </p>
-                      </div>
-                      <p className="mt-2 text-sm font-bold leading-6 text-white/70">
-                        {[injury.injury, injury.practice_level, injury.return_timeline].filter(Boolean).join(" • ") ||
-                          "No injury detail provided."}
-                      </p>
-                      {injury.notes ? <p className="mt-2 text-xs leading-5 text-white/50">{injury.notes}</p> : null}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4 text-sm font-bold leading-6 text-white/55">
-                  No verified injury alerts are recorded for this player.
-                </p>
-              )}
             </section>
           ) : activeTab === "projections" ? (
             <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
