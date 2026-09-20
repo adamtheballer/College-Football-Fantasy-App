@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.integrations.espn import ESPNClient
 from collegefootballfantasy_api.app.models.player import Player
+from collegefootballfantasy_api.app.services.power4 import canonical_school_name
 from collegefootballfantasy_api.app.services.provider_identity import (
     ProviderIdentityConflict,
     upsert_player_provider_mapping,
@@ -23,6 +24,7 @@ POSITION_ALIASES = {
     "TIGHT END": "TE",
     "PLACE KICKER": "K",
     "KICKER": "K",
+    "PK": "K",
 }
 
 # A missing portrait is not proof that ESPN has no image.  Their profile data
@@ -183,11 +185,27 @@ def refresh_espn_headshot_if_due(
 
 def _item_name_matches(item: dict[str, Any], player: Player) -> bool:
     player_name = normalize_espn_lookup_text(player.name)
-    return any(
-        normalize_espn_lookup_text(str(item.get(key))) == player_name
-        for key in ("displayName", "name", "fullName")
-        if item.get(key)
-    )
+    player_tokens = _name_tokens(player.name)
+    for key in ("displayName", "name", "fullName"):
+        candidate_name = item.get(key)
+        if not candidate_name:
+            continue
+        if normalize_espn_lookup_text(str(candidate_name)) == player_name:
+            return True
+        candidate_tokens = _name_tokens(str(candidate_name))
+        # ESPN sometimes includes a middle name that the fantasy source omits
+        # (for example, "Jacobo Echeverria Lozano"). The first/last-name
+        # relaxation is still followed by exact school and position profile
+        # checks before an identity is ever persisted.
+        if len(player_tokens) >= 2 and len(candidate_tokens) >= 2 and (
+            player_tokens[0], player_tokens[-1]
+        ) == (candidate_tokens[0], candidate_tokens[-1]):
+            return True
+    return False
+
+
+def _name_tokens(value: str | None) -> tuple[str, ...]:
+    return tuple(re.findall(r"[a-z0-9]+", (value or "").lower()))
 
 
 def _item_is_college_football_player(item: dict[str, Any]) -> bool:
@@ -202,7 +220,10 @@ def _school_matches(profile_payload: dict[str, Any] | None, player: Player) -> b
     school = normalize_espn_lookup_text(player.school)
     if not school:
         return False
+    canonical_school = canonical_school_name(player.school)
     for team_name in _profile_team_names(profile_payload):
+        if canonical_school and canonical_school_name(team_name) == canonical_school:
+            return True
         normalized_team = normalize_espn_lookup_text(team_name)
         if school == normalized_team or school in normalized_team or normalized_team in school:
             return True
