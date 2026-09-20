@@ -1752,22 +1752,75 @@ def build_settings_view(db: Session, league: League, user: User) -> LeagueSettin
         .order_by(Matchup.week.asc(), Matchup.id.asc())
         .all()
     )
-    away_names = {team.id: team.display_name for team in teams}
-    schedule = [
-        LeagueScheduleRowRead(
-            matchup_id=matchup.id,
-            week=matchup.week,
-            home_team_id=matchup.home_team_id,
-            home_team_name=away_names.get(home_team_id, "TBD"),
-            away_team_id=matchup.away_team_id,
-            away_team_name=away_names.get(matchup.away_team_id, "TBD"),
-            home_projected_total=float(matchup.home_score or 0.0),
-            away_projected_total=float(matchup.away_score or 0.0),
-            home_win_probability=50.0,
-            away_win_probability=50.0,
+    team_names = {team.id: team.display_name for team in teams}
+    final_statuses = {"final", "completed", "stat_corrected"}
+    active_statuses = {"live", "in_progress", "in-progress", "delayed", "unavailable"}
+    projected_totals_by_week: dict[int, dict[int, float]] = {}
+
+    def projected_totals_for_week(week: int) -> dict[int, float]:
+        """Use the same roster/projection serializer as the matchup tab.
+
+        Schedule rows are generated for the whole season, while each row's
+        actual score is meaningful only once that week's games begin. Future
+        weeks therefore derive starter projections from the shared roster
+        path instead of overloading Matchup.home_score/away_score, which are
+        strictly actual scoring fields.
+        """
+
+        if week not in projected_totals_by_week:
+            roster_by_team = _serialize_team_rosters(db, league, teams_by_id, week)
+            projected_totals_by_week[week] = {
+                team_id: _starter_projection_total(roster)
+                for team_id, roster in roster_by_team.items()
+            }
+        return projected_totals_by_week[week]
+
+    schedule: list[LeagueScheduleRowRead] = []
+    for matchup, home_team_id in schedule_rows:
+        raw_status = (matchup.status or "scheduled").lower()
+        home_current_total: float | None = None
+        away_current_total: float | None = None
+        home_projected_total: float | None = None
+        away_projected_total: float | None = None
+        home_result: str | None = None
+        away_result: str | None = None
+
+        if raw_status in final_statuses:
+            home_current_total = float(matchup.home_score or 0.0)
+            away_current_total = float(matchup.away_score or 0.0)
+            if home_current_total > away_current_total:
+                home_result, away_result = "W", "L"
+            elif away_current_total > home_current_total:
+                home_result, away_result = "L", "W"
+            else:
+                home_result = away_result = "T"
+        elif raw_status in active_statuses:
+            home_current_total = float(matchup.home_score or 0.0)
+            away_current_total = float(matchup.away_score or 0.0)
+        else:
+            projected_totals = projected_totals_for_week(matchup.week)
+            home_projected_total = projected_totals.get(matchup.home_team_id, 0.0)
+            away_projected_total = projected_totals.get(matchup.away_team_id, 0.0)
+
+        schedule.append(
+            LeagueScheduleRowRead(
+                matchup_id=matchup.id,
+                week=matchup.week,
+                home_team_id=matchup.home_team_id,
+                home_team_name=team_names.get(home_team_id, "TBD"),
+                away_team_id=matchup.away_team_id,
+                away_team_name=team_names.get(matchup.away_team_id, "TBD"),
+                status=raw_status,
+                home_current_total=home_current_total,
+                away_current_total=away_current_total,
+                home_projected_total=home_projected_total,
+                away_projected_total=away_projected_total,
+                home_result=home_result,
+                away_result=away_result,
+                home_win_probability=50.0,
+                away_win_probability=50.0,
+            )
         )
-        for matchup, home_team_id in schedule_rows
-    ]
     draft = db.query(Draft).filter(Draft.league_id == league.id).first()
     draft_status = (draft.status if draft else None) or league.status
     draft_is_complete = (draft_status or "").lower() in {"completed", "complete", "final", "closed"} or league.status == "post_draft"

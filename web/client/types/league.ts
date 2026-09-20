@@ -468,8 +468,13 @@ export interface LeagueScheduleRow {
   home_team_name: string;
   away_team_id: number;
   away_team_name: string;
-  home_projected_total: number;
-  away_projected_total: number;
+  status?: string | null;
+  home_current_total?: number | null;
+  away_current_total?: number | null;
+  home_projected_total: number | null;
+  away_projected_total: number | null;
+  home_result?: "W" | "L" | "T" | null;
+  away_result?: "W" | "L" | "T" | null;
   home_win_probability: number;
   away_win_probability: number;
 }

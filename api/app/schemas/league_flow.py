@@ -821,8 +821,16 @@ class LeagueScheduleRowRead(BaseModel):
     home_team_name: str
     away_team_id: int
     away_team_name: str
-    home_projected_total: float = 0.0
-    away_projected_total: float = 0.0
+    status: str = "scheduled"
+    # Current/final fantasy totals are deliberately separate from projections.
+    # A scheduled matchup has projections; an active or completed matchup has
+    # actual totals instead, so clients cannot label a final score as "Proj".
+    home_current_total: float | None = None
+    away_current_total: float | None = None
+    home_projected_total: float | None = None
+    away_projected_total: float | None = None
+    home_result: str | None = None
+    away_result: str | None = None
     home_win_probability: float = 50.0
     away_win_probability: float = 50.0
 
