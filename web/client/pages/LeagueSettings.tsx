@@ -91,9 +91,9 @@ const groupRostersByTeam = (rosters: LeagueRosterPlayer[]) =>
     return groups;
   }, {});
 
-type StandingsRow = Record<string, string | number>;
+type StandingsRow = LeagueSettingsTabResponse["standings"][number];
 
-const buildStandingsRows = (data?: LeagueSettingsTabResponse): StandingsRow[] => {
+export const buildStandingsRows = (data?: LeagueSettingsTabResponse): StandingsRow[] => {
   if ((data?.standings ?? []).length > 0) return data?.standings ?? [];
 
   return (data?.teams ?? []).map((team, index) => ({
@@ -324,7 +324,7 @@ export default function LeagueSettings() {
           ) : (
             <div className="divide-y divide-cfb-border-subtle">
               {standingsRows.map((row, index) => {
-                const teamName = formatValue(row.team_name ?? row.name ?? `Team ${index + 1}`);
+                const teamName = formatValue(row.team_name ?? `Team ${index + 1}`);
                 return (
                   <div
                     key={`${teamName}-${index}`}

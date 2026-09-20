@@ -794,6 +794,42 @@ def test_settings_view_shows_every_team_at_zero_zero_before_scoring(client, db_s
     assert payload["postseason_calendar"] is None
 
 
+def test_settings_view_exposes_calculated_points_against(client, db_session):
+    owner_token = create_user_and_token(client, "settings-points-against-owner")
+    member_token = create_user_and_token(client, "settings-points-against-member")
+    league = create_league(client, owner_token, name="Points Against League", max_teams=2)
+    assert client.post(f"/leagues/{league['id']}/join", headers=auth_headers(member_token)).status_code == 200
+
+    home_team, away_team = (
+        db_session.query(Team)
+        .filter(Team.league_id == league["id"])
+        .order_by(Team.id.asc())
+        .all()
+    )
+    db_session.add(
+        Matchup(
+            league_id=league["id"],
+            season=2026,
+            week=1,
+            home_team_id=home_team.id,
+            away_team_id=away_team.id,
+            status="final",
+            home_score=104.25,
+            away_score=87.5,
+        )
+    )
+    db_session.commit()
+
+    response = client.get(f"/leagues/{league['id']}/settings-view", headers=auth_headers(owner_token))
+
+    assert response.status_code == 200
+    standings = {row["team_id"]: row for row in response.json()["standings"]}
+    assert standings[home_team.id]["points_for"] == 104.25
+    assert standings[home_team.id]["points_against"] == 87.5
+    assert standings[away_team.id]["points_for"] == 87.5
+    assert standings[away_team.id]["points_against"] == 104.25
+
+
 def test_settings_view_exposes_only_a_persisted_certified_postseason_calendar(client, db_session):
     owner_token = create_user_and_token(client, "calendar-settings-owner")
     league = create_league(client, owner_token, name="Certified calendar settings", max_teams=2)
