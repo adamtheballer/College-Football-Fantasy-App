@@ -2,6 +2,7 @@ import { ChevronRight, Trophy } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { WinChanceBar, formatDisplayedProbabilityPair, validProbability } from "@/components/league/WinChanceMeter";
+import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
 import type { LeagueDetail } from "@/types/league";
 
 const formatPoints = (value: number | null | undefined) =>
@@ -222,7 +223,7 @@ export function LeagueMatchupCarousel({
                 else cardRefs.current.delete(index);
               }}
               onClick={() => onOpenLeague(league.id)}
-              className={`cfb-league-matchup-card w-full min-w-0 shrink-0 snap-start rounded-2xl border p-4 text-left shadow-[0_14px_34px_rgba(2,6,23,0.28)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70 sm:w-[22rem] ${
+              className={`cfb-league-matchup-card w-full min-w-0 shrink-0 snap-start rounded-2xl border p-4 text-left shadow-[0_14px_34px_rgba(2,6,23,0.28)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand/70 sm:w-[24rem] ${
                 active
                   ? "border-cfb-brand/70 bg-cfb-surface-raised"
                   : "border-cfb-border-subtle bg-cfb-surface-raised/90 hover:border-cfb-brand/45 hover:bg-cfb-surface-hover"
@@ -239,19 +240,45 @@ export function LeagueMatchupCarousel({
                 <ChevronRight className="h-4 w-4 shrink-0 text-cfb-brand" aria-hidden="true" />
               </div>
 
-              <div className="mt-4 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 border-y border-cfb-border-subtle py-3">
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-black text-cfb-text-primary">{summary?.team_name ?? "Your Team"}</p>
-                  <p className="cfb-score-value mt-1 text-2xl text-cfb-brand">
-                    {formatPoints(summary?.projected_points_for)}
-                  </p>
+              <div className="mt-4 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2 border-y border-cfb-border-subtle py-3.5">
+                <div className="flex min-w-0 items-start gap-2.5">
+                  <ManagerAvatar
+                    avatarUrl={summary?.manager_avatar_url_for}
+                    managerName={summary?.manager_name_for ?? summary?.team_name ?? "Your Team"}
+                    size="md"
+                    className="border-cfb-brand/60 bg-cfb-brand/10 text-cfb-brand"
+                  />
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-black text-cfb-text-primary">
+                      {summary?.manager_name_for ?? summary?.team_name ?? "Your Team"}
+                    </p>
+                    <p className="mt-0.5 truncate text-[9px] font-bold uppercase tracking-[0.1em] text-cfb-text-muted">
+                      {summary?.team_name ?? "Your team"}
+                    </p>
+                    <p className="cfb-score-value mt-1.5 text-2xl text-cfb-brand">
+                      {formatPoints(summary?.projected_points_for)}
+                    </p>
+                  </div>
                 </div>
-                <span className="rounded-full border border-cfb-border-subtle bg-cfb-canvas px-2 py-1 text-[10px] font-black text-cfb-text-secondary">VS</span>
-                <div className="min-w-0 text-right">
-                  <p className="truncate text-xs font-black text-cfb-text-primary">{summary?.opponent_team_name ?? "Opponent TBD"}</p>
-                  <p className="cfb-score-value mt-1 text-2xl text-cfb-crimson">
-                    {formatPoints(summary?.projected_points_against)}
-                  </p>
+                <span className="mt-2 rounded-full border border-cfb-border-subtle bg-cfb-canvas px-2 py-1 text-[10px] font-black text-cfb-text-secondary">VS</span>
+                <div className="flex min-w-0 items-start justify-end gap-2.5 text-right">
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-black text-cfb-text-primary">
+                      {summary?.opponent_manager_name ?? summary?.opponent_team_name ?? "Opponent TBD"}
+                    </p>
+                    <p className="mt-0.5 truncate text-[9px] font-bold uppercase tracking-[0.1em] text-cfb-text-muted">
+                      {summary?.opponent_team_name ?? "Opponent TBD"}
+                    </p>
+                    <p className="cfb-score-value mt-1.5 text-2xl text-cfb-crimson">
+                      {formatPoints(summary?.projected_points_against)}
+                    </p>
+                  </div>
+                  <ManagerAvatar
+                    avatarUrl={summary?.opponent_manager_avatar_url}
+                    managerName={summary?.opponent_manager_name ?? summary?.opponent_team_name ?? "Opponent"}
+                    size="md"
+                    className="border-cfb-crimson/60 bg-cfb-crimson/10 text-cfb-crimson"
+                  />
                 </div>
               </div>
 

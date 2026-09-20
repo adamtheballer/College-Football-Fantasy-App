@@ -40,8 +40,9 @@ describe("PlayerCardHeader injury status", () => {
     expect(portrait.className).toContain("right-");
     expect(portrait.className).toContain("bottom-");
     expect(portrait.className).not.toContain("left-");
-    expect(portrait.className).toContain("h-[13rem]");
+    expect(portrait.className).toContain("h-[14.5rem]");
     expect(portrait.querySelector("img")?.className).toContain("mask-image");
+    expect(screen.getByText(/WR\s+•\s+Miami/)).toBeTruthy();
   });
 
   it("treats a missing official injury report as ACTIVE", () => {

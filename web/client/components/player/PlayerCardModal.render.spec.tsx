@@ -64,7 +64,7 @@ describe("PlayerCardModal game log", () => {
     );
 
     const summary = screen.getByTestId("player-card-summary");
-    expect(summary.closest("article")?.className).toContain("h-[75dvh]");
+    expect(summary.closest("article")?.className).toContain("h-[86dvh]");
     expect(summary.closest("article")?.className).toContain("max-w-4xl");
     expect(summary.className).toContain("w-full");
     expect(screen.getByTestId("player-card-hero-portrait")).toBeTruthy();

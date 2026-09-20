@@ -430,10 +430,11 @@ test.describe("player card modal", () => {
     const mobileBox = await mobileArticle.boundingBox();
     expect(mobileBox).not.toBeNull();
     if (mobileBox) {
-      // Mobile cards are a 75%-height sheet. The remaining page context stays
-      // visible while the card's own detail region handles vertical scrolling.
-      expect(mobileBox.height).toBeGreaterThan(844 * 0.74);
-      expect(mobileBox.height).toBeLessThan(844 * 0.76);
+      // The player card is a high-visibility, 86%-height sheet. It retains a
+      // sliver of the page context while leaving room for the header and
+      // summary content to breathe on a narrow screen.
+      expect(mobileBox.height).toBeGreaterThan(844 * 0.85);
+      expect(mobileBox.height).toBeLessThan(844 * 0.87);
       expect(mobileBox.height).toBeLessThanOrEqual(844);
       expect(mobileBox.width).toBeGreaterThan(390 * 0.9);
       expect(mobileBox.width).toBeLessThanOrEqual(390);

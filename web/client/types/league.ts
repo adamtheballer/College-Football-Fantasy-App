@@ -78,10 +78,14 @@ export interface LeagueMember {
 
 export interface LeagueListCurrentUserSummary {
   team_name?: string | null;
+  manager_name_for?: string | null;
+  manager_avatar_url_for?: string | null;
   wins?: number | null;
   losses?: number | null;
   ties?: number | null;
   opponent_team_name?: string | null;
+  opponent_manager_name?: string | null;
+  opponent_manager_avatar_url?: string | null;
   matchup_week?: number | null;
   projected_points_for?: number | null;
   projected_points_against?: number | null;
@@ -153,6 +157,10 @@ export interface LeagueWorkspaceMatchupSummary {
   team_id?: number | null;
   opponent_team_id?: number | null;
   opponent_team_name?: string | null;
+  manager_name_for?: string | null;
+  manager_avatar_url_for?: string | null;
+  opponent_manager_name?: string | null;
+  opponent_manager_avatar_url?: string | null;
   status?: string | null;
   projected_points_for?: number | null;
   projected_points_against?: number | null;

@@ -14,7 +14,11 @@ const leagues = [
     icon_url: null,
     current_user_summary: {
       team_name: "Adam's Team",
+      manager_name_for: "Adam",
+      manager_avatar_url_for: "https://images.example.com/adam.jpg",
       opponent_team_name: "Mary's Team",
+      opponent_manager_name: "Mary",
+      opponent_manager_avatar_url: "https://images.example.com/mary.jpg",
       matchup_week: 1,
       wins: 3,
       losses: 1,
@@ -46,6 +50,8 @@ describe("LeagueMatchupCarousel", () => {
     expect(screen.getByText("133.1")).toBeTruthy();
     expect(screen.getByText("127.6")).toBeTruthy();
     expect(screen.getByText("55.2% / 44.8%")).toBeTruthy();
+    expect(screen.getByAltText("Adam profile picture").getAttribute("src")).toBe("https://images.example.com/adam.jpg");
+    expect(screen.getByAltText("Mary profile picture").getAttribute("src")).toBe("https://images.example.com/mary.jpg");
     expect(screen.getByLabelText("Swipe through your league matchups").className).toContain("overflow-x-auto");
     // Cards size from the rail rather than from 100vw. The latter exceeds a
     // padded native shell and clips the card's far border in Capacitor.
