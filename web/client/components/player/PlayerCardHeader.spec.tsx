@@ -41,7 +41,9 @@ describe("PlayerCardHeader injury status", () => {
     expect(portrait.className).toContain("bottom-");
     expect(portrait.className).not.toContain("left-");
     expect(portrait.className).toContain("h-[14.5rem]");
+    expect(portrait.className).toContain("sm:h-[17.5rem]");
     expect(portrait.querySelector("img")?.className).toContain("mask-image");
+    expect(screen.getByTestId("player-card-identity").className).toContain("sm:-translate-y-3");
     expect(screen.getByText(/WR\s+•\s+Miami/)).toBeTruthy();
   });
 

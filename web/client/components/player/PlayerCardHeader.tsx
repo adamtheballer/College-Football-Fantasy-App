@@ -119,13 +119,13 @@ export function PlayerCardHeader({
         <X className="h-5 w-5" />
       </button>
 
-      <header className={cn("relative min-h-[15.5rem] shrink-0 overflow-hidden bg-gradient-to-br px-5 py-5 sm:min-h-[19rem] sm:px-10 sm:py-8", palette.headerBase)}>
+      <header className={cn("relative min-h-[15.5rem] shrink-0 overflow-hidden bg-gradient-to-br px-5 py-5 sm:min-h-[17.75rem] sm:px-10 sm:py-7", palette.headerBase)}>
         <div className="absolute inset-0 opacity-50 mix-blend-screen" style={headerStreakStyle} />
         <div className="absolute inset-0 bg-[linear-gradient(112deg,rgba(4,8,18,0.14)_0%,transparent_44%,rgba(2,6,23,0.42)_100%)]" />
         <div aria-hidden="true" className="cfb-player-card-grain-layer pointer-events-none absolute inset-0" />
         <div
           data-testid="player-card-hero-portrait"
-          className="pointer-events-none absolute bottom-0 right-0 z-[5] h-[14.5rem] w-[12.5rem] sm:h-[19rem] sm:w-[19rem]"
+          className="pointer-events-none absolute bottom-0 right-0 z-[5] h-[14.5rem] w-[12.5rem] sm:h-[17.5rem] sm:w-[17.5rem]"
         >
           {card?.about.headshot_url && !headshotFailed ? (
             <img
@@ -161,7 +161,7 @@ export function PlayerCardHeader({
           ))}
         </div>
         <div aria-hidden="true" className="cfb-player-card-ink-edge pointer-events-none absolute inset-x-0 bottom-0 z-20 h-px" />
-        <div className="relative z-10 flex min-h-[12.5rem] min-w-0 flex-col justify-center pr-[10.25rem] text-left sm:min-h-[16rem] sm:max-w-[60%] sm:pr-0">
+        <div data-testid="player-card-identity" className="relative z-10 flex min-h-[12.5rem] min-w-0 flex-col justify-center pr-[10.25rem] text-left sm:min-h-[15rem] sm:max-w-[60%] sm:-translate-y-3 sm:pr-0">
           <p className="hidden text-[10px] font-black uppercase tracking-[0.28em] text-white/65 sm:block">{title}</p>
           <div className="min-w-0 max-w-xl">
             <h2 id="player-card-title" className="break-words text-[1.8rem] font-black uppercase leading-[0.92] tracking-[-0.035em] text-white [text-shadow:0_2px_16px_rgba(2,6,23,0.7)] sm:text-[3.35rem]">
