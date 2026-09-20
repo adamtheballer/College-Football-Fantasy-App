@@ -123,6 +123,8 @@ export function PlayerCardHeader({
         <div className="absolute inset-0 opacity-50 mix-blend-screen" style={headerStreakStyle} />
         <div className="absolute inset-0 bg-[linear-gradient(112deg,rgba(4,8,18,0.14)_0%,transparent_44%,rgba(2,6,23,0.42)_100%)]" />
         <div aria-hidden="true" className="cfb-player-card-grain-layer pointer-events-none absolute inset-0" />
+        <div aria-hidden="true" className="cfb-player-card-halftone pointer-events-none absolute inset-0" />
+        <div aria-hidden="true" className="cfb-player-card-brush pointer-events-none absolute bottom-4 left-5 sm:bottom-6 sm:left-10" />
         <div
           data-testid="player-card-hero-portrait"
           className="pointer-events-none absolute bottom-0 right-0 z-[5] h-[14.5rem] w-[12.5rem] sm:h-[17.5rem] sm:w-[17.5rem]"
@@ -164,7 +166,7 @@ export function PlayerCardHeader({
         <div data-testid="player-card-identity" className="relative z-10 flex min-h-[12.5rem] min-w-0 flex-col justify-center pr-[10.25rem] text-left sm:min-h-[15rem] sm:max-w-[60%] sm:-translate-y-3 sm:pr-0">
           <p className="mb-3 text-[9px] font-black uppercase tracking-[0.24em] text-white/65 sm:mb-4 sm:text-[10px] sm:tracking-[0.28em]">{title}</p>
           <div className="min-w-0 max-w-xl">
-            <h2 id="player-card-title" className="break-words text-[1.8rem] font-black uppercase leading-[0.92] tracking-[-0.035em] text-white [text-shadow:0_2px_16px_rgba(2,6,23,0.7)] sm:text-[3.35rem]">
+            <h2 id="player-card-title" className="break-words text-[1.8rem] font-black uppercase leading-[0.92] tracking-[-0.035em] text-[#F3F0E7] [text-shadow:0_2px_16px_rgba(2,6,23,0.7)] sm:text-[3.35rem]">
               {player.name}
             </h2>
             <p className="mt-2 truncate text-[10px] font-black uppercase tracking-[0.13em] text-white/80 sm:mt-3 sm:text-xs sm:tracking-[0.18em]">

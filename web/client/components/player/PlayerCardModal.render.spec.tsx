@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
-import { PlayerCardModal } from "./PlayerCardModal";
+import { getPlayerCardPalette, PlayerCardModal } from "./PlayerCardModal";
 
 const gameLogFixture = vi.hoisted(() => ({ live: false }));
 
@@ -48,6 +48,12 @@ afterEach(() => {
 });
 
 describe("PlayerCardModal game log", () => {
+  it("uses the kicker treatment for supported kicker aliases and a neutral fallback for unknown positions", () => {
+    expect(getPlayerCardPalette("PK")).toBe(getPlayerCardPalette("K"));
+    expect(getPlayerCardPalette("Placekicker")).toBe(getPlayerCardPalette("K"));
+    expect(getPlayerCardPalette("LS")).toBe(getPlayerCardPalette());
+  });
+
   it("uses the expanded player-card viewport and compact Summary core", () => {
     render(
       <PlayerCardModal
