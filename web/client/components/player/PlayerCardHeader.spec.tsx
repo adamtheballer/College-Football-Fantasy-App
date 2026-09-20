@@ -8,6 +8,37 @@ import { formatPlayerCardPositionRank, PlayerCardHeader, resolvePlayerCardStatus
 afterEach(cleanup);
 
 describe("PlayerCardHeader injury status", () => {
+  it("embeds the player portrait without the old nested sticker border", () => {
+    render(
+      <PlayerCardHeader
+        card={{
+          about: { source: "espn", headshot_url: "https://example.com/player.png" },
+          player: { id: 1, name: "Portrait Player", position: "WR", school: "Miami" },
+          injuries: [],
+          season_stats: [],
+          historical_stats: null,
+        } as never}
+        currentValue={88}
+        onClose={vi.fn()}
+        palette={{
+          headerBase: "bg-slate-900",
+          markerA: "rgba(255,255,255,0.1)",
+          markerB: "rgba(255,255,255,0.1)",
+          markerC: "rgba(255,255,255,0.1)",
+          pill: "bg-slate-800",
+          silhouette: "from-slate-700 to-slate-800",
+        }}
+        player={{ id: 1, name: "Portrait Player", position: "WR", school: "Miami" }}
+        position="WR"
+        title="Player Card"
+      />,
+    );
+
+    const portrait = screen.getByTestId("player-card-portrait");
+    expect(portrait.className).not.toContain("cfb-player-sticker-frame");
+    expect(portrait.className).not.toContain("border");
+  });
+
   it("treats a missing official injury report as ACTIVE", () => {
     expect(resolvePlayerCardStatus({
       current_injury_status: null,
