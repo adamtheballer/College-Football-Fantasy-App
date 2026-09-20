@@ -430,10 +430,11 @@ test.describe("player card modal", () => {
     const mobileBox = await mobileArticle.boundingBox();
     expect(mobileBox).not.toBeNull();
     if (mobileBox) {
-      // Mobile player cards intentionally use a compact, blurred-backdrop
-      // bottom sheet instead of taking over the entire viewport.
-      expect(mobileBox.height).toBeGreaterThan(844 * 0.7);
-      expect(mobileBox.height).toBeLessThan(844 * 0.85);
+      // Summary is the default player-card view. It intentionally uses nearly
+      // the full mobile viewport so the game context and canonical bio are
+      // readable together rather than hidden behind an inner scroll region.
+      expect(mobileBox.height).toBeGreaterThan(844 * 0.9);
+      expect(mobileBox.height).toBeLessThanOrEqual(844);
       expect(mobileBox.width).toBeGreaterThan(390 * 0.9);
       expect(mobileBox.width).toBeLessThanOrEqual(390);
     }

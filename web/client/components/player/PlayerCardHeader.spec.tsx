@@ -8,7 +8,7 @@ import { formatPlayerCardPositionRank, PlayerCardHeader, resolvePlayerCardStatus
 afterEach(cleanup);
 
 describe("PlayerCardHeader injury status", () => {
-  it("embeds the player portrait without the old nested sticker border", () => {
+  it("uses a larger unfenced hero portrait with a faded edge", () => {
     render(
       <PlayerCardHeader
         card={{
@@ -34,9 +34,10 @@ describe("PlayerCardHeader injury status", () => {
       />,
     );
 
-    const portrait = screen.getByTestId("player-card-portrait");
+    const portrait = screen.getByTestId("player-card-hero-portrait");
     expect(portrait.className).not.toContain("cfb-player-sticker-frame");
-    expect(portrait.className).not.toContain("border");
+    expect(portrait.className).not.toContain("rounded");
+    expect(portrait.querySelector("img")?.className).toContain("mask-image");
   });
 
   it("treats a missing official injury report as ACTIVE", () => {

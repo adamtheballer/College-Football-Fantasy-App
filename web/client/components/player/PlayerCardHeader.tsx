@@ -119,10 +119,27 @@ export function PlayerCardHeader({
         <X className="h-5 w-5" />
       </button>
 
-      <header className={cn("relative shrink-0 overflow-hidden bg-gradient-to-br px-4 py-5 pr-14 sm:px-8 sm:py-7 sm:pr-24", palette.headerBase)}>
+      <header className={cn("relative min-h-[12.5rem] shrink-0 overflow-hidden bg-gradient-to-br px-4 py-5 pr-14 sm:min-h-[15rem] sm:px-8 sm:py-7 sm:pr-24", palette.headerBase)}>
         <div className="absolute inset-0 opacity-50 mix-blend-screen" style={headerStreakStyle} />
         <div className="absolute inset-0 bg-[linear-gradient(112deg,rgba(4,8,18,0.14)_0%,transparent_44%,rgba(2,6,23,0.42)_100%)]" />
         <div aria-hidden="true" className="cfb-player-card-grain-layer pointer-events-none absolute inset-0" />
+        <div
+          data-testid="player-card-hero-portrait"
+          className="pointer-events-none absolute bottom-[-2.75rem] left-1/2 z-[5] h-52 w-52 -translate-x-1/2 sm:bottom-[-3.5rem] sm:h-64 sm:w-64 lg:left-[68%]"
+        >
+          {card?.about.headshot_url && !headshotFailed ? (
+            <img
+              src={card.about.headshot_url}
+              alt={player.name}
+              className="h-full w-full object-cover object-top opacity-95 [mask-image:radial-gradient(ellipse_72%_76%_at_50%_42%,black_53%,transparent_100%)]"
+              onError={() => setHeadshotFailed(true)}
+            />
+          ) : (
+            <div className={cn("flex h-full w-full items-center justify-center bg-gradient-to-b opacity-85 [mask-image:radial-gradient(ellipse_72%_76%_at_50%_42%,black_53%,transparent_100%)]", palette.silhouette)}>
+              <UserRound className="h-20 w-20 text-white/75 sm:h-24 sm:w-24" />
+            </div>
+          )}
+        </div>
         <div
           className="pointer-events-none absolute inset-0 hidden text-white/20 [mask-image:linear-gradient(to_right,black_0%,black_58%,transparent_74%)] lg:block"
           aria-hidden="true"
@@ -144,37 +161,26 @@ export function PlayerCardHeader({
           ))}
         </div>
         <div aria-hidden="true" className="cfb-player-card-ink-edge pointer-events-none absolute inset-x-0 bottom-0 z-20 h-px" />
-        <div className="relative z-10 min-w-0">
+        <div className="relative z-10 flex min-h-[10rem] min-w-0 flex-col justify-end pr-12 sm:min-h-[12rem] sm:pr-48 lg:pr-72">
           <p className="hidden text-[10px] font-black uppercase tracking-[0.28em] text-white/65 sm:block">{title}</p>
-          <div className="flex min-w-0 items-center gap-3 sm:mt-4 sm:gap-5">
-            <div data-testid="player-card-portrait" className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-950/15 shadow-[0_12px_24px_rgba(2,6,23,0.18)] sm:h-[5.75rem] sm:w-[5.75rem]">
-                {card?.about.headshot_url && !headshotFailed ? (
-                  <img src={card.about.headshot_url} alt={player.name} className="h-full w-full object-cover" onError={() => setHeadshotFailed(true)} />
-                ) : (
-                  <div className={cn("flex h-full w-full items-center justify-center bg-gradient-to-b", palette.silhouette)}>
-                    <UserRound className="h-8 w-8 text-white/75 sm:h-11 sm:w-11" />
-                  </div>
-                )}
-            </div>
-            <div className="min-w-0">
-              <h2 id="player-card-title" className="max-w-2xl break-words text-[1.7rem] font-semibold leading-[0.98] tracking-tight text-white sm:text-5xl">
-                {player.name}
-              </h2>
-              <p className="mt-2 truncate text-[10px] font-black uppercase tracking-[0.15em] text-white/80 sm:mt-3 sm:text-xs sm:tracking-[0.18em]">
-                {[position || player.position, card?.about.team ?? player.school].filter(Boolean).join("  |  ")}
-              </p>
-              <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[9px] font-bold sm:mt-3 sm:text-[11px]">
-                <PlayerAvailabilityIndicator status={statusSource}>
-                  <span className="inline-flex items-center gap-1.5 text-emerald-100">
-                    <span data-testid="player-card-status-dot" className={cn("h-1.5 w-1.5 rounded-full", playerAvailabilityDotClass(statusSource))} />
-                    {playerStatus}
-                  </span>
-                </PlayerAvailabilityIndicator>
-                {card?.about.jersey ? <span className="text-white/70">#{card.about.jersey}</span> : null}
-                {!seasonRank && currentValue !== null && currentValue !== undefined ? (
-                  <span className="text-white/70">Value {formatCurrentValueRating(currentValue)}</span>
-                ) : null}
-              </div>
+          <div className="min-w-0">
+            <h2 id="player-card-title" className="max-w-2xl break-words text-[1.85rem] font-semibold leading-[0.98] tracking-tight text-white [text-shadow:0_2px_16px_rgba(2,6,23,0.7)] sm:text-5xl">
+              {player.name}
+            </h2>
+            <p className="mt-2 truncate text-[10px] font-black uppercase tracking-[0.15em] text-white/80 sm:mt-3 sm:text-xs sm:tracking-[0.18em]">
+              {[position || player.position, card?.about.team ?? player.school].filter(Boolean).join("  |  ")}
+            </p>
+            <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[9px] font-bold sm:mt-3 sm:text-[11px]">
+              <PlayerAvailabilityIndicator status={statusSource}>
+                <span className="inline-flex items-center gap-1.5 text-emerald-100">
+                  <span data-testid="player-card-status-dot" className={cn("h-1.5 w-1.5 rounded-full", playerAvailabilityDotClass(statusSource))} />
+                  {playerStatus}
+                </span>
+              </PlayerAvailabilityIndicator>
+              {card?.about.jersey ? <span className="text-white/70">#{card.about.jersey}</span> : null}
+              {!seasonRank && currentValue !== null && currentValue !== undefined ? (
+                <span className="text-white/70">Value {formatCurrentValueRating(currentValue)}</span>
+              ) : null}
             </div>
           </div>
         </div>
