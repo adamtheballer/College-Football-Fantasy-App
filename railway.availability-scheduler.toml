@@ -3,9 +3,10 @@ builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile.api"
 
 [deploy]
-# Railway evaluates cron in UTC. The script limits this to 10 AM and 5 PM
-# America/New_York, which keeps both refreshes correct across EST/EDT.
-cronSchedule = "0 14,15,21,22 * * *"
-startCommand = "cd /app && exec env PYTHONPATH=/app uv run python scripts/sync_official_availability_reports.py --season 2026 --only-local-hour 10 --only-local-hour 17"
+# Railway evaluates cron in UTC. The paired UTC hours cover 10 AM
+# America/New_York across EST/EDT; the script also limits runs to Wednesday
+# and Sunday so a scheduler misconfiguration cannot refresh on another day.
+cronSchedule = "0 14,15 * * 0,3"
+startCommand = "cd /app && exec env PYTHONPATH=/app uv run python scripts/sync_official_availability_reports.py --season 2026 --only-local-hour 10 --only-local-weekday 2 --only-local-weekday 6"
 restartPolicyType = "NEVER"
 restartPolicyMaxRetries = 1
