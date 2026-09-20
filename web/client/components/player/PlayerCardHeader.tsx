@@ -162,13 +162,13 @@ export function PlayerCardHeader({
         </div>
         <div aria-hidden="true" className="cfb-player-card-ink-edge pointer-events-none absolute inset-x-0 bottom-0 z-20 h-px" />
         <div data-testid="player-card-identity" className="relative z-10 flex min-h-[12.5rem] min-w-0 flex-col justify-center pr-[10.25rem] text-left sm:min-h-[15rem] sm:max-w-[60%] sm:-translate-y-3 sm:pr-0">
-          <p className="hidden text-[10px] font-black uppercase tracking-[0.28em] text-white/65 sm:block">{title}</p>
+          <p className="mb-3 text-[9px] font-black uppercase tracking-[0.24em] text-white/65 sm:mb-4 sm:text-[10px] sm:tracking-[0.28em]">{title}</p>
           <div className="min-w-0 max-w-xl">
             <h2 id="player-card-title" className="break-words text-[1.8rem] font-black uppercase leading-[0.92] tracking-[-0.035em] text-white [text-shadow:0_2px_16px_rgba(2,6,23,0.7)] sm:text-[3.35rem]">
               {player.name}
             </h2>
             <p className="mt-2 truncate text-[10px] font-black uppercase tracking-[0.13em] text-white/80 sm:mt-3 sm:text-xs sm:tracking-[0.18em]">
-              {[position || player.position, card?.about.team ?? player.school, seasonRank ? `#${seasonRank.rank}` : card?.about.jersey ? `#${card.about.jersey}` : null].filter(Boolean).join("  •  ")}
+              {[position || player.position, card?.about.team ?? player.school].filter(Boolean).join("  •  ")}
             </p>
             <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[9px] font-bold sm:mt-3 sm:text-[11px]">
               <PlayerAvailabilityIndicator status={statusSource}>

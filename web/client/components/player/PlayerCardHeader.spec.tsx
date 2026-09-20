@@ -44,6 +44,7 @@ describe("PlayerCardHeader injury status", () => {
     expect(portrait.className).toContain("sm:h-[17.5rem]");
     expect(portrait.querySelector("img")?.className).toContain("mask-image");
     expect(screen.getByTestId("player-card-identity").className).toContain("sm:-translate-y-3");
+    expect(screen.getByText("Player Card").className).toContain("mb-3");
     expect(screen.getByText(/WR\s+•\s+Miami/)).toBeTruthy();
   });
 
@@ -97,7 +98,7 @@ describe("PlayerCardHeader injury status", () => {
       <PlayerCardHeader
         card={{
           current_injury_status: null,
-          about: { status: "Active", source: "local" },
+          about: { status: "Active", source: "local", jersey: "17" },
           player: { id: 1, name: "Top Receiver", position: "WR", school: "Miami" },
           injuries: [],
           season_stats: [],
@@ -122,6 +123,8 @@ describe("PlayerCardHeader injury status", () => {
 
     expect(screen.getAllByText("WR 1")).toHaveLength(1);
     expect(screen.queryByText("Rank WR 1")).toBeNull();
+    expect(screen.queryByText("#1")).toBeNull();
+    expect(screen.getByText("#17")).toBeTruthy();
     expect(screen.queryByText("Current Value Rating")).toBeNull();
     expect(formatPlayerCardPositionRank({ position: "WR", rank: 1, fantasy_points: 42.6, through_week: 1 })).toBe("WR 1");
   });
