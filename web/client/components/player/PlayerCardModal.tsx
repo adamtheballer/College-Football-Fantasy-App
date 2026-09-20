@@ -623,7 +623,7 @@ export function PlayerCardModal({
         ref={dialogRef}
         tabIndex={-1}
         className={cn(
-          "relative mb-[max(0.375rem,env(safe-area-inset-bottom))] flex h-[75dvh] max-h-[calc(100dvh-0.75rem-env(safe-area-inset-bottom))] w-full max-w-4xl flex-col overflow-hidden rounded-md border border-cfb-border-subtle bg-cfb-surface text-cfb-text-primary shadow-[0_16px_44px_rgba(2,6,23,0.46)] sm:mb-0 sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:rounded-lg",
+          "relative mb-[max(0.375rem,env(safe-area-inset-bottom))] flex h-[86dvh] max-h-[calc(100dvh-0.75rem-env(safe-area-inset-bottom))] w-full max-w-4xl flex-col overflow-hidden rounded-md border border-cfb-border-subtle bg-cfb-surface text-cfb-text-primary shadow-[0_16px_44px_rgba(2,6,23,0.46)] sm:mb-0 sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:rounded-lg",
           palette.glow
         )}
         onClick={(event) => event.stopPropagation()}

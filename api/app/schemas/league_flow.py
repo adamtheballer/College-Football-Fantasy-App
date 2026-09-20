@@ -415,10 +415,14 @@ class LeagueListCurrentUserSummaryRead(BaseModel):
     """The signed-in member's compact, source-of-truth league card summary."""
 
     team_name: str | None = None
+    manager_name_for: str | None = None
+    manager_avatar_url_for: str | None = None
     wins: int | None = None
     losses: int | None = None
     ties: int | None = None
     opponent_team_name: str | None = None
+    opponent_manager_name: str | None = None
+    opponent_manager_avatar_url: str | None = None
     matchup_week: int | None = None
     projected_points_for: float | None = None
     projected_points_against: float | None = None
@@ -472,6 +476,10 @@ class LeagueWorkspaceMatchupSummaryRead(BaseModel):
     team_id: int | None = None
     opponent_team_id: int | None = None
     opponent_team_name: str | None = None
+    manager_name_for: str | None = None
+    manager_avatar_url_for: str | None = None
+    opponent_manager_name: str | None = None
+    opponent_manager_avatar_url: str | None = None
     status: str | None = None
     projected_points_for: float | None = None
     projected_points_against: float | None = None

@@ -1157,6 +1157,15 @@ def test_league_workspace_returns_real_matchup_and_standings(client, db_session,
     teams = db_session.query(Team).filter(Team.league_id == league["id"]).order_by(Team.id.asc()).all()
     assert len(teams) == 2
     commissioner_team, member_team = teams
+    managers = {
+        manager.id: manager
+        for manager in db_session.query(User).filter(User.id.in_([
+            commissioner_team.owner_user_id,
+            member_team.owner_user_id,
+        ])).all()
+    }
+    managers[commissioner_team.owner_user_id].avatar_url = "https://images.example.com/workspace-manager.jpg"
+    managers[member_team.owner_user_id].avatar_url = "https://images.example.com/workspace-opponent.jpg"
 
     db_session.add(
         Matchup(
@@ -1231,6 +1240,10 @@ def test_league_workspace_returns_real_matchup_and_standings(client, db_session,
     body = response.json()
     assert body["matchup_summary"]["week"] == 3
     assert body["matchup_summary"]["opponent_team_name"] == member_team.name
+    assert body["matchup_summary"]["manager_name_for"] == "Coachworkspace"
+    assert body["matchup_summary"]["manager_avatar_url_for"] == "https://images.example.com/workspace-manager.jpg"
+    assert body["matchup_summary"]["opponent_manager_name"] == "Coachmember"
+    assert body["matchup_summary"]["opponent_manager_avatar_url"] == "https://images.example.com/workspace-opponent.jpg"
     assert body["matchup_summary"]["projected_points_for"] == 133.1
     assert body["matchup_summary"]["projected_points_against"] == 137.0
     assert body["matchup_summary"]["win_probability_for"] == 48.05
@@ -1243,9 +1256,13 @@ def test_league_workspace_returns_real_matchup_and_standings(client, db_session,
     assert list_response.status_code == 200
     card_summary = list_response.json()["data"][0]["current_user_summary"]
     assert card_summary["team_name"] == commissioner_team.name
+    assert card_summary["manager_name_for"] == "Coachworkspace"
+    assert card_summary["manager_avatar_url_for"] == "https://images.example.com/workspace-manager.jpg"
     assert card_summary["wins"] == 2
     assert card_summary["losses"] == 0
     assert card_summary["opponent_team_name"] == member_team.name
+    assert card_summary["opponent_manager_name"] == "Coachmember"
+    assert card_summary["opponent_manager_avatar_url"] == "https://images.example.com/workspace-opponent.jpg"
     assert card_summary["matchup_week"] == 3
     assert card_summary["projected_points_for"] == 133.1
     assert card_summary["projected_points_against"] == 137.0

@@ -119,24 +119,24 @@ export function PlayerCardHeader({
         <X className="h-5 w-5" />
       </button>
 
-      <header className={cn("relative min-h-[14.5rem] shrink-0 overflow-hidden bg-gradient-to-br px-4 py-5 sm:min-h-[18rem] sm:px-8 sm:py-7", palette.headerBase)}>
+      <header className={cn("relative min-h-[15.5rem] shrink-0 overflow-hidden bg-gradient-to-br px-5 py-5 sm:min-h-[19rem] sm:px-10 sm:py-8", palette.headerBase)}>
         <div className="absolute inset-0 opacity-50 mix-blend-screen" style={headerStreakStyle} />
         <div className="absolute inset-0 bg-[linear-gradient(112deg,rgba(4,8,18,0.14)_0%,transparent_44%,rgba(2,6,23,0.42)_100%)]" />
         <div aria-hidden="true" className="cfb-player-card-grain-layer pointer-events-none absolute inset-0" />
         <div
           data-testid="player-card-hero-portrait"
-          className="pointer-events-none absolute bottom-0 right-0 z-[5] h-[13rem] w-[10.75rem] sm:h-[17.25rem] sm:w-[16rem]"
+          className="pointer-events-none absolute bottom-0 right-0 z-[5] h-[14.5rem] w-[12.5rem] sm:h-[19rem] sm:w-[19rem]"
         >
           {card?.about.headshot_url && !headshotFailed ? (
             <img
               src={card.about.headshot_url}
               alt={player.name}
-              className="h-full w-full object-contain object-bottom opacity-100 [mask-image:linear-gradient(to_right,transparent_0%,black_22%,black_100%)]"
+              className="h-full w-full object-contain object-bottom opacity-100 [mask-image:linear-gradient(to_right,transparent_0%,black_18%,black_100%)]"
               onError={() => setHeadshotFailed(true)}
             />
           ) : (
-            <div className={cn("flex h-full w-full items-end justify-center bg-gradient-to-l opacity-85 [mask-image:linear-gradient(to_right,transparent_0%,black_22%,black_100%)]", palette.silhouette)}>
-              <UserRound className="mb-4 h-28 w-28 text-white/75 sm:mb-6 sm:h-40 sm:w-40" />
+            <div className={cn("flex h-full w-full items-end justify-center bg-gradient-to-l opacity-85 [mask-image:linear-gradient(to_right,transparent_0%,black_18%,black_100%)]", palette.silhouette)}>
+              <UserRound className="mb-4 h-32 w-32 text-white/75 sm:mb-6 sm:h-44 sm:w-44" />
             </div>
           )}
         </div>
@@ -161,14 +161,14 @@ export function PlayerCardHeader({
           ))}
         </div>
         <div aria-hidden="true" className="cfb-player-card-ink-edge pointer-events-none absolute inset-x-0 bottom-0 z-20 h-px" />
-        <div className="relative z-10 flex min-h-[11.5rem] min-w-0 flex-col justify-end pr-[8.75rem] pt-12 text-left sm:min-h-[15rem] sm:max-w-[66%] sm:justify-center sm:pr-0 sm:pt-6">
+        <div className="relative z-10 flex min-h-[12.5rem] min-w-0 flex-col justify-center pr-[10.25rem] text-left sm:min-h-[16rem] sm:max-w-[60%] sm:pr-0">
           <p className="hidden text-[10px] font-black uppercase tracking-[0.28em] text-white/65 sm:block">{title}</p>
           <div className="min-w-0 max-w-xl">
-            <h2 id="player-card-title" className="break-words text-[1.85rem] font-semibold leading-[0.98] tracking-tight text-white [text-shadow:0_2px_16px_rgba(2,6,23,0.7)] sm:text-5xl">
+            <h2 id="player-card-title" className="break-words text-[1.8rem] font-black uppercase leading-[0.92] tracking-[-0.035em] text-white [text-shadow:0_2px_16px_rgba(2,6,23,0.7)] sm:text-[3.35rem]">
               {player.name}
             </h2>
-            <p className="mt-2 truncate text-[10px] font-black uppercase tracking-[0.15em] text-white/80 sm:mt-3 sm:text-xs sm:tracking-[0.18em]">
-              {[position || player.position, card?.about.team ?? player.school].filter(Boolean).join("  |  ")}
+            <p className="mt-2 truncate text-[10px] font-black uppercase tracking-[0.13em] text-white/80 sm:mt-3 sm:text-xs sm:tracking-[0.18em]">
+              {[position || player.position, card?.about.team ?? player.school, seasonRank ? `#${seasonRank.rank}` : card?.about.jersey ? `#${card.about.jersey}` : null].filter(Boolean).join("  •  ")}
             </p>
             <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[9px] font-bold sm:mt-3 sm:text-[11px]">
               <PlayerAvailabilityIndicator status={statusSource}>
