@@ -562,7 +562,7 @@ export function PlayerCardModal({
         ref={dialogRef}
         tabIndex={-1}
         className={cn(
-          "relative mb-[max(1rem,env(safe-area-inset-bottom))] flex h-[78dvh] max-h-[calc(100dvh-3rem-env(safe-area-inset-bottom))] w-full max-w-5xl flex-col overflow-hidden rounded-md border border-cfb-border-subtle bg-cfb-surface text-cfb-text-primary shadow-[0_16px_44px_rgba(2,6,23,0.46)] sm:mb-0 sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:rounded-lg",
+          "relative mb-[max(0.375rem,env(safe-area-inset-bottom))] flex h-[95dvh] max-h-[calc(100dvh-0.75rem-env(safe-area-inset-bottom))] w-full max-w-5xl flex-col overflow-hidden rounded-md border border-cfb-border-subtle bg-cfb-surface text-cfb-text-primary shadow-[0_16px_44px_rgba(2,6,23,0.46)] sm:mb-0 sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:rounded-lg",
           palette.glow
         )}
         onClick={(event) => event.stopPropagation()}
@@ -605,7 +605,7 @@ export function PlayerCardModal({
           data-testid="player-card-scroll-area"
           tabIndex={0}
           aria-label="Player card details"
-          className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch] p-3 pb-20 scroll-pb-20 sm:p-8 sm:pb-8 sm:scroll-pb-8"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch] p-3 pb-4 scroll-pb-4 sm:p-8 sm:pb-8 sm:scroll-pb-8"
         >
           {loading ? (
             <div className="flex min-h-56 items-center justify-center gap-3 rounded-md border border-cfb-border-subtle bg-cfb-surface-raised text-[10px] font-semibold uppercase tracking-[0.18em] text-cfb-text-muted">
@@ -653,9 +653,9 @@ export function PlayerCardModal({
               )}
             </section>
           ) : activeTab === "summary" ? (
-            <div className="w-full">
+            <div data-testid="player-card-summary" className="w-full">
               {currentGame && ["completed", "live", "awaiting_live"].includes(currentGame.state) ? (
-                <section className="mb-3 rounded-md border border-cfb-border-subtle bg-cfb-surface-raised p-4 sm:p-5" aria-label={currentGame.state === "completed" ? "Current player game result" : "Current player game"}>
+                <section className="mb-3 rounded-md border border-cfb-border-subtle bg-cfb-surface-raised p-3 sm:p-5" aria-label={currentGame.state === "completed" ? "Current player game result" : "Current player game"}>
                   <p className={cn("flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>
                     {currentGame.state === "live" ? <LiveGameIndicator /> : null}
                     {currentGame.state === "completed" ? "Latest verified game" : currentGame.state === "live" ? "Live game" : "Current game · awaiting live update"}
@@ -663,9 +663,9 @@ export function PlayerCardModal({
                   <p className="mt-2 text-sm font-black text-white">Week {currentGame.week} vs. {currentGame.opponent_name ?? "opponent"}</p>
                   <p className="mt-1 text-xs font-bold text-white/55">{currentGame.kickoff_at ? formatGameLogDate(undefined, currentGame.kickoff_at) : "Time TBD"}</p>
                   {currentGameStats.length ? (
-                    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2">
                       {currentGameStats.slice(0, 4).map(([label, value]) => (
-                        <div key={label} className="rounded-sm border border-cfb-border-subtle bg-cfb-surface p-2.5">
+                        <div key={label} className="rounded-sm border border-cfb-border-subtle bg-cfb-surface p-2 sm:p-2.5">
                           <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/45">{label}</p>
                           <p className="mt-1 text-sm font-black tabular-nums text-white">{formatPlayerCardValue(value)}</p>
                         </div>
@@ -680,9 +680,9 @@ export function PlayerCardModal({
                   <p className="mt-1 text-xs font-bold text-white/55">{currentGame.kickoff_at ? formatGameLogDate(undefined, currentGame.kickoff_at) : "Time TBD"}</p>
                 </section>
               ) : null}
-              <section className="rounded-md border border-cfb-border-subtle bg-cfb-surface-raised p-4 sm:p-5">
+              <section className="rounded-md border border-cfb-border-subtle bg-cfb-surface-raised p-3 sm:p-5">
                 <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Bio</p>
-                <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-4 sm:gap-3">
+                <div className="mt-3 grid grid-cols-3 gap-1.5 sm:mt-4 sm:grid-cols-2 sm:gap-3">
                   {[
                     ["Height", card?.about.height],
                     ["Weight", card?.about.weight],
@@ -691,9 +691,9 @@ export function PlayerCardModal({
                     ["School", card?.about.team ?? player.school],
                     ["Status", playerStatus],
                   ].map(([label, value]) => (
-                    <div key={label} className="rounded-sm border border-cfb-border-subtle bg-cfb-surface p-2.5 sm:p-3">
+                    <div key={label} className="min-w-0 rounded-sm border border-cfb-border-subtle bg-cfb-surface p-2 sm:p-3">
                       <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">{label}</p>
-                      <p className="mt-1 text-sm font-black text-white sm:mt-2">{formatPlayerCardValue(value)}</p>
+                      <p className="mt-1 truncate text-xs font-black text-white sm:mt-2 sm:text-sm">{formatPlayerCardValue(value)}</p>
                     </div>
                   ))}
                 </div>

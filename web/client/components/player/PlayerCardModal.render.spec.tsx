@@ -48,6 +48,27 @@ afterEach(() => {
 });
 
 describe("PlayerCardModal game log", () => {
+  it("uses the expanded player-card viewport and compact Summary core", () => {
+    render(
+      <PlayerCardModal
+        onClose={vi.fn()}
+        player={{ id: 1, name: "Ian Strong", position: "WR", school: "California" }}
+        card={{
+          about: { source: "local", position: "WR", team: "California", height: "6-2", weight: "205" },
+          player: { id: 1, name: "Ian Strong", position: "WR", school: "California" },
+          injuries: [],
+          season_stats: [],
+          historical_stats: null,
+        } as never}
+      />,
+    );
+
+    const summary = screen.getByTestId("player-card-summary");
+    expect(summary.closest("article")?.className).toContain("h-[95dvh]");
+    expect(summary.className).toContain("w-full");
+    expect(screen.getByTestId("player-card-hero-portrait")).toBeTruthy();
+  });
+
   it("uses the same horizontally scrollable table on mobile instead of game cards", () => {
     render(
       <PlayerCardModal
