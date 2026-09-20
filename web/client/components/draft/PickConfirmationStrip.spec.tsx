@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { usePickConfirmation, type ConfirmedDraftPick } from "@/hooks/use-pick-confirmation";
+import { PICK_BANNER_MOTION, usePickConfirmation, type ConfirmedDraftPick } from "@/hooks/use-pick-confirmation";
 import { PickConfirmationStrip } from "./PickConfirmationStrip";
 
 const own = (number: number): ConfirmedDraftPick => ({ key: `${number}:7`, number, teamId: 1, playerId: 7, name: `Player ${number}`, school: "Ole Miss", position: "RB", auto: false });
@@ -20,7 +20,7 @@ describe("confirmed pick presentation", () => {
     expect(strip.className).toContain("fixed");
     expect(strip.className).toContain("top-0");
     expect(strip.className).toContain("pointer-events-none");
-    expect(strip.className).toContain("h-9");
+    expect(strip.className).toContain("h-10");
     expect(strip.textContent).toContain("Player One");
   });
 
@@ -40,15 +40,15 @@ describe("confirmed pick presentation", () => {
     view.rerender(<Harness picks={[own(1), own(2)]} complete />);
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.getByTestId("pick-confirmation").dataset.phase).toBe("enter");
-    tick(240);
+    tick(PICK_BANNER_MOTION.enter);
     expect(screen.getByTestId("pick-confirmation").dataset.phase).toBe("hold");
     tick(1999);
     expect(screen.getByTestId("pick-confirmation").dataset.phase).toBe("hold");
     tick(1);
     expect(screen.getByTestId("pick-confirmation").dataset.phase).toBe("exit");
-    tick(240);
+    tick(PICK_BANNER_MOTION.exit);
     expect(screen.getByTestId("pick-confirmation").textContent).toContain("Player 2");
-    tick(2480);
+    tick(PICK_BANNER_MOTION.enter + PICK_BANNER_MOTION.hold + PICK_BANNER_MOTION.exit);
     expect(screen.queryByTestId("pick-confirmation")).toBeNull();
     expect(screen.getByRole("dialog").textContent).toBe("Complete");
     view.rerender(<Harness picks={[own(1), own(2)]} complete />);

@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
-export const PICK_BANNER_MOTION = { enter: 240, hold: 2000, exit: 240 } as const;
+// The confirmation is presentation-only. Keep the two-second readable hold,
+// but use a slightly longer, eased reveal/retract so the full pick card never
+// feels like it snaps over the draft room.
+export const PICK_BANNER_MOTION = { enter: 300, hold: 2000, exit: 260 } as const;
 export type ConfirmedDraftPick = {
   key: string;
   number: number;

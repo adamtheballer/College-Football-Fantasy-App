@@ -94,6 +94,25 @@ test("confirmed pick animates once without moving list; next timer keeps running
   await expect(page.getByTestId("pick-confirmation")).toContainText("Arch Manning");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByTestId("draft-player-row").filter({hasText:"Arch Manning"})).toHaveCount(0);
+  const confirmationLayout = await page.evaluate(() => {
+    const context = document.querySelector<HTMLElement>("[data-testid='pick-context-strip']");
+    const confirmation = document.querySelector<HTMLElement>("[data-testid='pick-confirmation']");
+    const portrait = confirmation?.querySelector<HTMLElement>("[aria-hidden='true']");
+    if (!context || !confirmation || !portrait) return null;
+    return {
+      contextBottom: context.getBoundingClientRect().bottom,
+      confirmationTop: confirmation.getBoundingClientRect().top,
+      confirmationHeight: confirmation.getBoundingClientRect().height,
+      confirmationBottom: confirmation.getBoundingClientRect().bottom,
+      portraitTop: portrait.getBoundingClientRect().top,
+      portraitBottom: portrait.getBoundingClientRect().bottom,
+    };
+  });
+  expect(confirmationLayout).not.toBeNull();
+  expect(Math.abs((confirmationLayout?.confirmationTop ?? 0) - (confirmationLayout?.contextBottom ?? 0))).toBeLessThanOrEqual(1);
+  expect(confirmationLayout?.confirmationHeight).toBeGreaterThanOrEqual(90);
+  expect(confirmationLayout?.portraitTop).toBeGreaterThanOrEqual(confirmationLayout?.confirmationTop ?? 0);
+  expect(confirmationLayout?.portraitBottom).toBeLessThanOrEqual(confirmationLayout?.confirmationBottom ?? 0);
   await page.screenshot({path:testInfo.outputPath("draft-confirmation-mobile.png")});
   expect(await page.getByTestId("pick-context-strip").evaluate((e)=>e.getBoundingClientRect().height)).toBe(height);
   await expect(page.getByTestId("pick-confirmation")).toHaveCount(0,{timeout:4000});
