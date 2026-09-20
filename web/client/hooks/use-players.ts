@@ -169,8 +169,11 @@ export type LeaguePlayerHistoryResponse = {
  * calendar.  Do not add a client-side week here: a stale cached bundle must
  * never pin every card to Week 1 after the Tuesday rollover.
  */
-export const playerCardRequestParams = (injurySeason: number) => ({
+export const playerCardRequestParams = (injurySeason: number, leagueId?: number | null) => ({
   injury_season: injurySeason,
+  ...(typeof leagueId === "number" && Number.isFinite(leagueId) && leagueId > 0
+    ? { league_id: leagueId }
+    : {}),
 });
 
 export type PlayerTradeValueResponse = {
@@ -807,10 +810,14 @@ export function usePlayerDetail(playerId?: number | null, enabled = true) {
   });
 }
 
-export function usePlayerCard(playerId?: number | null, enabled = true) {
+export function usePlayerCard(
+  playerId?: number | null,
+  enabled = true,
+  leagueId?: number | null,
+) {
   const injurySeason = new Date().getFullYear();
   return useQuery({
-    queryKey: ["player-card", playerId, injurySeason],
+    queryKey: ["player-card", playerId, injurySeason, leagueId ?? null],
     enabled: enabled && typeof playerId === "number" && !Number.isNaN(playerId),
     staleTime: 5_000,
     // An open player card is a live surface during games. Keep its stat line
@@ -818,7 +825,10 @@ export function usePlayerCard(playerId?: number | null, enabled = true) {
     refetchInterval: 30_000,
     refetchIntervalInBackground: true,
     refetchOnMount: "always",
-    queryFn: () => apiGet<PlayerCardResponse>(`/players/${playerId}/card`, playerCardRequestParams(injurySeason)),
+    queryFn: () => apiGet<PlayerCardResponse>(
+      `/players/${playerId}/card`,
+      playerCardRequestParams(injurySeason, leagueId),
+    ),
   });
 }
 

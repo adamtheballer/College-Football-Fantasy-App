@@ -316,10 +316,14 @@ export function SideBySideMatchup({
   const opponentStarters = sortBySlot(startersFor(opponentTeam));
   const myReserves = sortBySlot(reservesFor(myTeam));
   const opponentReserves = sortBySlot(reservesFor(opponentTeam));
-  const selectedPlayerCardQuery = usePlayerCard(selectedPlayer?.player_id, Boolean(selectedPlayer?.player_id));
-  const selectedProjection = selectedPlayer?.projected_points ?? selectedPlayer?.weekly_projected_fantasy_points;
   const numericLeagueId = typeof leagueId === "number" ? leagueId : Number(leagueId);
   const resolvedLeagueId = Number.isFinite(numericLeagueId) && numericLeagueId > 0 ? numericLeagueId : undefined;
+  const selectedPlayerCardQuery = usePlayerCard(
+    selectedPlayer?.player_id,
+    Boolean(selectedPlayer?.player_id),
+    resolvedLeagueId,
+  );
+  const selectedProjection = selectedPlayer?.projected_points ?? selectedPlayer?.weekly_projected_fantasy_points;
   const pointMode = pointModeForMatchupStatus(scoringStatus);
 
   return (

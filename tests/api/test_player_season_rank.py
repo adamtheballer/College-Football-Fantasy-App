@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 import pytest
 
 from collegefootballfantasy_api.app.models.league import League
+from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.matchup import Matchup
 from collegefootballfantasy_api.app.models.player import Player
@@ -122,6 +123,36 @@ def test_player_card_exposes_only_finalized_cumulative_positional_rank(client, d
         "rank": 2,
         "fantasy_points": 40.0,
         "through_week": 2,
+    }
+
+
+def test_player_card_rank_uses_the_requested_league_conference_pool(client, db_session):
+    """An SEC card must not be pushed down by a higher-scoring ACC player."""
+
+    sec_receiver = _rankable_player(name="SEC Receiver", position="WR", school="Alabama")
+    acc_receiver = _rankable_player(name="ACC Receiver", position="WR", school="Miami")
+    league = League(name="SEC rankings", season_year=2026)
+    db_session.add_all([sec_receiver, acc_receiver, league])
+    db_session.flush()
+    db_session.add(LeagueSettings(league_id=league.id, conference_codes=["SEC"]))
+    db_session.add_all([
+        PlayerStat(player_id=sec_receiver.id, season=2026, week=1, verified=True, stats={"fantasy_points": 24.0}),
+        PlayerStat(player_id=acc_receiver.id, season=2026, week=1, verified=True, stats={"fantasy_points": 32.0}),
+    ])
+    _finalize_week(db_session, week=1)
+    db_session.commit()
+
+    global_card = client.get(f"/players/{sec_receiver.id}/card")
+    league_card = client.get(f"/players/{sec_receiver.id}/card?league_id={league.id}")
+
+    assert global_card.status_code == 200
+    assert global_card.json()["season_positional_rank"]["rank"] == 2
+    assert league_card.status_code == 200
+    assert league_card.json()["season_positional_rank"] == {
+        "position": "WR",
+        "rank": 1,
+        "fantasy_points": 24.0,
+        "through_week": 1,
     }
 
 

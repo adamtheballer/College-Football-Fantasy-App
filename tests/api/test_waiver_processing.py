@@ -608,9 +608,10 @@ def test_waiver_and_all_players_expose_finalized_positional_ranks(db_session, mo
     db_session.add_all((league, Team(league=league, name="Rank Waiver Team", owner_user_id=user.id, owner_name="Rank"), top_receiver, second_receiver))
     db_session.flush()
 
-    def ranks_for_position(_db, *, season, position):
+    def ranks_for_position(_db, *, season, position, conference_codes=None):
         assert season == 2026
         assert position == "WR"
+        assert conference_codes is None
         return {
             top_receiver.id: PlayerSeasonPositionalRank(position="WR", rank=1, fantasy_points=42.5, through_week=1),
             second_receiver.id: PlayerSeasonPositionalRank(position="WR", rank=2, fantasy_points=31.0, through_week=1),

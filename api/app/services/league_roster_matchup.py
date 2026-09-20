@@ -1472,6 +1472,7 @@ def build_waivers_view(
                 db,
                 season=league.season_year,
                 position=position,
+                conference_codes=settings.conference_codes if settings else None,
             ).items()
             if player_id in player_ids
         }

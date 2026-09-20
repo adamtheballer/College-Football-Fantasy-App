@@ -64,7 +64,8 @@ describe("PlayerCardModal game log", () => {
     );
 
     const summary = screen.getByTestId("player-card-summary");
-    expect(summary.closest("article")?.className).toContain("h-[95dvh]");
+    expect(summary.closest("article")?.className).toContain("h-[75dvh]");
+    expect(summary.closest("article")?.className).toContain("max-w-4xl");
     expect(summary.className).toContain("w-full");
     expect(screen.getByTestId("player-card-hero-portrait")).toBeTruthy();
   });
@@ -95,6 +96,37 @@ describe("PlayerCardModal game log", () => {
     expect(screen.getByText("vs. UCLA")).toBeTruthy();
     expect(screen.queryByText("Week 1")).toBeNull();
     expect(screen.queryByTestId("live-game-indicator")).toBeNull();
+  });
+
+  it("keeps injury updates in News and does not render a separate Alerts tab", () => {
+    render(
+      <PlayerCardModal
+        onClose={vi.fn()}
+        player={{ id: 1, name: "Ahmad Hardy", position: "RB", school: "Missouri" }}
+        card={{
+          about: { source: "local", position: "RB", team: "Missouri" },
+          player: { id: 1, name: "Ahmad Hardy", position: "RB", school: "Missouri" },
+          injuries: [{
+            id: 5,
+            season: 2026,
+            week: 3,
+            status: "OUT",
+            injury: "Upper-leg injury rehabilitation",
+            is_game_time_decision: false,
+            is_returning: false,
+            updated_at: "2026-09-20T08:13:19Z",
+          }],
+          recent_news: [],
+          season_stats: [],
+          historical_stats: null,
+        } as never}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Alerts" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "News" }));
+    expect(screen.getByText("News & injury updates")).toBeTruthy();
+    expect(screen.getByText("Upper-leg injury rehabilitation")).toBeTruthy();
   });
 
   it("marks only live games with a red dot in the summary and game log", () => {

@@ -13,6 +13,7 @@ from collegefootballfantasy_api.app.db.session import get_db
 from collegefootballfantasy_api.app.integrations.espn import ESPNClient
 from collegefootballfantasy_api.app.integrations.sportsdata import SportsDataClient
 from collegefootballfantasy_api.app.models.injury import Injury
+from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_news_event import PlayerNewsEvent
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
@@ -321,6 +322,7 @@ def get_player_card_endpoint(
     player_id: int,
     request: Request,
     refresh: bool = False,
+    league_id: int | None = Query(default=None, ge=1),
     injury_season: int | None = Query(default=None, ge=2020, le=2100),
     injury_week: int | None = Query(default=None, ge=1, le=30),
     db: Session = Depends(get_db),
@@ -436,10 +438,16 @@ def get_player_card_endpoint(
         season_year=datetime.now(timezone.utc).year,
     )
     season = datetime.now(timezone.utc).year
+    league_settings = (
+        db.query(LeagueSettings).filter(LeagueSettings.league_id == league_id).first()
+        if league_id is not None
+        else None
+    )
     season_rank = season_positional_rank_for_player(
         db,
         player=player,
         season=season,
+        conference_codes=league_settings.conference_codes if league_settings else None,
     )
     return PlayerCardRead(
         player=card_player,

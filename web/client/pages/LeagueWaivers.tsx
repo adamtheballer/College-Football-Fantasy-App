@@ -326,7 +326,8 @@ export default function LeagueWaivers() {
   const toggleWatchlistPlayer = useToggleWatchlistPlayer();
   const selectedPlayerCardQuery = usePlayerCard(
     selectedPlayer?.id,
-    Boolean(selectedPlayer?.id)
+    Boolean(selectedPlayer?.id),
+    Number.isFinite(parsedLeagueId) ? parsedLeagueId : undefined,
   );
   const players = useMemo<AvailablePlayerRow[]>(() =>
     (waiverData?.available_players ?? []).map((player, index) => ({
