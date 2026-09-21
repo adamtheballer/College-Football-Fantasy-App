@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from sqlalchemy.orm import Session
+
+from collegefootballfantasy_api.app.models.injury import Injury
+
 
 def normalize_injury_status(raw_status: str | None) -> str:
     """Return the canonical reviewed-injury designation used by all API readers."""
@@ -35,3 +39,16 @@ def normalize_injury_status(raw_status: str | None) -> str:
 def is_current_injury_designation(status: str | None) -> bool:
     """Whether a normalized status is an active, informational injury designation."""
     return normalize_injury_status(status) not in {"FULL", "N_A"}
+
+
+def is_out_for_season(db: Session, *, player_id: int, season: int) -> bool:
+    """Whether a reviewed season-ending report applies to the player.
+
+    Unlike a normal weekly status, this designation remains active after the
+    week that recorded it so acquisition and roster reads stay consistent.
+    """
+    statuses = db.query(Injury.status).filter(
+        Injury.player_id == player_id,
+        Injury.season == season,
+    ).all()
+    return any(normalize_injury_status(status) == "OUT_FOR_SEASON" for (status,) in statuses)

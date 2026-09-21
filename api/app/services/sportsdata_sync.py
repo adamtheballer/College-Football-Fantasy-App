@@ -111,6 +111,9 @@ def _timeline_indicates_four_or_more_weeks(timeline: str | None) -> bool:
 
 def _official_availability_status(raw_status: str | None, timeline: str | None) -> str:
     raw = (raw_status or "").upper()
+    season_ending_terms = ("OUT FOR SEASON", "SEASON-ENDING", "SEASON ENDING", "LOST FOR THE SEASON")
+    if any(term in f"{raw} {timeline or ''}".upper() for term in season_ending_terms):
+        return "OUT_FOR_SEASON"
     if "IR" in raw or "INJURED RESERVE" in raw:
         return "IR"
     if _timeline_indicates_four_or_more_weeks(f"{raw} {timeline or ''}"):
@@ -125,7 +128,7 @@ def _official_availability_status(raw_status: str | None, timeline: str | None) 
 
 
 def _availability_multiplier(status: str) -> tuple[float, float]:
-    if status in {"OUT", "IR"}:
+    if status in {"OUT", "IR", "OUT_FOR_SEASON"}:
         return 0.0, 0.0
     if status == "QUESTIONABLE":
         return 0.7, 0.7

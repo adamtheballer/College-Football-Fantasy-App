@@ -122,7 +122,7 @@ def test_official_ir_policy_requires_an_explicit_four_week_minimum():
     assert _official_availability_status("Out", "2-4 weeks") == "OUT"
     assert _official_availability_status("Out", "4-6 weeks") == "IR"
     assert _official_availability_status("Out", "at least four weeks") == "IR"
-    assert _official_availability_status("Out for season", None) == "IR"
+    assert _official_availability_status("Out for season", None) == "OUT_FOR_SEASON"
     assert _official_availability_status("Questionable", None) == "QUESTIONABLE"
 
 

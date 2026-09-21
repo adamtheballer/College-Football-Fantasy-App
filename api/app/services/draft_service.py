@@ -34,7 +34,9 @@ from collegefootballfantasy_api.app.services.player_pool_filters import (
     is_canonical_fantasy_player,
     is_player_in_league_conference_scope,
     league_conference_player_filter,
+    season_eligible_player_filter,
 )
+from collegefootballfantasy_api.app.services.injury_status import is_out_for_season
 from collegefootballfantasy_api.app.services.live_scoring_readiness import ensure_official_acquisition_identity
 from collegefootballfantasy_api.app.services.roster_legality import (
     assign_best_roster_slot_for_team,
@@ -398,6 +400,7 @@ def _select_auto_pick_player(
             Player.id.not_in(drafted_player_ids),
             Player.id.not_in(rostered_player_ids),
             canonical_fantasy_player_filter(league.season_year),
+            season_eligible_player_filter(league.season_year),
             league_conference_player_filter(settings_row.conference_codes),
         )
         .order_by(
@@ -464,6 +467,11 @@ def _record_draft_pick(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="player is not in this season's approved draft pool",
+        )
+    if is_out_for_season(db, player_id=player.id, season=league.season_year):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="player is out for the season and cannot be drafted",
         )
     if not is_player_in_league_conference_scope(player, settings_row.conference_codes):
         raise HTTPException(

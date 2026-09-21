@@ -40,6 +40,7 @@ from collegefootballfantasy_api.app.services.player_pool_filters import (
     is_canonical_fantasy_player,
     is_player_in_league_conference_scope,
 )
+from collegefootballfantasy_api.app.services.injury_status import is_out_for_season
 from collegefootballfantasy_api.app.services.live_scoring_readiness import ensure_official_acquisition_identity
 from collegefootballfantasy_api.app.services.roster_slots import first_open_eligible_slot
 
@@ -476,6 +477,11 @@ def _ensure_player_available(db: Session, league_id: int, player_id: int, *, now
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="player is outside this league's selected conference pool",
+        )
+    if is_out_for_season(db, player_id=player.id, season=league.season_year):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="player is out for the season and cannot be added",
         )
     rostered = (
         db.query(RosterEntry.id)
