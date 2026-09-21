@@ -30,12 +30,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const navigationType = useNavigationType();
   const navigate = useNavigate();
-  const { user, logout, isLoggedIn } = useAuth();
+  const { user, logout, isBootstrapping, isLoggedIn } = useAuth();
+  // Wait for the refresh-cookie restore before fan-out requests. A cached
+  // user alone is not proof that the short-lived access token is usable.
+  const sessionReady = isLoggedIn && !isBootstrapping;
   const { data: unreadChatSummary } = useChatUnreadSummary(
-    isLoggedIn,
+    sessionReady,
     location.pathname === "/chats",
   );
-  const { data: notifications } = useNotifications(isLoggedIn);
+  const { data: notifications } = useNotifications(sessionReady);
   const [isGuideActive, setIsGuideActive] = useState(false);
   const [guidedNavItem, setGuidedNavItem] = useState<string | undefined>();
   const mainScrollRef = useRef<HTMLElement | null>(null);
