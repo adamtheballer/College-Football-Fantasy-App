@@ -16,6 +16,7 @@ from collegefootballfantasy_api.app.services.player_pool_filters import (
     generated_test_player_filter,
     league_conference_player_filter,
     retired_canonical_preseason_player_filter,
+    season_eligible_player_filter,
 )
 
 
@@ -67,7 +68,7 @@ def list_players(
             league_season = db.scalar(select(League.season_year).where(League.id == league_id))
             if league_season is not None:
                 season = int(league_season)
-        stmt = stmt.where(canonical_fantasy_player_filter(season))
+        stmt = stmt.where(canonical_fantasy_player_filter(season), season_eligible_player_filter(season))
     if league_id is not None:
         conference_codes = db.scalar(
             select(LeagueSettings.conference_codes).where(LeagueSettings.league_id == league_id)
@@ -85,6 +86,9 @@ def list_players(
         pattern = f"%{search}%"
         stmt = stmt.where(Player.name.ilike(pattern) | Player.school.ilike(pattern) | Player.position.ilike(pattern))
     if league_id is not None and available_only:
+        league_season = db.scalar(select(League.season_year).where(League.id == league_id))
+        if league_season is not None:
+            stmt = stmt.where(season_eligible_player_filter(int(league_season)))
         rostered_players = (
             select(RosterEntry.player_id)
             .join(Team, Team.id == RosterEntry.team_id)

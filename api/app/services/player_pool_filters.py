@@ -1,5 +1,6 @@
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, exists, func, or_, select
 
+from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.services.power4 import (
     CANONICAL_POWER4_TEAMS,
@@ -179,6 +180,25 @@ def canonical_fantasy_player_filter(season: int):
     """SQL predicate for the complete public-beta draft and waiver universe."""
 
     return active_canonical_preseason_player_filter(season)
+
+
+def season_eligible_player_filter(season: int):
+    """Exclude reviewed season-ending injuries from draft and waiver pools."""
+    normalized_status = func.upper(
+        func.replace(func.replace(Injury.status, "_", " "), "-", " ")
+    )
+    season_ending_injury = exists(
+        select(Injury.id).where(
+            Injury.player_id == Player.id,
+            Injury.season == int(season),
+            or_(
+                normalized_status == "OUT FOR SEASON",
+                normalized_status.like("%SEASON ENDING%"),
+                normalized_status.like("%LOST FOR THE SEASON%"),
+            ),
+        )
+    )
+    return ~season_ending_injury
 
 
 def is_approved_fantasy_school(school: str | None) -> bool:

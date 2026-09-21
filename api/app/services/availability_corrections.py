@@ -67,7 +67,7 @@ def publish_zero_projection_for_unavailable_player(
     provider snapshots, so every roster, matchup, waiver, and player endpoint
     receives the same zero result.
     """
-    if status not in {"OUT", "IR"}:
+    if status not in {"OUT", "IR", "OUT_FOR_SEASON"}:
         return None
 
     source = db.scalar(

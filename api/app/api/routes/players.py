@@ -57,6 +57,7 @@ from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_f
 from collegefootballfantasy_api.app.services.auth_security import enforce_auth_rate_limit
 from collegefootballfantasy_api.app.services.injury_status import (
     is_current_injury_designation,
+    is_out_for_season,
     normalize_injury_status,
 )
 from collegefootballfantasy_api.app.services.league_weeks import calendar_cfb_week
@@ -405,6 +406,10 @@ def get_player_card_endpoint(
         if current_injury_row and is_current_injury_designation(current_injury_row.status)
         else None
     )
+    if current_injury_status is None and is_out_for_season(
+        db, player_id=player.id, season=current_injury_season
+    ):
+        current_injury_status = "OUT_FOR_SEASON"
     injury_rows = (
         db.query(Injury)
         .filter(Injury.player_id == player.id)

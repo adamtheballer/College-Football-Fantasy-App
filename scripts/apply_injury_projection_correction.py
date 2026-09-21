@@ -41,7 +41,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--week", type=int, required=True)
     parser.add_argument("--player", required=True)
     parser.add_argument("--school", required=True)
-    parser.add_argument("--status", choices=("OUT", "DOUBTFUL", "QUESTIONABLE", "PROBABLE"), required=True)
+    parser.add_argument(
+        "--status",
+        choices=("OUT", "OUT_FOR_SEASON", "DOUBTFUL", "QUESTIONABLE", "PROBABLE"),
+        required=True,
+    )
     parser.add_argument("--injury", required=True)
     parser.add_argument("--return-timeline", required=True)
     parser.add_argument("--notes", required=True)
@@ -113,8 +117,8 @@ def apply_correction(args: argparse.Namespace) -> dict[str, object]:
             event = PlayerAvailabilityEvent(player_id=player.id, season=args.season, week=args.week)
             db.add(event)
         event.status = args.status
-        event.probability_active = 0.0 if args.status == "OUT" else 0.7
-        event.availability_multiplier = 0.0 if args.status == "OUT" else 0.7
+        event.probability_active = 0.0 if args.status in {"OUT", "OUT_FOR_SEASON"} else 0.7
+        event.availability_multiplier = 0.0 if args.status in {"OUT", "OUT_FOR_SEASON"} else 0.7
         event.source = source
         event.source_url = source_url
         event.content_hash = content_hash
@@ -150,7 +154,7 @@ def apply_correction(args: argparse.Namespace) -> dict[str, object]:
             db, player=player, season=args.season, week=args.week,
             status=args.status, note=corroboration_note,
         )
-        if correction is None and args.status in {"OUT", "IR"}:
+        if correction is None and args.status in {"OUT", "IR", "OUT_FOR_SEASON"}:
             raise ValueError(
                 f"No published Week {args.week} projection exists for {args.player}; refusing to create an unverified correction."
             )

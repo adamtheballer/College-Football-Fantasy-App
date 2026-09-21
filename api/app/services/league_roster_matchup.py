@@ -643,14 +643,16 @@ def _injury_status_by_player(
         return {}
     rows = (
         db.query(Injury)
-        .filter(Injury.season == season, Injury.week == week, Injury.player_id.in_(player_ids))
+        .filter(Injury.season == season, Injury.player_id.in_(player_ids))
         .order_by(Injury.updated_at.desc(), Injury.id.desc())
         .all()
     )
     statuses: dict[int, str] = {}
     for row in rows:
         normalized = normalize_injury_status(row.status)
-        if row.player_id not in statuses and is_current_injury_designation(normalized):
+        if normalized == "OUT_FOR_SEASON":
+            statuses[row.player_id] = normalized
+        elif row.week == week and row.player_id not in statuses and is_current_injury_designation(normalized):
             statuses[row.player_id] = normalized
     return statuses
 
