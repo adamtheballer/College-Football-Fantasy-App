@@ -13,7 +13,29 @@
       ]
     }
   ],
+  "redirects": [
+    { "source": "/how-to-play-college-fantasy-football/", "destination": "/how-to-play-college-fantasy-football", "permanent": true },
+    { "source": "/college-fantasy-football-leagues/", "destination": "/college-fantasy-football-leagues", "permanent": true },
+    { "source": "/college-fantasy-football-waiver-wire/", "destination": "/college-fantasy-football-waiver-wire", "permanent": true },
+    { "source": "/about/", "destination": "/about", "permanent": true }
+  ],
   "rewrites": [
+    {
+      "source": "/how-to-play-college-fantasy-football",
+      "destination": "/how-to-play-college-fantasy-football/index.html"
+    },
+    {
+      "source": "/college-fantasy-football-leagues",
+      "destination": "/college-fantasy-football-leagues/index.html"
+    },
+    {
+      "source": "/college-fantasy-football-waiver-wire",
+      "destination": "/college-fantasy-football-waiver-wire/index.html"
+    },
+    {
+      "source": "/about",
+      "destination": "/about/index.html"
+    },
     {
       "source": "/api/:path*",
       "destination": "https://api.collegefantasyfootball.org/:path*"

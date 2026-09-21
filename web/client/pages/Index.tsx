@@ -105,24 +105,31 @@ export function SaturdayPick6HomeFeature() {
 function GuestHome() {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-8 pb-16 pt-5 sm:pt-10">
-      <section className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-center">
+      <section className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-center" aria-labelledby="guest-home-title">
         <div className="space-y-6">
           <div className="space-y-3">
-            <p className="cfb-micro-label text-cfb-gold">College Fantasy Football</p>
-            <h1 className="cfb-display-title max-w-2xl text-4xl sm:text-5xl">
-              Own Saturday. Your league, your rules.
+            <p className="cfb-micro-label text-cfb-gold">CFFB · 2026 season</p>
+            <h1 id="guest-home-title" className="cfb-display-title max-w-2xl text-4xl sm:text-5xl">
+              Play College Fantasy Football in 2026
             </h1>
             <p className="max-w-xl text-base leading-7 text-cfb-text-secondary sm:text-lg">
-              Draft real players, set your lineup, and run your league from kickoff to final.
+              Create or join a college fantasy football league with CFFB. Draft real college players, manage your roster,
+              make trades, use the waiver wire, set weekly lineups, and compete with friends throughout the season.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
             <Button asChild className="h-11 px-5">
-              <Link to="/signup">Create Your League</Link>
+              <Link to="/signup">Create a League</Link>
             </Button>
             <Button asChild variant="outline" className="h-11 px-5">
-              <Link to="/login">Log In</Link>
+              <Link to="/login?flow=signup">Join a League</Link>
             </Button>
+            <a
+              className="inline-flex h-11 items-center px-2 text-sm font-bold text-cfb-brand underline-offset-4 transition hover:text-cfb-cyan hover:underline"
+              href="https://apps.apple.com/us/app/college-football-fantasy/id6804566813"
+            >
+              Download the App
+            </a>
           </div>
           <p className="text-sm text-cfb-text-muted">Invite your managers, draft your team, and own every Saturday.</p>
         </div>
@@ -148,14 +155,69 @@ function GuestHome() {
         </SurfaceCard>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-3">
-        {[{ title: "Run your league", detail: "Invite managers, set rules, and keep the season moving." }, { title: "Draft real players", detail: "Search a CFB player pool, queue targets, and make every pick count." }, { title: "Compete each Saturday", detail: "Set your lineup and follow your matchup from kickoff to final." }].map((item, index) => (
-          <SurfaceCard key={item.title} padding="compact"><p className="cfb-micro-label text-cfb-brand">0{index + 1}</p><h2 className="mt-2 text-base font-bold">{item.title}</h2><p className="mt-2 text-sm leading-6 text-cfb-text-secondary">{item.detail}</p></SurfaceCard>
-        ))}
+      <section aria-labelledby="league-tools-title" className="space-y-4">
+        <div>
+          <p className="cfb-micro-label text-cfb-brand">Built for real leagues</p>
+          <h2 id="league-tools-title" className="mt-1 text-2xl font-black text-cfb-text-primary">College fantasy football from draft day to the final</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-cfb-text-secondary">CFFB gives college football fans a dedicated way to create a private league, draft players, manage a roster, submit waiver claims, make trades, and compete in weekly fantasy matchups.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { title: "Live Drafts", detail: "Build a roster together in a shared league draft room." },
+            { title: "Weekly Matchups", detail: "Follow lineup scores and head-to-head results all season." },
+            { title: "Waiver Wire", detail: "Review available players and make the roster moves that matter." },
+            { title: "League Management", detail: "Invite managers, organize your season, and keep everyone connected." },
+          ].map((item, index) => (
+            <SurfaceCard key={item.title} padding="compact"><p className="cfb-micro-label text-cfb-brand">0{index + 1}</p><h3 className="mt-2 text-base font-bold">{item.title}</h3><p className="mt-2 text-sm leading-6 text-cfb-text-secondary">{item.detail}</p></SurfaceCard>
+          ))}
+        </div>
       </section>
 
+      <section aria-labelledby="how-cffb-works" className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+        <div>
+          <p className="cfb-micro-label text-cfb-gold">How it works</p>
+          <h2 id="how-cffb-works" className="mt-1 text-2xl font-black text-cfb-text-primary">Run your league in five plays</h2>
+          <p className="mt-2 text-sm leading-6 text-cfb-text-secondary">Everything that matters to your league stays connected in one product.</p>
+        </div>
+        <ol className="grid gap-3 sm:grid-cols-2">
+          {[
+            ["Create or join a league", "Start a private league for your group or join from an invitation."],
+            ["Draft college football players", "Build a team from the available player pool before the season."],
+            ["Set your weekly lineup", "Choose your starters before games lock each week."],
+            ["Make trades and waiver claims", "Improve your roster as the season and player roles change."],
+            ["Compete through the season", "Follow matchups, standings, and the story of your league week by week."],
+          ].map(([title, detail], index) => (
+            <li key={title} className="flex gap-3 rounded-xl border border-cfb-border-subtle bg-cfb-surface/75 p-4">
+              <span className="cfb-micro-label mt-0.5 text-cfb-brand">0{index + 1}</span>
+              <div><h3 className="text-sm font-black text-cfb-text-primary">{title}</h3><p className="mt-1 text-sm leading-5 text-cfb-text-secondary">{detail}</p></div>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section aria-labelledby="college-fantasy-football-faq" className="space-y-4">
+        <div><p className="cfb-micro-label text-cfb-brand">Common questions</p><h2 id="college-fantasy-football-faq" className="mt-1 text-2xl font-black text-cfb-text-primary">College fantasy football FAQ</h2></div>
+        <div className="grid gap-3 md:grid-cols-2">
+          {[
+            ["What is college fantasy football?", "It is a season-long game where managers draft real college players, set lineups, and compete based on player production."],
+            ["Can I create a private league?", "Yes. Create a CFFB league, invite friends, schedule a draft, and manage the season together."],
+            ["Does CFFB have waivers and trades?", "Yes. Managers can manage their rosters through waiver claims and league trades."],
+            ["Is CFFB available on iPhone?", "Yes. College Football Fantasy is available on the App Store for iPhone."],
+          ].map(([question, answer]) => (
+            <SurfaceCard key={question} padding="compact"><h3 className="text-base font-bold text-cfb-text-primary">{question}</h3><p className="mt-2 text-sm leading-6 text-cfb-text-secondary">{answer}</p></SurfaceCard>
+          ))}
+        </div>
+      </section>
+
+      <nav aria-label="Learn more about CFFB" className="flex flex-wrap items-center gap-x-5 gap-y-3 border-y border-cfb-border-subtle py-5 text-sm font-bold text-cfb-brand">
+        <a href="/how-to-play-college-fantasy-football" className="hover:text-cfb-cyan hover:underline">How to Play College Fantasy Football</a>
+        <a href="/college-fantasy-football-leagues" className="hover:text-cfb-cyan hover:underline">Create or Join a League</a>
+        <a href="/college-fantasy-football-waiver-wire" className="hover:text-cfb-cyan hover:underline">College Fantasy Football Waiver Wire</a>
+        <a href="/about" className="hover:text-cfb-cyan hover:underline">About CFFB</a>
+      </nav>
+
       <footer className="border-t border-cfb-border-subtle pt-5 text-center text-sm text-cfb-text-muted">
-        <p>© 2026 College Football Fantasy</p>
+        <p>© 2026 CFFB · College Fantasy Football</p>
         <PublicLegalLinks className="mt-3" />
       </footer>
     </div>
