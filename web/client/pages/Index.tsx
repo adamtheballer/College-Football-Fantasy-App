@@ -163,10 +163,15 @@ function GuestHome() {
 }
 
 export default function Index() {
-  const { isLoggedIn, user } = useAuth();
+  const { isBootstrapping, isLoggedIn, user } = useAuth();
   const navigate = useNavigate();
   const { activeLeagueId, setActiveLeagueId } = useActiveLeagueId();
-  const { data: leagues = [], isLoading: leaguesLoading } = useLeagues(20, isLoggedIn);
+  // A cached manager can be rendered before the refresh cookie has restored
+  // its access token. Do not start league-dependent queries in that short
+  // window: parallel 401s can otherwise leave Home on its loading skeleton
+  // even after the session becomes valid.
+  const sessionReady = isLoggedIn && !isBootstrapping;
+  const { data: leagues = [], isLoading: leaguesLoading } = useLeagues(20, sessionReady);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [alertsLoaded, setAlertsLoaded] = useState(false);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
@@ -187,20 +192,20 @@ export default function Index() {
 
   const { data: workspace } = useLeagueWorkspace(
     selectedLeague?.id,
-    Boolean(isLoggedIn && selectedLeague?.id),
+    Boolean(sessionReady && selectedLeague?.id),
   );
 
   useEffect(() => {
-    if (!isLoggedIn || !leagues.length) return;
+    if (!sessionReady || !leagues.length) return;
     if (selectedLeague?.id && selectedLeague.id !== activeLeagueId) {
       setActiveLeagueId(selectedLeague.id);
     }
-  }, [activeLeagueId, isLoggedIn, leagues.length, selectedLeague?.id, setActiveLeagueId]);
+  }, [activeLeagueId, leagues.length, selectedLeague?.id, sessionReady, setActiveLeagueId]);
 
   useEffect(() => {
-    if (!isLoggedIn) {
+    if (!sessionReady) {
       setAlerts([]);
-      setAlertsLoaded(true);
+      setAlertsLoaded(!isBootstrapping);
       return;
     }
 
@@ -211,7 +216,7 @@ export default function Index() {
       .finally(() => setAlertsLoaded(true));
 
     return () => controller.abort();
-  }, [isLoggedIn]);
+  }, [isBootstrapping, sessionReady]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setCurrentTime(Date.now()), 60_000);
