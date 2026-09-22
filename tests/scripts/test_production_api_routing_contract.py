@@ -8,7 +8,7 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_vercel_routes_api_before_the_spa_and_strips_the_api_prefix():
+def test_vercel_routes_api_before_static_marketing_pages_and_the_spa():
     config = json.loads((REPO_ROOT / "web" / "vercel.json").read_text(encoding="utf-8"))
 
     assert config["$schema"] == "https://openapi.vercel.sh/vercel.json"
@@ -17,7 +17,21 @@ def test_vercel_routes_api_before_the_spa_and_strips_the_api_prefix():
     assert "VERCEL_GIT_COMMIT_SHA" in config["buildCommand"]
     assert 'test -n "$VERCEL_GIT_COMMIT_SHA"' in config["buildCommand"]
     assert config["outputDirectory"] == "dist/spa"
-    assert config["rewrites"] == [
+    rewrites = config["rewrites"]
+    assert rewrites[0] == {
+        "source": "/how-to-play-college-fantasy-football",
+        "destination": "/how-to-play-college-fantasy-football/index.html",
+    }
+    assert rewrites[1] == {
+        "source": "/college-fantasy-football-leagues",
+        "destination": "/college-fantasy-football-leagues/index.html",
+    }
+    assert rewrites[2] == {
+        "source": "/college-fantasy-football-waiver-wire",
+        "destination": "/college-fantasy-football-waiver-wire/index.html",
+    }
+    assert rewrites[3] == {"source": "/about", "destination": "/about/index.html"}
+    assert rewrites[4:] == [
         {
             "source": "/api/:path*",
             "destination": "https://api.collegefantasyfootball.org/:path*",
