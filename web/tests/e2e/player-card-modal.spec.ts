@@ -174,6 +174,7 @@ test.describe("player card modal", () => {
           contentType: "application/json",
           body: JSON.stringify({
             player: mockPlayer,
+            current_injury_status: "DOUBTFUL",
             about: {
               espn_player_id: "999001",
               height: "6'3\"",
@@ -404,6 +405,9 @@ test.describe("player card modal", () => {
     await page.getByRole("button", { name: /Jeremiah Smith/i }).first().click();
     const dialog = page.getByRole("dialog", { name: /Jeremiah Smith player card/i });
     await expect(dialog).toBeVisible();
+    await expect(dialog.getByLabel("Doubtful")).toHaveText("D");
+    await expect(dialog.getByTestId("player-card-status-dot")).toHaveClass(/bg-red-400/);
+    await expect(dialog.getByLabel("Questionable")).toHaveCount(0);
     await expect(dialog.getByText("ESPN PROFILE", { exact: true })).toHaveCount(0);
     await expect(dialog.getByText("6'3\"")).toBeVisible();
     await expect(dialog.getByText("215 lbs")).toBeVisible();
