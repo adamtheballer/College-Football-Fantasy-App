@@ -93,6 +93,41 @@ describe("PlayerCardHeader injury status", () => {
     expect(screen.getByLabelText("Out").textContent).toBe("O");
   });
 
+  it.each([
+    ["DOUBTFUL", "Doubtful", "D", "bg-red-400", "text-red-200"],
+    ["QUESTIONABLE", "Questionable", "Q", "bg-amber-300", "text-amber-100"],
+    ["PROBABLE", "Probable", "P", "bg-amber-300", "text-amber-100"],
+  ])("uses the %s designation and color on the card", (status, label, code, dotClass, textClass) => {
+    render(
+      <PlayerCardHeader
+        card={{
+          current_injury_status: status,
+          about: { status: "Active", source: "local" },
+          player: { id: 1, name: "Status Player", position: "RB", school: "Georgia" },
+          injuries: [],
+          season_stats: [],
+          historical_stats: null,
+        } as never}
+        onClose={vi.fn()}
+        palette={{
+          headerBase: "bg-slate-900",
+          markerA: "rgba(255,255,255,0.1)",
+          markerB: "rgba(255,255,255,0.1)",
+          markerC: "rgba(255,255,255,0.1)",
+          pill: "bg-slate-800",
+          silhouette: "from-slate-700 to-slate-800",
+        }}
+        player={{ id: 1, name: "Status Player", position: "RB", school: "Georgia", status: "Active" }}
+        position="RB"
+        title="Player Card"
+      />,
+    );
+
+    expect(screen.getByLabelText(label).textContent).toBe(code);
+    expect(screen.getByTestId("player-card-status-dot").className).toContain(dotClass);
+    expect(screen.getByTestId("player-card-status-dot").parentElement?.className).toContain(textClass);
+  });
+
   it("replaces value with a finalized cumulative positional rank", () => {
     render(
       <PlayerCardHeader

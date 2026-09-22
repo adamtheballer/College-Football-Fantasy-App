@@ -154,3 +154,27 @@ def test_league_roster_availability_preserves_every_reviewed_non_active_status(d
     statuses = _injury_status_by_player(db_session, season=2026, week=1, player_ids={player.id})
 
     assert statuses == {player.id: "OUT_FOR_SEASON"}
+
+
+@pytest.mark.parametrize("status", ["OUT", "DOUBTFUL", "QUESTIONABLE", "PROBABLE"])
+def test_current_player_card_and_roster_row_share_reviewed_status(client, db_session, status):
+    player = Player(name=f"Shared {status}", position="RB", school="Missouri", espn_status="Active")
+    db_session.add(player)
+    db_session.flush()
+    db_session.add(
+        Injury(
+            player_id=player.id,
+            season=2026,
+            week=4,
+            status=status,
+            updated_at=datetime.now(timezone.utc),
+        )
+    )
+    db_session.commit()
+
+    card = client.get(f"/players/{player.id}/card?injury_season=2026&injury_week=4")
+    row_status = _injury_status_by_player(db_session, season=2026, week=4, player_ids={player.id})
+
+    assert card.status_code == 200
+    assert card.json()["current_injury_status"] == status
+    assert row_status[player.id] == status

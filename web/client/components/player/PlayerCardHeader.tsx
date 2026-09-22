@@ -2,7 +2,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { UserRound, X } from "lucide-react";
 
 import type { PlayerCardResponse } from "@/hooks/use-players";
-import { PlayerAvailabilityIndicator, playerAvailabilityDotClass } from "@/lib/playerAvailability";
+import { PlayerAvailabilityIndicator, playerAvailabilityBadge, playerAvailabilityDotClass } from "@/lib/playerAvailability";
 import { cn } from "@/lib/utils";
 
 import type { PlayerCardModalPlayer } from "./PlayerCardModal";
@@ -77,6 +77,12 @@ export function PlayerCardHeader({
   useEffect(() => setHeadshotFailed(false), [card?.about.headshot_url]);
   const playerStatus = resolvePlayerCardStatus(card, player.status);
   const statusSource = playerStatus;
+  const statusBadge = playerAvailabilityBadge(statusSource);
+  const statusTextClass = statusBadge?.code === "O" || statusBadge?.code === "D"
+    ? "text-red-200"
+    : statusBadge?.code === "Q" || statusBadge?.code === "P"
+      ? "text-amber-100"
+      : "text-emerald-100";
   const seasonRank = card?.season_positional_rank;
   const metricCards = [
     {
@@ -173,8 +179,8 @@ export function PlayerCardHeader({
               {[position || player.position, card?.about.team ?? player.school].filter(Boolean).join("  •  ")}
             </p>
             <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[9px] font-bold sm:mt-3 sm:text-[11px]">
-              <PlayerAvailabilityIndicator status={statusSource}>
-                <span className="inline-flex items-center gap-1.5 text-emerald-100">
+              <PlayerAvailabilityIndicator status={statusSource} showActive={false}>
+                <span className={cn("inline-flex items-center gap-1.5", statusTextClass)}>
                   <span data-testid="player-card-status-dot" className={cn("h-1.5 w-1.5 rounded-full", playerAvailabilityDotClass(statusSource))} />
                   {playerStatus}
                 </span>
