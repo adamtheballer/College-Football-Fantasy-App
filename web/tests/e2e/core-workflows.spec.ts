@@ -65,7 +65,7 @@ test.describe("critical browser workflows", () => {
   test("public launch page has no retired beta copy", async ({ page }) => {
     await page.goto("/");
 
-    await expect(page.getByRole("heading", { name: /Own Saturday\. Your league, your rules\./i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Play College Fantasy Football in 2026/i })).toBeVisible();
     await expect(page.getByText(/beta/i)).toHaveCount(0);
   });
 
