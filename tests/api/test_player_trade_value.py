@@ -66,6 +66,20 @@ def test_value_weights_bounds_ranks_and_repeat_generation(db_session):
     assert min(row.positional_value_rank for row in value_rows) == 1
 
 
+def test_preseason_batch_skips_unrated_player_without_blocking_rated_values(db_session):
+    rated = Player(name="Rated RB", position="RB", school="Texas", raw_cfb27_rating=90)
+    unrated = Player(name="New RB", position="RB", school="Texas")
+    db_session.add_all([rated, unrated])
+    db_session.commit()
+
+    result = calculate_weekly_trade_values(db_session, season=2026, week=4)
+    db_session.commit()
+
+    assert result["calculated"] == 1
+    assert db_session.query(PlayerTradeValue).filter_by(player_id=rated.id).count() == 1
+    assert db_session.query(PlayerTradeValue).filter_by(player_id=unrated.id).count() == 0
+
+
 def test_trade_value_tiers_and_serialized_legacy_values_use_the_0_to_99_scale(db_session):
     player = Player(name="Tier Receiver", position="WR", school="Miami", raw_cfb27_rating=88, current_value_rating=88, value_policy_version="cfb27_exact_preseason_v1", cfb27_overall=88)
     db_session.add(player)
