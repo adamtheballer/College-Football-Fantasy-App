@@ -39,6 +39,7 @@ from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGam
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.scheduled_notification import ScheduledNotification
 from collegefootballfantasy_api.app.models.team import Team
+from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.worker_heartbeat import WorkerHeartbeat
 from collegefootballfantasy_api.app.services.worker_health import record_worker_heartbeat
 from collegefootballfantasy_api.app.services.espn_stats_sync import (
@@ -720,9 +721,10 @@ def certify_espn_matchup_finality(
 ) -> int:
     """Certify final fantasy matchups only after every starter's ESPN game final.
 
-    It never uses elapsed time or score shape.  An unknown player-to-game
-    mapping, a delayed game, a cancellation, or a non-final provider event is
-    a hard stop.  A later changed final snapshot turns an already-certified
+    It never uses elapsed time or score shape. A verified schedule BYE does
+    not require a provider game; an unknown player-to-game mapping, a delayed
+    game, a cancellation, or a non-final provider event is a hard stop.
+    A later changed final snapshot turns an already-certified
     matchup into ``stat_corrected`` so the existing correction/audit path owns
     downstream notifications.
     """
@@ -739,6 +741,24 @@ def certify_espn_matchup_finality(
             ProviderGamePoll.status == "final",
         )
         .all()
+    }
+    # A starter on a canonical BYE has no ESPN game to map. Only a schedule
+    # row that explicitly records the BYE can exempt that player from the
+    # provider-final requirement; missing or conflicting schedule data cannot.
+    schedule_rows_by_school: dict[str, list[TeamSchedule]] = {}
+    for row in db.query(TeamSchedule).filter(
+        TeamSchedule.season == season, TeamSchedule.week == week
+    ).all():
+        school_key = _school_key(row.team_name)
+        if school_key:
+            schedule_rows_by_school.setdefault(school_key, []).append(row)
+    verified_bye_schools = {
+        school_key
+        for school_key, rows in schedule_rows_by_school.items()
+        if len(rows) == 1
+        and rows[0].is_bye
+        and rows[0].game_id is None
+        and rows[0].opponent_name is None
     }
     for matchup in db.query(Matchup).filter(Matchup.season == season, Matchup.week == week).all():
         snapshots = (
@@ -760,8 +780,21 @@ def certify_espn_matchup_finality(
             season=season,
             week=week,
         )
-        provider_game_ids = set(game_ids_by_player.values())
-        if None in provider_game_ids or not provider_game_ids or not provider_game_ids.issubset(final_rows):
+        starter_schools = {
+            player_id: _school_key(school)
+            for player_id, school in db.query(Player.id, Player.school).filter(
+                Player.id.in_({snapshot.player_id for snapshot in snapshots})
+            ).all()
+        }
+        unmapped_players = {
+            player_id for player_id, game_id in game_ids_by_player.items()
+            if game_id is None
+        }
+        if any(starter_schools.get(player_id) not in verified_bye_schools for player_id in unmapped_players):
+            continue
+        provider_game_ids = {game_id for game_id in game_ids_by_player.values() if game_id is not None}
+        # An all-BYE lineup cannot establish that the week has completed.
+        if not provider_game_ids or not provider_game_ids.issubset(final_rows):
             continue
         current_status = (matchup.status or "").lower()
         next_status = "stat_corrected" if current_status == "final" and provider_game_ids.intersection(corrected_provider_game_ids) else "final"
