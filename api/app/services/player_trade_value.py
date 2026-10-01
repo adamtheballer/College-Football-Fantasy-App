@@ -287,8 +287,20 @@ def calculate_player_trade_value(db: Session, *, player_id: int, season: int, we
 
 
 def calculate_weekly_trade_values(db: Session, *, season: int, week: int, policy_version: str = VALUE_POLICY_VERSION) -> dict[str, int]:
-    rows = [calculate_player_trade_value(db, player_id=player.id, season=season, week=week, policy_version=policy_version) for player in db.query(Player).all()]
-    for position in {row_player.position.upper() for row_player in db.query(Player).all()}:
+    players = db.query(Player).all()
+    active_policy = active_value_policy_version(db, season=season)
+    # The preseason contract requires an approved raw rating. A newly added
+    # player without one has no publishable value, but must not abort the
+    # entire batch (or the independent weekly projection refresh).
+    eligible_players = [
+        player for player in players
+        if active_policy != PRESEASON_VALUE_POLICY_VERSION or preseason_rating_value(player) is not None
+    ]
+    rows = [
+        calculate_player_trade_value(db, player_id=player.id, season=season, week=week, policy_version=policy_version)
+        for player in eligible_players
+    ]
+    for position in {player.position.upper() for player in eligible_players}:
         position_rows = [row for row in rows if db.get(Player, row.player_id).position.upper() == position]
         for rank, row in enumerate(sorted(position_rows, key=lambda item: (-item.value, item.player_id)), start=1): row.positional_value_rank = rank
     db.flush()
