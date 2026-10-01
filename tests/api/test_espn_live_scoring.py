@@ -1415,3 +1415,29 @@ def test_finality_requires_explicit_final_espn_status_for_every_starter_and_mark
         corrected_provider_game_ids={"401"},
     ) == 1
     assert db_session.get(Matchup, matchup.id).status == "stat_corrected"
+
+
+def test_finality_accepts_verified_bye_starter_but_not_missing_schedule(db_session):
+    league, home, away, players, matchup = create_scoring_fixture(db_session)
+    bye_player = Player(name="Bye Starter", position="RB", school="Bye School")
+    db_session.add(bye_player)
+    db_session.flush()
+    db_session.add(Game(external_id="401", season=2026, week=1, home_team="Test", away_team="Other", schedule_status="final"))
+    for team_id, player_id in ((home.id, players["qb"].id), (away.id, players["away_qb"].id), (home.id, bye_player.id)):
+        db_session.add(LineupWeekSnapshot(
+            league_id=league.id, team_id=team_id, player_id=player_id,
+            season=2026, week=1, slot="QB", is_starter=True,
+        ))
+    db_session.add(ProviderGamePoll(provider="espn", provider_game_id="401", season=2026, week=1, status="final"))
+    db_session.commit()
+
+    assert certify_espn_matchup_finality(db_session, season=2026, week=1) == 0
+    assert db_session.get(Matchup, matchup.id).status == "scheduled"
+
+    db_session.add(TeamSchedule(
+        team_name="Bye School", season=2026, week=1,
+        location="bye", is_bye=True,
+    ))
+    db_session.commit()
+    assert certify_espn_matchup_finality(db_session, season=2026, week=1) == 1
+    assert db_session.get(Matchup, matchup.id).status == "final"
