@@ -1,3 +1,11 @@
+import {
+  clearNativeRefreshToken,
+  isNativeSessionRuntime,
+  nativeSessionHeaders,
+  readNativeRefreshToken,
+  saveNativeRefreshToken,
+} from "./native-session";
+
 export const resolveDefaultApiBase = (
   protocol = typeof window === "undefined" ? "" : window.location.protocol
 ) => {
@@ -162,6 +170,7 @@ export const isStoredAccessTokenExpired = (bufferMs = 0): boolean => {
 type RefreshPayload = {
   access_token: string;
   access_token_expires_at: string;
+  refresh_token?: string | null;
 };
 
 type RefreshResult = "refreshed" | "terminal_failure" | "transient_failure";
@@ -174,13 +183,18 @@ export const restoreAccessTokenSession = async (signal?: AbortSignal): Promise<R
   }
   inflightRefresh = (async () => {
     try {
+      const native = isNativeSessionRuntime();
+      const nativeToken = native ? await readNativeRefreshToken() : null;
       const res = await fetch(buildApiUrl("/auth/refresh"), {
         method: "POST",
         credentials: "include",
+        headers: native ? { ...nativeSessionHeaders(), "Content-Type": "application/json" } : undefined,
+        body: native ? JSON.stringify({ refresh_token: nativeToken }) : undefined,
         signal,
       });
       if (!res.ok) {
         if (res.status === 401 || res.status === 403) {
+          if (native) await clearNativeRefreshToken().catch(() => {});
           clearAccessTokenSession();
           return "terminal_failure";
         }
@@ -190,6 +204,7 @@ export const restoreAccessTokenSession = async (signal?: AbortSignal): Promise<R
       if (!payload.access_token || !payload.access_token_expires_at) {
         return "transient_failure";
       }
+      if (native) await saveNativeRefreshToken(payload.refresh_token);
       storeAccessTokenSession(payload.access_token, payload.access_token_expires_at);
       return "refreshed";
     } catch {
@@ -379,6 +394,7 @@ const apiRequest = async <T>({
 }: RequestOptions): Promise<T> => {
   const headers: Record<string, string> = {
     ...buildAuthHeaders(),
+    ...(path.startsWith("/auth/") ? nativeSessionHeaders() : {}),
   };
   if (body !== undefined) {
     headers["Content-Type"] = "application/json";

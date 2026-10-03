@@ -102,6 +102,7 @@
   "dependencies": {
     "@capacitor/app": "^8.1.1",
     "@capacitor/core": "^8.5.0",
-    "@onesignal/capacitor-plugin": "^1.1.8"
+    "@onesignal/capacitor-plugin": "^1.1.8",
+    "capacitor-secure-storage-plugin": "0.13.0"
   }
 }

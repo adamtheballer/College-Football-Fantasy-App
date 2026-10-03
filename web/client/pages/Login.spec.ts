@@ -40,6 +40,12 @@ describe("loginErrorMessage", () => {
       "The sign-in service hit an error. Try again or contact support."
     );
   });
+
+  it("explains native secure-storage failures without blaming the password", () => {
+    expect(loginErrorMessage(new Error("The server did not provide a native refresh session."))).toContain(
+      "could not securely save the sign-in session",
+    );
+  });
 });
 
 describe("reset password route", () => {

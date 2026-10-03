@@ -30,6 +30,7 @@ from collegefootballfantasy_api.app.schemas.auth import (
     AuthMessageResponse,
     AuthResponse,
     AuthenticatedPasswordChange,
+    LogoutRequest,
     LogoutResponse,
     PasswordResetWithCurrentPassword,
     PasswordResetCompleteResponse,
@@ -38,6 +39,7 @@ from collegefootballfantasy_api.app.schemas.auth import (
     PasswordResetValidate,
     PasswordResetValidateResponse,
     RefreshResponse,
+    RefreshRequest,
     SessionRead,
     SessionsResponse,
     UserCreate,
@@ -80,6 +82,16 @@ from collegefootballfantasy_api.app.services.password_reset import (
 router = APIRouter()
 logger = logging.getLogger(__name__)
 PASSWORD_CHANGE_CREDENTIAL_ERROR = "Unable to reset password with the provided credentials."
+NATIVE_SESSION_HEADER = "x-cffb-native-session"
+
+
+def _is_native_session_request(request: Request) -> bool:
+    # The browser cannot forge Origin. Require the explicit opt-in as well so
+    # ordinary web responses never expose refresh credentials to JavaScript.
+    return (
+        request.headers.get("origin") in TRUSTED_NATIVE_CORS_ORIGINS
+        and request.headers.get(NATIVE_SESSION_HEADER) == "ios"
+    )
 
 
 def _normalize_username(value: str | None, *, fallback: str) -> str:
@@ -246,6 +258,7 @@ def _complete_successful_login(
         access_token=access_token,
         access_token_expires_at=access_expires_at,
         user=UserRead.model_validate(user),
+        refresh_token=refresh_token if _is_native_session_request(request) else None,
     )
 
 
@@ -359,7 +372,7 @@ def delete_current_user_account(
     return AuthMessageResponse(message="account deleted")
 
 
-@router.post("/signup", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/signup", response_model=AuthResponse, response_model_exclude_none=True, status_code=status.HTTP_201_CREATED)
 def signup(payload: UserCreate, response: Response, request: Request, db: Session = Depends(get_db)) -> AuthResponse:
     payload.first_name = moderate_user_text(
         db, actor_user_id=None, field_name="manager_name", value=payload.first_name, required=True
@@ -437,10 +450,11 @@ def signup(payload: UserCreate, response: Response, request: Request, db: Sessio
         access_token=access_token,
         access_token_expires_at=access_expires_at,
         user=UserRead.model_validate(user),
+        refresh_token=refresh_token if _is_native_session_request(request) else None,
     )
 
 
-@router.post("/login", response_model=AuthResponse)
+@router.post("/login", response_model=AuthResponse, response_model_exclude_none=True)
 def login(payload: UserLogin, response: Response, request: Request, db: Session = Depends(get_db)) -> AuthResponse:
     normalized_email = payload.email.strip().lower()
     try:
@@ -506,9 +520,20 @@ def login(payload: UserLogin, response: Response, request: Request, db: Session 
     )
 
 
-@router.post("/refresh", response_model=RefreshResponse)
-def refresh_session(response: Response, request: Request, db: Session = Depends(get_db)) -> RefreshResponse:
-    refresh_token = request.cookies.get(settings.refresh_cookie_name)
+@router.post("/refresh", response_model=RefreshResponse, response_model_exclude_none=True)
+def refresh_session(
+    response: Response,
+    request: Request,
+    payload: RefreshRequest | None = None,
+    db: Session = Depends(get_db),
+) -> RefreshResponse:
+    native = _is_native_session_request(request)
+    # A body credential is accepted only from the packaged native app; the
+    # website continues to use the HTTP-only cookie exclusively.
+    if payload and payload.refresh_token and not native:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="native refresh is not allowed")
+    refresh_token = (payload.refresh_token if payload else None) if native else None
+    refresh_token = refresh_token or request.cookies.get(settings.refresh_cookie_name)
     if not refresh_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="missing refresh token")
 
@@ -566,12 +591,26 @@ def refresh_session(response: Response, request: Request, db: Session = Depends(
         auth_version=user.auth_version,
     )
     _set_refresh_cookie(response, new_refresh_token, request)
-    return RefreshResponse(access_token=access_token, access_token_expires_at=access_expires_at)
+    return RefreshResponse(
+        access_token=access_token,
+        access_token_expires_at=access_expires_at,
+        refresh_token=new_refresh_token if native else None,
+    )
 
 
 @router.post("/logout", response_model=LogoutResponse)
-def logout(response: Response, request: Request, db: Session = Depends(get_db)) -> LogoutResponse:
-    session = _current_refresh_session(db, request)
+def logout(
+    response: Response,
+    request: Request,
+    payload: LogoutRequest | None = None,
+    db: Session = Depends(get_db),
+) -> LogoutResponse:
+    native = _is_native_session_request(request)
+    if payload and payload.refresh_token and not native:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="native logout is not allowed")
+    token = (payload.refresh_token if payload else None) if native else None
+    token = token or request.cookies.get(settings.refresh_cookie_name)
+    session = db.query(RefreshSession).filter(RefreshSession.token_hash == hash_token(token)).first() if token else None
     if session and not session.revoked_at:
         now = utcnow()
         session.revoked_at = now
