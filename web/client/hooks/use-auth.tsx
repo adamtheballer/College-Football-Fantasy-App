@@ -10,6 +10,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 
 import {
+  API_REQUEST_TIMEOUT_MS,
   ApiError,
   apiDelete,
   apiGet,
@@ -24,6 +25,12 @@ import {
   storeAccessTokenSession,
 } from "@/lib/api";
 import { clearBrowserPushIdentity, syncBrowserPushIdentity } from "@/lib/push-notifications";
+import {
+  clearNativeRefreshToken,
+  isNativeSessionRuntime,
+  readNativeRefreshToken,
+  saveNativeRefreshToken,
+} from "@/lib/native-session";
 
 export interface User {
   firstName: string;
@@ -59,6 +66,7 @@ type AuthUserPayload = {
 type AuthPayload = {
   access_token: string;
   access_token_expires_at: string;
+  refresh_token?: string | null;
   user: AuthUserPayload;
 };
 
@@ -230,7 +238,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let cancelled = false;
     const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => controller.abort(), 5000);
+    // Keychain access plus a cold cellular API request can take longer than
+    // the old five-second web bootstrap window. Do not show Login while a
+    // valid native session is still being restored.
+    const timeoutId = window.setTimeout(
+      () => controller.abort(),
+      isNativeCapacitorRuntime() ? API_REQUEST_TIMEOUT_MS : 5000,
+    );
 
     const restoreSession = async () => {
       // The refresh token is intentionally HTTP-only, so it can survive an
@@ -317,6 +331,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
       beta_access_reservation: betaAccessReservation,
     });
+    await saveNativeRefreshToken(payload.refresh_token);
     const nextUser = mapAuthPayload(payload);
     persistUser(nextUser, payload.access_token, payload.access_token_expires_at);
     queryClient.clear();
@@ -332,6 +347,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
       beta_access_reservation: betaAccessReservation,
     });
+    await saveNativeRefreshToken(payload.refresh_token);
     const nextUser = mapAuthPayload(payload);
     persistUser(nextUser, payload.access_token, payload.access_token_expires_at);
     queryClient.clear();
@@ -363,9 +379,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   const logout = useCallback(() => {
-    void apiPost("/auth/logout", {}).catch(() => {
-      // Ignore network failures; local logout must still complete.
-    });
+    void (async () => {
+      let refreshToken: string | null = null;
+      try {
+        refreshToken = await readNativeRefreshToken();
+      } catch {
+        // Local logout still proceeds if Keychain is unavailable.
+      }
+      await clearNativeRefreshToken().catch(() => {});
+      try {
+        await apiPost("/auth/logout", refreshToken ? { refresh_token: refreshToken } : {});
+      } catch {
+        // Ignore network failures; local logout must still complete.
+      }
+    })();
     clearBrowserPushIdentity();
     clearStoredAuth();
     queryClient.clear();
@@ -374,6 +401,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   const clearPasswordChangeAuth = useCallback(() => {
+    void clearNativeRefreshToken().catch(() => {});
     clearBrowserPushIdentity();
     clearStoredAuth();
     queryClient.clear();
@@ -442,6 +470,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutAll = useCallback(async () => {
     await apiPost("/auth/logout-all", {});
+    await clearNativeRefreshToken().catch(() => {});
     clearBrowserPushIdentity();
     clearStoredAuth();
     queryClient.clear();
@@ -454,6 +483,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       current_password: currentPassword,
       confirmation,
     });
+    await clearNativeRefreshToken().catch(() => {});
     clearBrowserPushIdentity();
     clearStoredAuth();
     queryClient.clear();

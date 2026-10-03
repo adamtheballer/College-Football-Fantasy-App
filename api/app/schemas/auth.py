@@ -205,12 +205,22 @@ class AuthResponse(BaseModel):
     access_token_expires_at: datetime
     token_type: str = "bearer"
     user: UserRead
+    refresh_token: str | None = None
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str | None = Field(default=None, min_length=1, max_length=512)
 
 
 class RefreshResponse(BaseModel):
     access_token: str
     access_token_expires_at: datetime
     token_type: str = "bearer"
+    refresh_token: str | None = None
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str | None = Field(default=None, min_length=1, max_length=512)
 
 
 class LogoutResponse(BaseModel):

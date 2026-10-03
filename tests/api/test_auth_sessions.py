@@ -81,6 +81,77 @@ def test_native_signup_uses_cross_site_refresh_cookie_for_capacitor(monkeypatch,
     assert "samesite=none" in cookie
 
 
+def test_native_refresh_survives_missing_webview_cookie_and_rotates(client):
+    native_headers = {"Origin": "capacitor://localhost", "X-CFFB-Native-Session": "ios"}
+    signup = client.post(
+        "/auth/signup",
+        headers=native_headers,
+        json={
+            "first_name": "Native Session",
+            "email": "native-session@example.com",
+            "password": STRONG_PASSWORD,
+        },
+    )
+    assert signup.status_code == 201
+    first_token = signup.json()["refresh_token"]
+    assert first_token
+    client.cookies.clear()
+
+    refresh = client.post(
+        "/auth/refresh",
+        headers=native_headers,
+        json={"refresh_token": first_token},
+    )
+    assert refresh.status_code == 200
+    second_token = refresh.json()["refresh_token"]
+    assert second_token and second_token != first_token
+    assert refresh.json()["access_token"]
+
+    client.cookies.clear()
+    replay = client.post("/auth/refresh", headers=native_headers, json={"refresh_token": first_token})
+    assert replay.status_code == 401
+    assert replay.json()["detail"] == "revoked refresh token"
+
+    logout = client.post("/auth/logout", headers=native_headers, json={"refresh_token": second_token})
+    assert logout.status_code == 200
+    client.cookies.clear()
+    after_logout = client.post("/auth/refresh", headers=native_headers, json={"refresh_token": second_token})
+    assert after_logout.status_code == 401
+
+
+def test_web_cannot_use_native_refresh_body(client):
+    signup = signup_user(client, "web-native-boundary")
+    assert "refresh_token" not in signup
+    cookie = client.cookies.get(settings.refresh_cookie_name)
+    assert cookie
+    client.cookies.clear()
+    denied = client.post("/auth/refresh", json={"refresh_token": cookie})
+    assert denied.status_code == 403
+    spoofed_header = client.post(
+        "/auth/refresh",
+        headers={"Origin": "https://collegefantasyfootball.org", "X-CFFB-Native-Session": "ios"},
+        json={"refresh_token": cookie},
+    )
+    assert spoofed_header.status_code == 403
+
+
+def test_native_login_returns_keychain_credential_without_exposing_it_to_web(client):
+    signup_user(client, "native-login")
+    client.cookies.clear()
+    credentials = {"email": "coach-native-login@example.com", "password": STRONG_PASSWORD}
+    web_login = client.post("/auth/login", json=credentials)
+    assert web_login.status_code == 200
+    assert "refresh_token" not in web_login.json()
+
+    native_login = client.post(
+        "/auth/login",
+        headers={"Origin": "capacitor://localhost", "X-CFFB-Native-Session": "ios"},
+        json=credentials,
+    )
+    assert native_login.status_code == 200
+    assert native_login.json()["refresh_token"]
+
+
 def test_web_signup_keeps_configured_refresh_cookie_policy(monkeypatch, client):
     monkeypatch.setattr(settings, "refresh_cookie_secure", True)
     response = client.post(

@@ -70,6 +70,14 @@ export const loginErrorMessage = (error: unknown): string => {
     return apiUnavailableMessage();
   }
 
+  if (error instanceof Error && (
+    error.message.includes("native refresh session") ||
+    error.message.includes("securely save") ||
+    error.message.includes("Keychain")
+  )) {
+    return "Your iPhone could not securely save the sign-in session. Please try again or contact support.";
+  }
+
   return "Sign in failed. Try again or contact support.";
 };
 

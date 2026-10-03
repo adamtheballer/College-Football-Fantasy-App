@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import Security
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -7,7 +8,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // iOS Keychain items survive uninstall. A fresh app installation must
+        // not silently restore a previous owner's refresh session.
+        let installMarker = "cffbNativeSessionStorageInitialized"
+        if !UserDefaults.standard.bool(forKey: installMarker) {
+            let staleSession: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: "cap_sec",
+                kSecAttrAccount as String: "cffb_native_refresh_token"
+            ]
+            SecItemDelete(staleSession as CFDictionary)
+            UserDefaults.standard.set(true, forKey: installMarker)
+        }
         return true
     }
 
