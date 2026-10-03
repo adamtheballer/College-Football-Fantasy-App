@@ -486,10 +486,6 @@ export function PlayerCardModal({
   );
   const palette = getPlayerCardPalette(position);
   const seasonProjectionStats = useMemo(() => resolvePlayerCardProjectionStats(player, card), [player, card]);
-  const currentValueRating = resolvePlayerCardCurrentValueRating(
-    valueQuery.data?.current?.current_value_rating,
-    card,
-  );
   const aboutMessage = visiblePlayerCardAboutMessage(card?.about.message);
   const newsFeedItems = useMemo(() => playerCardNewsFeedItems(card), [card]);
   const cardActions = [...(action ? [action] : []), ...actions];
@@ -635,7 +631,6 @@ export function PlayerCardModal({
       >
         <PlayerCardHeader
           card={card}
-          currentValue={currentValueRating}
           onClose={onClose}
           palette={palette}
           player={player}

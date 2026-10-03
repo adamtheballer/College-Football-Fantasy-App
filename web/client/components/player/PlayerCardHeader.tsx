@@ -16,11 +16,6 @@ type PlayerCardPalette = {
   silhouette: string;
 };
 
-export const CURRENT_VALUE_RATING_LABEL = "Current Value Rating";
-
-export const formatCurrentValueRating = (value?: number | null) =>
-  typeof value === "number" && Number.isFinite(value) ? value.toFixed(0) : "N/A";
-
 export const formatPlayerCardPositionRank = (
   rank?: PlayerCardResponse["season_positional_rank"],
 ) => rank && Number.isInteger(rank.rank) && rank.rank > 0
@@ -58,7 +53,6 @@ const playbookMarks = [
 
 export function PlayerCardHeader({
   card,
-  currentValue,
   onClose,
   palette,
   player,
@@ -66,7 +60,6 @@ export function PlayerCardHeader({
   title,
 }: {
   card?: PlayerCardResponse | null;
-  currentValue?: number | null;
   onClose: () => void;
   palette: PlayerCardPalette;
   player: PlayerCardModalPlayer;
@@ -90,17 +83,11 @@ export function PlayerCardHeader({
       mobileLabel: "Proj",
       value: typeof player.projectedPoints === "number" ? player.projectedPoints.toFixed(1) : "—",
     },
-    seasonRank
-      ? {
-          label: "Rank",
-          mobileLabel: "Rank",
-          value: formatPlayerCardPositionRank(seasonRank),
-        }
-      : {
-          label: CURRENT_VALUE_RATING_LABEL,
-          mobileLabel: "Value",
-          value: formatCurrentValueRating(currentValue),
-        },
+    {
+      label: "Positional Rating",
+      mobileLabel: "Pos Rating",
+      value: formatPlayerCardPositionRank(seasonRank),
+    },
     { label: "Class", mobileLabel: "Class", value: card?.about.player_class ?? player.playerClass ?? "—" },
     { label: "Status", mobileLabel: "Status", value: playerStatus },
   ];
@@ -186,9 +173,6 @@ export function PlayerCardHeader({
                 </span>
               </PlayerAvailabilityIndicator>
               {card?.about.jersey ? <span className="text-white/70">#{card.about.jersey}</span> : null}
-              {!seasonRank && currentValue !== null && currentValue !== undefined ? (
-                <span className="text-white/70">Value {formatCurrentValueRating(currentValue)}</span>
-              ) : null}
             </div>
           </div>
         </div>
