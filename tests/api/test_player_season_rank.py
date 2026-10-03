@@ -14,8 +14,8 @@ from collegefootballfantasy_api.app.services import player_season_rank
 
 @pytest.fixture(autouse=True)
 def rank_publication_clock(monkeypatch):
-    # Existing history fixtures represent completed weeks after their reset.
-    monkeypatch.setattr(player_season_rank, "calendar_cfb_week", lambda season: 15)
+    # Existing history fixtures represent Week 1 after its Tuesday reset.
+    monkeypatch.setattr(player_season_rank, "calendar_cfb_week", lambda season: 2)
 
 
 def test_completed_rank_is_published_only_after_reset(db_session, monkeypatch):
@@ -41,6 +41,18 @@ def test_completed_rank_is_published_only_after_reset(db_session, monkeypatch):
     assert season_positional_rank_for_player(db_session, player=player, season=2026).fantasy_points == 20
 
 
+def test_rank_waits_for_scoring_data_after_calendar_rollover(client, db_session):
+    player = _rankable_player(name="Missing import", position="WR", school="Miami")
+    db_session.add(player)
+    db_session.commit()
+
+    assert client.get(f"/players/{player.id}/card").json()["season_positional_rank"] is None
+
+    db_session.add(PlayerStat(player_id=player.id, season=2026, week=1, verified=True, stats={"fantasy_points": 12}))
+    db_session.commit()
+    assert client.get(f"/players/{player.id}/card").json()["season_positional_rank"]["rank"] == 1
+
+
 def _rankable_player(*, name: str, position: str, school: str) -> Player:
     return Player(
         name=name,
@@ -51,7 +63,7 @@ def _rankable_player(*, name: str, position: str, school: str) -> Player:
     )
 
 
-def _finalize_week(db_session, *, week: int) -> None:
+def _finalize_week(db_session, *, week: int, status: str = "final") -> None:
     league = League(name=f"Rank Finality {week}", season_year=2026)
     home = Team(league=league, name=f"Home {week}", owner_name=f"Home Owner {week}")
     away = Team(league=league, name=f"Away {week}", owner_name=f"Away Owner {week}")
@@ -64,12 +76,14 @@ def _finalize_week(db_session, *, week: int) -> None:
             week=week,
             home_team_id=home.id,
             away_team_id=away.id,
-            status="final",
+            status=status,
         )
     )
 
 
-def test_player_card_exposes_only_finalized_cumulative_positional_rank(client, db_session):
+def test_player_card_rank_uses_completed_calendar_weeks_not_other_leagues(client, db_session, monkeypatch):
+    current_week = [1]
+    monkeypatch.setattr(player_season_rank, "calendar_cfb_week", lambda season: current_week[0])
     leader = _rankable_player(name="KJ Duff", position="WR", school="Miami")
     challenger = _rankable_player(name="Ryan Williams", position="WR", school="Alabama")
     qb = _rankable_player(name="Quarterback Example", position="QB", school="Texas")
@@ -82,13 +96,14 @@ def test_player_card_exposes_only_finalized_cumulative_positional_rank(client, d
     ])
     db_session.commit()
 
-    # Live or unprocessed Week 1 totals must never appear as season ranks.
-    before_finality = client.get(f"/players/{leader.id}/card")
-    assert before_finality.status_code == 200
-    assert before_finality.json()["season_positional_rank"] is None
+    # A current-week score cannot change the season rank before rollover.
+    before_rollover = client.get(f"/players/{leader.id}/card")
+    assert before_rollover.status_code == 200
+    assert before_rollover.json()["season_positional_rank"] is None
 
     _finalize_week(db_session, week=1)
     db_session.commit()
+    current_week[0] = 2
 
     after_week_one = client.get(f"/players/{leader.id}/card")
     assert after_week_one.status_code == 200
@@ -99,23 +114,28 @@ def test_player_card_exposes_only_finalized_cumulative_positional_rank(client, d
         "through_week": 1,
     }
 
+    # A newly drafted league may create projected matchups for past weeks.
+    # They must not erase ranks already earned from completed player games.
+    _finalize_week(db_session, week=1, status="projected")
+    db_session.commit()
+    assert client.get(f"/players/{leader.id}/card").json()["season_positional_rank"] == after_week_one.json()["season_positional_rank"]
+
     db_session.add_all([
         PlayerStat(player_id=leader.id, season=2026, week=2, verified=True, stats={"fantasy_points": 10.0}),
         PlayerStat(player_id=challenger.id, season=2026, week=2, verified=True, stats={"fantasy_points": 25.0}),
     ])
     db_session.commit()
 
-    # Week 2 is still partial: the visible rank remains based on Week 1 only.
-    before_week_two_finality = client.get(f"/players/{leader.id}/card")
-    assert before_week_two_finality.json()["season_positional_rank"] == {
+    # Week 2 is still current: the visible rank remains based on Week 1 only.
+    before_week_two_rollover = client.get(f"/players/{leader.id}/card")
+    assert before_week_two_rollover.json()["season_positional_rank"] == {
         "position": "WR",
         "rank": 1,
         "fantasy_points": 30.0,
         "through_week": 1,
     }
 
-    _finalize_week(db_session, week=2)
-    db_session.commit()
+    current_week[0] = 3
 
     after_week_two = client.get(f"/players/{leader.id}/card")
     assert after_week_two.json()["season_positional_rank"] == {

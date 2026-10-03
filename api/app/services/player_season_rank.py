@@ -1,9 +1,9 @@
-"""Authoritative cumulative positional fantasy ranks for player cards.
+"""Cumulative positional fantasy ranks for completed calendar weeks.
 
-Ranks use verified weekly scoring rows from fantasy weeks whose application
-matchups have all finalized.  A final, game-keyed box score is used only when
-the corresponding weekly row is missing, so a completed performance is never
-silently converted into zero points while the weekly import is repaired.
+Ranks use verified weekly scoring rows from past fantasy weeks. A final,
+game-keyed box score is used only when the corresponding weekly row is
+missing. League matchups do not govern this player-wide statistic: a new
+league can create projected matchups for past weeks at any time.
 """
 from __future__ import annotations
 
@@ -18,9 +18,6 @@ from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.scoring import calculate_fantasy_points
-from collegefootballfantasy_api.app.services.fantasy_week_finality import (
-    latest_authoritatively_finalized_week,
-)
 from collegefootballfantasy_api.app.services.fantasy_game_selection import (
     fantasy_games_by_school,
     fantasy_stat_weeks,
@@ -75,7 +72,7 @@ def season_positional_ranks(
     season: int,
     conference_codes: Sequence[str] | None = None,
 ) -> dict[int, PlayerSeasonPositionalRank]:
-    """Return a player's cumulative rank after a finalized fantasy week.
+    """Return a player's cumulative rank for completed fantasy weeks.
 
     The eligible player universe is the exact canonical public draft/waiver
     pool. When a league has selected one or more conferences, that universe
@@ -85,7 +82,10 @@ def season_positional_ranks(
     relevant pool.
     """
 
-    through_week = min(latest_authoritatively_finalized_week(db, season=season), calendar_cfb_week(season) - 1)
+    # A calendar rollover excludes the live week. Do not use global matchup
+    # finality here: one newly drafted league can add a projected Week 1 row
+    # and otherwise erase every player's rank for the entire season.
+    through_week = calendar_cfb_week(season) - 1
     if through_week < 1:
         return {}
 
@@ -178,6 +178,11 @@ def season_positional_ranks(
         (row.player_id, row.game_id): row
         for row in fallback_rows
     }
+    # A calendar rollover is necessary but not evidence that the scoring
+    # import ran. Avoid publishing an alphabetical all-zero board during a
+    # provider outage or before the first final box score arrives.
+    if not verified_stat_keys and not fallback_by_player_game:
+        return {}
     for (player_id, stat_week), game_id in selected_game_id_by_player_week.items():
         if (player_id, stat_week) in verified_stat_keys:
             continue
