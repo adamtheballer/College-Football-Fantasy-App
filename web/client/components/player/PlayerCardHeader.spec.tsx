@@ -18,7 +18,6 @@ describe("PlayerCardHeader injury status", () => {
           season_stats: [],
           historical_stats: null,
         } as never}
-        currentValue={88}
         onClose={vi.fn()}
         palette={{
           headerBase: "bg-slate-900",
@@ -70,7 +69,6 @@ describe("PlayerCardHeader injury status", () => {
           season_stats: [],
           historical_stats: null,
         } as never}
-        currentValue={88}
         onClose={vi.fn()}
         palette={{
           headerBase: "bg-slate-900",
@@ -88,7 +86,9 @@ describe("PlayerCardHeader injury status", () => {
 
     expect(screen.getAllByText("OUT FOR SEASON")).toHaveLength(2);
     expect(screen.queryByText("Active")).toBeNull();
-    expect(screen.getByText("Current Value Rating")).toBeTruthy();
+    expect(screen.getByText("Positional Rating")).toBeTruthy();
+    expect(screen.getByTestId("player-card-metric-rail").children[1].textContent).toContain("—");
+    expect(screen.queryByText("Current Value Rating")).toBeNull();
     expect(screen.getByTestId("player-card-status-dot").className).toContain("bg-red-400");
     expect(screen.getByLabelText("Out").textContent).toBe("O");
   });
@@ -128,7 +128,7 @@ describe("PlayerCardHeader injury status", () => {
     expect(screen.getByTestId("player-card-status-dot").parentElement?.className).toContain(textClass);
   });
 
-  it("replaces value with a finalized cumulative positional rank", () => {
+  it("shows the finalized cumulative positional rank under the positional label", () => {
     render(
       <PlayerCardHeader
         card={{
@@ -140,7 +140,6 @@ describe("PlayerCardHeader injury status", () => {
           season_positional_rank: { position: "WR", rank: 1, fantasy_points: 42.6, through_week: 1 },
           historical_stats: null,
         } as never}
-        currentValue={96}
         onClose={vi.fn()}
         palette={{
           headerBase: "bg-slate-900",
@@ -157,6 +156,7 @@ describe("PlayerCardHeader injury status", () => {
     );
 
     expect(screen.getAllByText("WR 1")).toHaveLength(1);
+    expect(screen.getByText("Positional Rating")).toBeTruthy();
     expect(screen.queryByText("Rank WR 1")).toBeNull();
     expect(screen.queryByText("#1")).toBeNull();
     expect(screen.getByText("#17")).toBeTruthy();

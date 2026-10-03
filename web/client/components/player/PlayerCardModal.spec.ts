@@ -20,7 +20,6 @@ import {
   visiblePlayerCardAboutMessage,
   visiblePlayerCardTabs,
 } from "./PlayerCardModal";
-import { CURRENT_VALUE_RATING_LABEL, formatCurrentValueRating } from "./PlayerCardHeader";
 
 describe("PlayerCardModal helpers", () => {
   it("always shows the History tab, with league context controlling its contents", () => {
@@ -163,12 +162,6 @@ describe("PlayerCardModal helpers", () => {
   it("formats finite numeric player-card fields for display", () => {
     expect(formatPlayerCardValue(1305)).toBe("1,305");
     expect(formatPlayerCardValue(Number.NaN)).toBe("—");
-  });
-
-  it("uses the canonical current-value label and an explicit unavailable state", () => {
-    expect(CURRENT_VALUE_RATING_LABEL).toBe("Current Value Rating");
-    expect(formatCurrentValueRating(85)).toBe("85");
-    expect(formatCurrentValueRating(null)).toBe("N/A");
   });
 
   it("uses the same loaded CFB 27 rating for every player-card rating display", () => {
