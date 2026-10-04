@@ -3,7 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "postinstall": "node scripts/align-onesignal-ios-platform.mjs",
     "dev": "bash ../scripts/dev.sh",
     "dev:vite": "vite",
     "build": "vite build",
