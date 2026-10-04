@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, LocateFixed, Loader2, Lock, Search, ShieldAlert, Trophy, Users } from "lucide-react";
 
 import { DraftBoard } from "@/components/DraftBoard";
 import { DraftOrderPickCard } from "@/components/DraftOrderPickCard";
+import { DraftPlayerPickHorizon, getDraftPlayerPickHorizon } from "@/components/draft/DraftPlayerPickHorizon";
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
 import { DraftRoomVisuals, draftMatteControlClass, draftMattePanelClass } from "@/components/DraftRoomVisuals";
@@ -618,6 +619,16 @@ export default function Draft() {
     : isTransition
       ? Math.min(totalPicks, Math.max(1, draftRoom?.picks.length + 1))
       : currentPick;
+  const playerPickHorizon =
+    !completed && position === "ALL" && !search.trim() && !debouncedSearch.trim()
+      ? getDraftPlayerPickHorizon(
+          draftOrderPicks.map((slot) => ({
+            overallPick: slot.overallPick,
+            isUser: slot.team?.id === draftRoom?.user_team_id,
+          })),
+          displayPick,
+        )
+      : null;
   useLayoutEffect(() => {
     if (displayPick < FIRST_CENTERED_DRAFT_PICK) {
       setMobileCarouselInset(0);
@@ -1401,7 +1412,7 @@ export default function Draft() {
                     : `No legal players available for your remaining roster slots. Remaining legal positions: ${legalPositions.join(", ")}.`}
               </div>
             ) : (
-              visiblePlayers.slice(0, 180).map((player) => {
+              visiblePlayers.slice(0, 180).map((player, index) => {
                 const positionClass = POSITION_STYLES[player.pos] ?? "border-white/20 bg-white/10 text-foreground";
                 const positionHoverClass = POSITION_ROW_HOVER_STYLES[player.pos] ?? "hover:bg-amber-300/[0.045] focus:bg-amber-300/[0.06]";
                 const isSelected = selectedPlayerId === player.id;
@@ -1411,8 +1422,11 @@ export default function Draft() {
                 const actionIsDraft = isUserTurn;
                 const actionIsDisabled = actionIsDraft && (!canPick || !isBackendPlayer);
                 return (
+                  <Fragment key={player.id}>
+                  {playerPickHorizon?.rowIndex === index ? (
+                    <DraftPlayerPickHorizon overallPick={playerPickHorizon.overallPick} />
+                  ) : null}
                   <div
-                    key={player.id}
                     data-testid="draft-player-row"
                     role="button"
                     tabIndex={0}
@@ -1486,6 +1500,7 @@ export default function Draft() {
                             : "Queue"}
                       </Button>
                   </div>
+                  </Fragment>
                 );
               })
             )}
