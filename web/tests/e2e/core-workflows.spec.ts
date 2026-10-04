@@ -1208,6 +1208,11 @@ test.describe("critical browser workflows", () => {
 
     await page.goto("/league/1/draft");
     await expect(page.getByRole("heading", { name: /Draft Test League/i })).toBeVisible();
+    const realPickHorizon = page.getByTestId("draft-player-pick-horizon");
+    await expect(realPickHorizon).toHaveText("Your pick #1");
+    await expect(page.getByTestId("draft-player-list").locator(":scope > *").first()).toHaveAttribute(
+      "data-testid", "draft-player-pick-horizon",
+    );
     for (const viewport of [
       { width: 320, height: 568 },
       { width: 375, height: 667 },
@@ -2784,6 +2789,15 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByText(/Draft is about to begin/i)).toBeVisible();
     await expect(page.getByText(/Unable to load players/i)).toHaveCount(0);
     await expect(page.getByText("Jeremiah Smith")).toBeVisible();
+    const mockPickHorizon = page.getByTestId("draft-player-pick-horizon");
+    await expect(mockPickHorizon).toBeVisible();
+    const mockHorizonPosition = await page.getByTestId("draft-player-list").evaluate((list) => {
+      const marker = list.querySelector("[data-testid='draft-player-pick-horizon']");
+      const rowsBefore = Array.from(list.querySelectorAll("[data-testid='draft-player-row']"))
+        .filter((row) => marker && Boolean(row.compareDocumentPosition(marker) & Node.DOCUMENT_POSITION_FOLLOWING)).length;
+      return { rowsBefore, pick: Number(marker?.textContent?.match(/#(\d+)/)?.[1]) };
+    });
+    expect(mockHorizonPosition.rowsBefore).toBe(mockHorizonPosition.pick - 1);
     for (const viewport of [
       { width: 320, height: 568 },
       { width: 375, height: 667 },

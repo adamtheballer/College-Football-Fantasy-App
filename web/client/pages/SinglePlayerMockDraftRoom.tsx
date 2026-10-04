@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, ClipboardList, LocateFixed, Loader2, RefreshCcw, Search, Trophy } from "lucide-react";
 
 import { DraftBoard } from "@/components/DraftBoard";
 import { DraftOrderPickCard } from "@/components/DraftOrderPickCard";
+import { DraftPlayerPickHorizon, getDraftPlayerPickHorizon } from "@/components/draft/DraftPlayerPickHorizon";
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { DraftRoomVisuals, draftMatteControlClass, draftMattePanelClass } from "@/components/DraftRoomVisuals";
 import { Button } from "@/components/ui/button";
@@ -377,6 +378,17 @@ export default function SinglePlayerMockDraftRoom() {
     [draftState.picks, draftState.teams, teamCount, totalPicks]
   );
 
+  const playerPickHorizon =
+    draftState.status !== "complete" && position === "ALL" && !search.trim() && !debouncedSearch.trim()
+      ? getDraftPlayerPickHorizon(
+          draftOrderPicks.map((slot) => ({
+            overallPick: slot.overallPick,
+            isUser: slot.teamId === draftState.userTeamId,
+          })),
+          draftState.currentPick,
+        )
+      : null;
+
   useLayoutEffect(() => {
     if (draftState.currentPick < FIRST_CENTERED_DRAFT_PICK) {
       setMobileCarouselInset(0);
@@ -504,7 +516,7 @@ export default function SinglePlayerMockDraftRoom() {
                 : `No legal players available for your remaining roster slots. Remaining legal positions: ${userLegalPositions.join(", ")}.`}
           </div>
         ) : (
-          availablePlayers.slice(0, 160).map((player) => {
+          availablePlayers.slice(0, 160).map((player, index) => {
             const positionClass = POSITION_STYLES[player.pos] ?? "border-white/20 bg-white/10 text-foreground";
             const positionHoverClass = POSITION_ROW_HOVER_STYLES[player.pos] ?? "hover:bg-amber-300/[0.045] focus:bg-amber-300/[0.06]";
             const isQueued = draftState.queuedPlayerIds.includes(player.id);
@@ -514,8 +526,11 @@ export default function SinglePlayerMockDraftRoom() {
             const actionIsDraft = userOnClock && draftState.status === "live";
             const actionIsDisabled = actionIsDraft && (!canPick || !isLegalForCurrentPick);
             return (
+              <Fragment key={player.id}>
+              {playerPickHorizon?.rowIndex === index ? (
+                <DraftPlayerPickHorizon overallPick={playerPickHorizon.overallPick} />
+              ) : null}
               <div
-                key={player.id}
                 data-testid="draft-player-row"
                 role="button"
                 tabIndex={0}
@@ -565,8 +580,9 @@ export default function SinglePlayerMockDraftRoom() {
                     aria-label={actionIsDraft ? `Draft ${player.name}` : isQueued ? `Remove ${player.name} from queue` : `Queue ${player.name}`}
                   >
                     {actionIsDraft ? (isLegalForCurrentPick ? "Draft" : "No Slot") : isQueued ? "Queued" : "Queue"}
-                  </Button>
+                </Button>
               </div>
+              </Fragment>
             );
           })
         )}
