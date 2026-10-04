@@ -104,6 +104,41 @@ describe("PlayerCardModal game log", () => {
     expect(screen.queryByTestId("live-game-indicator")).toBeNull();
   });
 
+  it("keeps Game Log gestures inside the card without closing it or navigating the matchup", () => {
+    const parentTouchEnd = vi.fn();
+    const parentWheel = vi.fn();
+    const onClose = vi.fn();
+    render(
+      <div onTouchEnd={parentTouchEnd} onWheel={parentWheel}>
+        <PlayerCardModal
+          onClose={onClose}
+          player={{ id: 1, name: "Ian Strong", position: "WR", school: "California" }}
+          card={{
+            about: { source: "local", position: "WR", team: "California" },
+            player: { id: 1, name: "Ian Strong", position: "WR", school: "California" },
+            injuries: [], season_stats: [], historical_stats: null,
+          } as never}
+        />
+      </div>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Game Log" }));
+    const table = screen.getByTestId("player-game-log-table");
+    fireEvent.touchStart(table, { touches: [{ clientX: 250, clientY: 200 }] });
+    fireEvent.touchMove(table, { touches: [{ clientX: 100, clientY: 201 }] });
+    fireEvent.touchEnd(table, { changedTouches: [{ clientX: 80, clientY: 201 }] });
+    fireEvent.wheel(table, { deltaX: 140, deltaY: 0 });
+    const backdrop = screen.getByRole("dialog");
+    fireEvent.click(backdrop);
+    expect(parentTouchEnd).not.toHaveBeenCalled();
+    expect(parentWheel).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByTestId("player-game-log-table")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /close player card/i }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps injury updates in News and does not render a separate Alerts tab", () => {
     render(
       <PlayerCardModal
