@@ -533,6 +533,8 @@ export function PlayerCardModal({
   const projectionRows = statRowsForPosition(position || player.position || "");
   const dialogRef = useRef<HTMLElement | null>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const suppressBackdropClickRef = useRef(false);
   const weeklyProjectionDetailRows = weeklyProjectionStats
     ? projectionRows
         .map((row) => [row.label, statValue(weeklyProjectionStats as unknown as Record<string, unknown>, row.projectionKeys)] as const)
@@ -618,7 +620,36 @@ export function PlayerCardModal({
       role="dialog"
       aria-modal="true"
       aria-label={`${player.name} player card`}
-      onClick={onClose}
+      onClick={(event) => {
+        if (suppressBackdropClickRef.current) {
+          suppressBackdropClickRef.current = false;
+          return;
+        }
+        if (event.target === event.currentTarget) onClose();
+      }}
+      onTouchStart={(event) => {
+        const touch = event.touches[0];
+        touchStartRef.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+        suppressBackdropClickRef.current = false;
+        event.stopPropagation();
+      }}
+      onTouchMove={(event) => {
+        const start = touchStartRef.current;
+        const touch = event.touches[0];
+        if (start && touch && Math.hypot(touch.clientX - start.x, touch.clientY - start.y) > 8) {
+          suppressBackdropClickRef.current = true;
+        }
+        event.stopPropagation();
+      }}
+      onTouchEnd={(event) => {
+        touchStartRef.current = null;
+        event.stopPropagation();
+      }}
+      onTouchCancel={(event) => {
+        touchStartRef.current = null;
+        event.stopPropagation();
+      }}
+      onWheel={(event) => event.stopPropagation()}
     >
       <article
         ref={dialogRef}

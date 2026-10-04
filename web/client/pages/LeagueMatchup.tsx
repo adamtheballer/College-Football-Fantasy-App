@@ -468,6 +468,11 @@ export default function LeagueMatchup() {
           <div
             data-testid="matchup-swipe-surface"
             onTouchStart={(event) => {
+              if ((event.target as HTMLElement).closest('[role="dialog"]')) {
+                swipeStartX.current = null;
+                swipeStartY.current = null;
+                return;
+              }
               const touch = event.touches[0];
               swipeStartX.current = touch?.clientX ?? null;
               swipeStartY.current = touch?.clientY ?? null;
@@ -481,7 +486,7 @@ export default function LeagueMatchup() {
               const endX = touch?.clientX;
               const endY = touch?.clientY;
               const target = event.target as HTMLElement | null;
-              if (target?.closest("button,a,input,textarea,select,[role='button']") || startX === null || startY === null || typeof endX !== "number" || typeof endY !== "number") return;
+              if (target?.closest("button,a,input,textarea,select,[role='button'],[role='dialog']") || startX === null || startY === null || typeof endX !== "number" || typeof endY !== "number") return;
               const deltaX = endX - startX;
               const deltaY = endY - startY;
               if (Math.abs(deltaX) < 48 || Math.abs(deltaX) <= Math.abs(deltaY) * 1.25) return;
@@ -492,6 +497,7 @@ export default function LeagueMatchup() {
               swipeStartY.current = null;
             }}
             onWheel={(event) => {
+              if ((event.target as HTMLElement).closest('[role="dialog"]')) return;
               // Preserve normal vertical page scrolling. Horizontal wheel and
               // trackpad gestures on desktop cycle through the week's other
               // matchups, matching the mobile swipe interaction.

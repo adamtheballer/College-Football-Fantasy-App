@@ -1767,6 +1767,19 @@ test.describe("critical browser workflows", () => {
       });
     });
 
+    await page.route("**/players/101/game-log**", (route) => route.fulfill({ json: {
+      season: 2026, available_seasons: [2026], team_name: "Texas",
+      games: [{ schedule_id: 1, week: 1, location: "home", location_label: "Home", neutral_site: false,
+        conference_game: false, game_status: "final", stat_status: "final", opponent_name: "Rival Team",
+        result: "W 24-17", stats: { source: "test", updated_at: "2026-09-05T20:00:00Z",
+          fantasy_points: 18.2, stats: { passing_yards: 220, passing_touchdowns: 2 } } }],
+    } }));
+    await page.route("**/players/101/card**", (route) => route.fulfill({ json: {
+      player: { id: 101, name: "Arch Manning", position: "QB", school: "Texas" },
+      about: { source: "test", position: "QB", team: "Texas" },
+      injuries: [], recent_news: [], season_stats: [], historical_stats: null,
+    } }));
+
     await page.goto("/league/1/matchup");
     await expect(page.getByRole("button", { name: "Back" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Notifications" })).toBeVisible();
@@ -1889,6 +1902,18 @@ test.describe("critical browser workflows", () => {
     const playerCardScroll = playerCard.getByTestId("player-card-scroll-area");
     await expect(appScroll).toHaveCSS("overflow-y", "hidden");
     await expect(playerCardScroll).toHaveCSS("overflow-y", "auto");
+    await playerCard.getByRole("button", { name: "Game Log" }).click();
+    const gameLogTable = playerCard.getByTestId("player-game-log-table");
+    await expect(gameLogTable).toBeVisible();
+    for (const [start, end] of [[300, 80], [80, 300], [300, 80]] as const) {
+      await gameLogTable.dispatchEvent("touchstart", { touches: [{ identifier: 1, clientX: start, clientY: 300 }] });
+      await gameLogTable.dispatchEvent("touchmove", { touches: [{ identifier: 1, clientX: end, clientY: 302 }] });
+      await gameLogTable.dispatchEvent("touchend", { changedTouches: [{ identifier: 1, clientX: end, clientY: 302 }] });
+      await expect(playerCard).toBeVisible();
+      await expect(playerCard.getByRole("button", { name: "Game Log" })).toHaveAttribute("aria-pressed", "true");
+    }
+    await gameLogTable.dispatchEvent("wheel", { deltaX: 110, deltaY: 0 });
+    await expect(playerCard).toBeVisible();
     await playerCardScroll.evaluate((element) => {
       const spacer = document.createElement("div");
       spacer.setAttribute("data-testid", "player-card-scroll-test-spacer");
