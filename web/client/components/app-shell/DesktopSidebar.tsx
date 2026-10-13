@@ -14,9 +14,9 @@ const displayNavName = (name: string) => name.toLowerCase().replace(/\b\w/g, (le
 
 export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarProps) {
   return (
-    <aside className="cfb-shell-sidebar relative z-10 hidden h-screen w-56 shrink-0 overflow-hidden border-r border-cfb-border-subtle bg-cfb-sidebar lg:sticky lg:top-0 lg:flex lg:flex-col">
+    <aside className="cfb-shell-sidebar relative z-10 hidden h-dvh w-60 shrink-0 overflow-hidden border-r border-cfb-border-subtle bg-cfb-sidebar lg:sticky lg:top-0 lg:flex lg:flex-col xl:w-64">
 
-      <div className="relative z-10 border-b border-cfb-border-subtle p-6">
+      <div className="relative z-10 shrink-0 border-b border-cfb-border-subtle p-6">
         <Link
           to="/"
           aria-label="College Fantasy Football"
@@ -26,7 +26,7 @@ export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarPro
         </Link>
       </div>
 
-      <nav className="relative z-10 flex flex-1 flex-col gap-1 overflow-y-auto px-3 pb-5 pt-4">
+      <nav aria-label="Main navigation" className="relative z-10 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-y-contain p-3">
         {items.map((item) => {
           const Icon = item.icon;
           const isActive = isShellNavItemActive(pathname, item);
@@ -40,7 +40,7 @@ export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarPro
               data-guide-nav={item.name}
               data-nav-active={isActive ? "true" : "false"}
               className={cn(
-                "group relative flex min-h-[42px] w-full items-center gap-3 rounded-sm border px-3 py-2 text-left font-ui text-sm font-semibold transition-colors duration-150",
+                "group relative flex h-full min-h-12 w-full items-center gap-3 rounded-sm border px-3 py-3 text-left font-ui text-sm font-semibold transition-colors duration-150",
                 isSignOut
                     ? "border-transparent text-red-300 hover:border-cfb-danger/30 hover:bg-cfb-danger/[0.06] hover:text-red-200"
                   : isAuth
@@ -54,7 +54,7 @@ export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarPro
             >
               <Icon
                 className={cn(
-                  "h-4 w-4 transition-colors duration-200",
+                  "h-[18px] w-[18px] shrink-0 transition-colors duration-200",
                   isSignOut
                     ? "text-red-500 group-hover:text-red-700"
                     : isAuth
@@ -79,14 +79,14 @@ export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarPro
 
           if (isSignOut) {
             return (
-              <button key={item.name} type="button" onClick={onSignOut} className="w-full">
+              <button key={item.name} type="button" onClick={onSignOut} className="min-h-12 w-full flex-1 shrink-0 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand">
                 {content}
               </button>
             );
           }
 
           return (
-            <Link key={item.name} to={item.path} aria-current={isActive ? "page" : undefined} className="w-full">
+            <Link key={item.name} to={item.path} aria-current={isActive ? "page" : undefined} className="min-h-12 w-full flex-1 shrink-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand">
               {content}
             </Link>
           );

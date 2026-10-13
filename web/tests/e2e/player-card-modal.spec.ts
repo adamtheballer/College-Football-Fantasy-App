@@ -32,7 +32,8 @@ const mockPlayer = {
   updated_at: "2026-07-11T00:00:00Z",
 };
 
-const seedAuthenticatedSession = async (page: Parameters<typeof test>[0]["page"]) => {
+const seedAuthenticatedSession = async (page: Parameters<typeof test>[0]["page"], isAdmin = false) => {
+  const authPayload = { ...mockAuthPayload, user: { ...mockAuthPayload.user, is_admin: isAdmin } };
   await page.addInitScript((payload) => {
     window.localStorage.setItem(
       "cfb_user",
@@ -40,18 +41,19 @@ const seedAuthenticatedSession = async (page: Parameters<typeof test>[0]["page"]
         id: payload.user.id,
         firstName: payload.user.first_name,
         email: payload.user.email,
+        isAdmin: payload.user.is_admin,
       })
     );
     window.localStorage.setItem("cfb_access_token", payload.access_token);
     window.localStorage.setItem("cfb_access_token_expires_at", payload.access_token_expires_at);
     window.localStorage.setItem(`cfb_completed_guide_${payload.user.id}`, "true");
-  }, mockAuthPayload);
+  }, authPayload);
 
   await page.route("**/auth/me", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify(mockAuthPayload.user),
+      body: JSON.stringify(authPayload.user),
     });
   });
   await page.route("**/notifications/preferences**", async (route) => {
@@ -77,6 +79,47 @@ const seedAuthenticatedSession = async (page: Parameters<typeof test>[0]["page"]
 
 test.describe("player card modal", () => {
   test.use({ timezoneId: "America/New_York" });
+
+  for (const isAdmin of [false, true]) {
+    test(`desktop navigation fills tall sidebars and scrolls in short windows (${isAdmin ? "admin" : "member"})`, async ({ page }, testInfo) => {
+      await seedAuthenticatedSession(page, isAdmin);
+      await page.route("**/chats/unread-count**", (route) => route.fulfill({ json: { total_unread: 9 } }));
+      await page.route("**/notifications/unread-count**", (route) => route.fulfill({ json: { total_unread: 0 } }));
+      await page.setViewportSize({ width: 1440, height: 960 });
+      await page.goto("/draft");
+      const nav = page.getByRole("navigation", { name: "Main navigation", exact: true });
+      await expect(nav.getByRole("button", { name: "Sign Out" })).toBeVisible();
+      await expect(nav.getByRole("link", { name: "Admin Scoring", exact: true })).toHaveCount(isAdmin ? 1 : 0);
+      for (const viewport of [{ width: 1440, height: 960 }, { width: 1024, height: 720 }]) {
+        await page.setViewportSize(viewport);
+        const layout = await nav.evaluate((element) => {
+          const sidebar = element.closest("aside")!;
+          const boxes = [...element.children].map((child) => child.getBoundingClientRect());
+          return {
+            sidebarBottom: sidebar.getBoundingClientRect().bottom,
+            sidebarWidth: sidebar.getBoundingClientRect().width,
+            lastBottom: boxes.at(-1)!.bottom,
+            heights: boxes.map((box) => box.height),
+            overflow: element.scrollHeight > element.clientHeight,
+          };
+        });
+        expect(layout.sidebarBottom).toBe(viewport.height);
+        expect(layout.sidebarWidth).toBeGreaterThanOrEqual(240);
+        expect(viewport.height - layout.lastBottom).toBeLessThanOrEqual(13);
+        expect(Math.max(...layout.heights) - Math.min(...layout.heights)).toBeLessThan(1);
+        expect(Math.min(...layout.heights)).toBeGreaterThanOrEqual(48);
+        expect(layout.overflow).toBe(false);
+      }
+      await page.screenshot({ path: testInfo.outputPath("sidebar-full-height.png") });
+      await page.setViewportSize({ width: 1440, height: 480 });
+      expect(await nav.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+      await nav.getByRole("button", { name: "Sign Out" }).scrollIntoViewIfNeeded();
+      await expect(nav.getByRole("button", { name: "Sign Out" })).toBeInViewport();
+      await nav.getByRole("link", { name: "Settings", exact: true }).click();
+      await expect(page).toHaveURL(/\/settings$/);
+      await expect(nav.getByRole("link", { name: "Settings", exact: true })).toHaveAttribute("aria-current", "page");
+    });
+  }
 
   test("keeps the live game on mobile and refreshes its stats and local date", async ({ page }, testInfo) => {
     await page.clock.install({ time: new Date("2026-09-05T00:22:00Z") });
@@ -422,7 +465,11 @@ test.describe("player card modal", () => {
       expect(portrait).not.toBeNull();
       expect(name).not.toBeNull();
       expect((name?.x ?? 0) + (name?.width ?? 0)).toBeLessThanOrEqual(portrait?.x ?? 0);
-      await expect(header.evaluate((element) => getComputedStyle(element).backgroundImage)).resolves.toBe("none");
+      await expect(header.evaluate((element) => getComputedStyle(element).backgroundImage)).resolves.toContain("linear-gradient");
+      await expect(header.evaluate((element) => getComputedStyle(element).backgroundImage)).resolves.toContain("57, 44, 85");
+      await expect(dialog.getByTestId("player-card-position-badge")).toHaveText("WR");
+      await expect(dialog.getByTestId("player-card-position-badge")).toHaveClass(/bg-violet-200/);
+      await expect(dialog.getByTestId("player-card-metric-rail").evaluate((element) => getComputedStyle(element).backgroundImage)).resolves.toBe("none");
       await expect(dialog.locator("#player-card-title").evaluate((element) => getComputedStyle(element).fontFamily)).resolves.toContain("Poppins");
     };
     await assertThemeLayout();

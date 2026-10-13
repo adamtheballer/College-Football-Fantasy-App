@@ -47,6 +47,7 @@ export const resolvePlayerCardStatus = (
 export function PlayerCardHeader({
   card,
   onClose,
+  palette,
   player,
   position,
   title,
@@ -94,7 +95,7 @@ export function PlayerCardHeader({
         <X className="h-5 w-5" />
       </button>
 
-      <header data-testid="player-card-header" className="relative min-h-[15.5rem] shrink-0 overflow-hidden border-t-2 border-cfb-brand bg-cfb-surface-raised px-5 py-5 sm:min-h-[15.75rem] sm:px-8 sm:py-6">
+      <header data-testid="player-card-header" className={cn("relative min-h-[15.5rem] shrink-0 overflow-hidden border-t-2 border-white/25 bg-gradient-to-r px-5 py-5 sm:min-h-[15.75rem] sm:px-8 sm:py-6", palette.headerBase)}>
         <div
           data-testid="player-card-hero-portrait"
           className="pointer-events-none absolute bottom-0 right-0 z-[5] h-[13rem] w-[11rem] sm:h-[14.5rem] sm:w-[15rem]"
@@ -113,13 +114,14 @@ export function PlayerCardHeader({
           )}
         </div>
         <div data-testid="player-card-identity" className="relative z-10 flex min-h-[12.5rem] min-w-0 flex-col justify-center pr-[10.5rem] text-left sm:min-h-[12.75rem] sm:max-w-[62%] sm:pr-0">
-          <p className="cfb-micro-label mb-4 text-cfb-brand sm:mb-5">{title}</p>
+          <p className="cfb-micro-label mb-4 text-white/75 sm:mb-5">{title}</p>
           <div className="min-w-0 max-w-xl">
             <h2 id="player-card-title" className="break-words font-ui text-[1.5rem] font-semibold leading-[1.15] tracking-[-0.025em] text-cfb-text-primary sm:text-[2.75rem]">
               {player.name}
             </h2>
-            <p className="mt-2 text-[11px] font-medium leading-relaxed text-cfb-text-secondary sm:mt-3 sm:text-sm">
-              {[position || player.position, card?.about.team ?? player.school].filter(Boolean).join("  •  ")}
+            <p className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-medium leading-relaxed text-white/85 sm:mt-3 sm:text-sm">
+              {position || player.position ? <span data-testid="player-card-position-badge" className={cn("inline-flex rounded-sm border px-2 py-0.5 text-[10px] font-semibold sm:text-xs", palette.pill)}>{position || player.position}</span> : null}
+              {card?.about.team ?? player.school ? <span>{position || player.position ? "• " : ""}{card?.about.team ?? player.school}</span> : null}
             </p>
             <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[9px] font-bold sm:mt-3 sm:text-[11px]">
               <PlayerAvailabilityIndicator status={statusSource} showActive={false}>
@@ -140,7 +142,7 @@ export function PlayerCardHeader({
               <span className="sm:hidden" aria-label={label}>{mobileLabel}</span>
               <span className="hidden sm:inline">{label}</span>
             </p>
-            <p className="mt-1 break-words text-[13px] font-semibold leading-tight tabular-nums text-white sm:mt-1.5 sm:text-2xl">{value}</p>
+            <p className={cn("mt-1 break-words font-semibold leading-tight tabular-nums text-white sm:mt-1.5 sm:text-2xl", label === "Class" || label === "Status" ? "text-[10px] min-[375px]:text-[11px]" : "text-[13px]")}>{value}</p>
           </div>
         ))}
       </div>

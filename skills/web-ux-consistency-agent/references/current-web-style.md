@@ -16,7 +16,7 @@ The user-approved website redesign uses a compact charcoal sports dashboard insp
 - Thin neutral dividers, matte fills and compact corners: controls 6px, surfaces 8px.
 - CFFB blue remains `207 90% 63%` for brand accents and selections.
 - Preserve established injury and live-game semantic colors. Never turn injury warnings blue merely to match the theme.
-- Working panels have no decorative gradient, glow or texture. Modal scrims may blur underlying content to distinguish the dialog.
+- Working panels have no decorative gradient, glow or texture. Player-card identity headers are the user-approved exception: reuse the existing positional palette for a restrained color gradient and position badge (QB blue, RB green, WR purple, TE amber, K slate). Keep metric rails charcoal and injury colors independent. Modal scrims may blur underlying content to distinguish the dialog.
 
 ## Typography
 
@@ -29,7 +29,7 @@ The user-approved website redesign uses a compact charcoal sports dashboard insp
 
 ## Layout and behavior
 
-- Compact left navigation on desktop; persistent bottom navigation and safe-area support on mobile.
+- Desktop navigation fills the available sidebar height with equally sized rows, and scrolls on short windows rather than clipping actions; persistent bottom navigation and safe-area support on mobile.
 - Keep data rows and action columns aligned. Contain genuinely wide data in its own horizontal scroller.
 - Preserve 16px mobile inputs, visible blue keyboard focus, and reduced-motion preferences.
 - Portraits have a dedicated right-side lane. Names and metadata must not overlap the portrait.
