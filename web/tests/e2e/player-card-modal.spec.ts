@@ -415,6 +415,19 @@ test.describe("player card modal", () => {
     await expect(dialog.getByLabel("Current player game result")).toBeVisible();
     await expect(dialog.getByText("Week 0 vs. San José State")).toBeVisible();
 
+    const assertThemeLayout = async () => {
+      const header = dialog.getByTestId("player-card-header");
+      const portrait = await dialog.getByTestId("player-card-hero-portrait").boundingBox();
+      const name = await dialog.locator("#player-card-title").boundingBox();
+      expect(portrait).not.toBeNull();
+      expect(name).not.toBeNull();
+      expect((name?.x ?? 0) + (name?.width ?? 0)).toBeLessThanOrEqual(portrait?.x ?? 0);
+      await expect(header.evaluate((element) => getComputedStyle(element).backgroundImage)).resolves.toBe("none");
+      await expect(dialog.locator("#player-card-title").evaluate((element) => getComputedStyle(element).fontFamily)).resolves.toContain("Poppins");
+    };
+    await assertThemeLayout();
+    await page.screenshot({ path: testInfo.outputPath("player-card-desktop-theme.png") });
+
     const viewport = page.viewportSize();
     const box = await dialog.boundingBox();
     expect(box).not.toBeNull();
@@ -425,6 +438,7 @@ test.describe("player card modal", () => {
     }
 
     await page.setViewportSize({ width: 390, height: 844 });
+    await assertThemeLayout();
     await expect(dialog.getByText("Bio", { exact: true })).toBeVisible();
     await expect(dialog.getByTestId("player-card-metric-rail")).toBeVisible();
     await expect(dialog.getByText("Height", { exact: true })).toBeVisible();
@@ -443,9 +457,7 @@ test.describe("player card modal", () => {
       expect(mobileBox.width).toBeGreaterThan(390 * 0.9);
       expect(mobileBox.width).toBeLessThanOrEqual(390);
     }
-    if (process.env.PLAYWRIGHT_CAPTURE_SCREENSHOTS === "1") {
-      await page.screenshot({ path: testInfo.outputPath("player-card-mobile-390x844.png"), fullPage: true });
-    }
+    await page.screenshot({ path: testInfo.outputPath("player-card-mobile-390x844.png"), fullPage: true });
 
     // Game Log is the single historical-performance hub. A separate Stats
     // tab must not be reintroduced, and the selected season owns its summary

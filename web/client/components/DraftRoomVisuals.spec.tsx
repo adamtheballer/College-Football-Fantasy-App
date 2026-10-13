@@ -13,5 +13,7 @@ describe("DraftRoomVisuals", () => {
 
     expect(canvas?.getAttribute("style")).toContain(collegiateCanvasBackground);
     expect(draftRoomCanvasBackground).toBe(collegiateCanvasBackground);
+    expect(draftRoomCanvasBackground).toBe("hsl(var(--background-canvas))");
+    expect(draftRoomCanvasBackground).not.toContain("gradient");
   });
 });

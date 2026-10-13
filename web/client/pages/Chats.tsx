@@ -545,7 +545,7 @@ export default function Chats({ leagueId: lockedLeagueId, embedded = false }: Ch
     >
       {!embedded ? <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-2">
-          <h1 className="bg-gradient-to-br from-white via-white to-primary/40 bg-clip-text text-5xl font-black uppercase italic tracking-tighter text-transparent">League Chat</h1>
+          <h1 className="cfb-display-title text-3xl sm:text-4xl">League Chat</h1>
           <p className="text-[10px] font-black uppercase tracking-[0.28em] text-muted-foreground/70">League conversation, manager messages, and binding events</p>
         </div>
         <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">

@@ -103,7 +103,7 @@ test.describe("critical browser workflows", () => {
     }
   });
 
-  test("the public auth screen keeps the universal Josefin Sans typography readable without narrow-screen overflow", async ({ page }, testInfo) => {
+  test("the public auth screen uses the charcoal theme and distinct fonts without narrow-screen overflow", async ({ page }, testInfo) => {
     await page.setViewportSize({ width: 320, height: 568 });
     await page.goto("/login");
 
@@ -113,17 +113,19 @@ test.describe("critical browser workflows", () => {
     const typography = await signInHeading.evaluate((heading) => ({
       bodyFamily: getComputedStyle(document.body).fontFamily,
       headingFamily: getComputedStyle(heading).fontFamily,
+      headingStyle: getComputedStyle(heading).fontStyle,
+      primaryBlue: getComputedStyle(document.documentElement).getPropertyValue("--brand-primary").trim(),
       documentWidth: document.documentElement.scrollWidth,
       viewportWidth: document.documentElement.clientWidth,
     }));
 
-    expect(typography.bodyFamily).toContain("Josefin Sans");
-    expect(typography.headingFamily).toContain("Josefin Sans");
+    expect(typography.bodyFamily).toContain("Poppins");
+    expect(typography.headingFamily).toContain("Exo 2");
+    expect(typography.headingStyle).toBe("italic");
+    expect(typography.primaryBlue).toBe("207 90% 63%");
     expect(typography.documentWidth).toBeLessThanOrEqual(typography.viewportWidth);
 
-    if (process.env.CAPTURE_MOBILE_UI === "1") {
-      await page.screenshot({ path: testInfo.outputPath("login-typography-320x568.png"), fullPage: false });
-    }
+    await page.screenshot({ path: testInfo.outputPath("login-typography-320x568.png"), fullPage: false });
   });
 
   test("Saturday Pick 6 dashboard action opens the contest instead of league creation", async ({ page }) => {

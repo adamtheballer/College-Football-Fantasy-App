@@ -14,7 +14,7 @@ const displayNavName = (name: string) => name.toLowerCase().replace(/\b\w/g, (le
 
 export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarProps) {
   return (
-    <aside className="cfb-shell-sidebar relative z-10 hidden h-screen w-64 shrink-0 overflow-hidden border-r border-cfb-border-subtle bg-cfb-sidebar lg:sticky lg:top-0 lg:flex lg:flex-col">
+    <aside className="cfb-shell-sidebar relative z-10 hidden h-screen w-56 shrink-0 overflow-hidden border-r border-cfb-border-subtle bg-cfb-sidebar lg:sticky lg:top-0 lg:flex lg:flex-col">
 
       <div className="relative z-10 border-b border-cfb-border-subtle p-6">
         <Link
@@ -26,7 +26,7 @@ export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarPro
         </Link>
       </div>
 
-      <nav className="relative z-10 flex flex-1 flex-col justify-between overflow-hidden px-3 pb-5 pt-4">
+      <nav className="relative z-10 flex flex-1 flex-col gap-1 overflow-y-auto px-3 pb-5 pt-4">
         {items.map((item) => {
           const Icon = item.icon;
           const isActive = isShellNavItemActive(pathname, item);
@@ -46,7 +46,7 @@ export function DesktopSidebar({ items, pathname, onSignOut }: DesktopSidebarPro
                   : isAuth
                     ? "border-cfb-border-subtle bg-cfb-surface-raised text-cfb-text-secondary hover:border-cfb-brand/55 hover:bg-cfb-brand/[0.08] hover:text-cfb-text-primary focus-visible:border-cfb-brand/55 focus-visible:bg-cfb-brand/[0.08]"
                     : isActive
-                    ? "border-transparent bg-cfb-brand/[0.08] text-cfb-text-primary shadow-[inset_2px_0_0_hsl(var(--brand-primary))]"
+                    ? "border-cfb-brand/30 bg-cfb-brand/[0.10] text-cfb-brand shadow-[inset_3px_0_0_hsl(var(--brand-primary))]"
                       : isAdmin
                         ? "border-transparent text-cfb-text-secondary hover:border-cfb-gold/40 hover:bg-cfb-gold/[0.08] hover:text-cfb-text-primary"
                         : "border-transparent text-cfb-text-muted hover:border-cfb-border-subtle hover:bg-cfb-surface-hover/55 hover:text-cfb-text-primary",

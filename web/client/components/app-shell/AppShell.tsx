@@ -97,7 +97,7 @@ export function AppShell({
             "min-w-0 max-w-full flex-1 overflow-x-clip",
             compactContent
               ? "p-0"
-              : "px-4 py-4 pb-5 sm:px-6 sm:py-6 sm:pb-6 lg:p-8",
+              : "px-4 py-4 pb-5 sm:px-5 sm:py-5 sm:pb-6 lg:p-6",
           )}
         >
           {children}

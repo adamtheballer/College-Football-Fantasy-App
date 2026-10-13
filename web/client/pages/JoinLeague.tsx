@@ -95,7 +95,7 @@ export default function JoinLeague() {
           <p className="text-sm font-medium text-muted-foreground uppercase tracking-widest">
             Please sign in to join a league.
           </p>
-          <Button onClick={() => navigate("/login")} className="h-12 px-8 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black tracking-[0.2em] uppercase">
+          <Button onClick={() => navigate("/login")} className="h-12 px-8 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black tracking-[0.06em] uppercase">
             Go to Login
           </Button>
         </Card>
@@ -106,15 +106,15 @@ export default function JoinLeague() {
   return (
     <div className="max-w-4xl mx-auto py-12 space-y-8">
       <div className="space-y-3">
-        <h1 className="text-6xl font-black italic uppercase text-foreground">Join League</h1>
-        <p className="text-sm font-medium text-muted-foreground uppercase tracking-[0.2em]">
+        <h1 className="text-3xl font-extrabold italic uppercase sm:text-4xl text-foreground">Join League</h1>
+        <p className="text-sm font-medium text-muted-foreground uppercase tracking-[0.06em]">
           Paste the 20-character invite code to join.
         </p>
       </div>
 
       <Card className="bg-card/40 border-border/60 rounded-[2.5rem]">
         <CardHeader className="px-10 pt-10">
-          <CardTitle className="text-xl font-black uppercase tracking-[0.2em]">Invite Code</CardTitle>
+          <CardTitle className="text-xl font-black uppercase tracking-[0.06em]">Invite Code</CardTitle>
         </CardHeader>
         <CardContent className="px-10 pb-10 space-y-6">
           <div className="flex flex-col md:flex-row gap-4">
@@ -128,21 +128,21 @@ export default function JoinLeague() {
               />
             </div>
             <Button
-              className="h-12 px-6 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.2em]"
+              className="h-12 px-6 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.06em]"
               onClick={() => void handlePreview(code)}
               disabled={loading}
             >
               Preview League
             </Button>
           </div>
-          {error && <p className="text-sm font-bold text-red-400 uppercase tracking-[0.2em]">{error}</p>}
+          {error && <p className="text-sm font-bold text-red-400 uppercase tracking-[0.06em]">{error}</p>}
         </CardContent>
       </Card>
 
       {preview && (
         <Card className="bg-card/40 border-border/60 rounded-[2.5rem]">
           <CardHeader className="px-10 pt-10">
-            <CardTitle className="text-xl font-black uppercase tracking-[0.2em]">League Preview</CardTitle>
+            <CardTitle className="text-xl font-black uppercase tracking-[0.06em]">League Preview</CardTitle>
           </CardHeader>
           <CardContent className="px-10 pb-10 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -179,7 +179,7 @@ export default function JoinLeague() {
 
             <div className="flex items-center gap-4">
               <Button
-                className="h-12 px-8 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.2em]"
+                className="h-12 px-8 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.06em]"
                 onClick={handleJoin}
                 disabled={loading || preview.member_count >= preview.max_teams}
               >
@@ -187,7 +187,7 @@ export default function JoinLeague() {
               </Button>
               <Button
                 variant="outline"
-                className="h-12 px-6 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em]"
+                className="h-12 px-6 rounded-2xl text-[10px] font-black uppercase tracking-[0.06em]"
                 onClick={() => navigator.clipboard.writeText(code)}
               >
                 <Copy className="w-4 h-4 mr-2" />
@@ -205,7 +205,7 @@ export default function JoinLeague() {
               <Users className="w-6 h-6 text-primary" />
             </div>
             <div>
-              <p className="text-sm font-black uppercase tracking-[0.2em] text-foreground">Need a code?</p>
+              <p className="text-sm font-black uppercase tracking-[0.06em] text-foreground">Need a code?</p>
               <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground/60">
                 Ask your commissioner to share the 20-character invite code.
               </p>

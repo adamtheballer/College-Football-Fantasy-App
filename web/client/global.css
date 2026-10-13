@@ -1,11 +1,14 @@
-/** @import must precede all other statements */
-/*
- * One lighter, open-licensed UI family across every surface. We deliberately
- * stop at 700 so existing semantic "black" utility classes resolve to the
- * nearest available weight instead of recreating the previous bulky display
- * treatment.  Font sizes and layout remain unchanged.
- */
-@import url("https://fonts.googleapis.com/css2?family=Josefin+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap");
+/* Self-hosted open-licensed fonts: rounded UI + athletic display headings.
+ * No dependency on third-party font requests at runtime. */
+@import "@fontsource/poppins/latin-400.css";
+@import "@fontsource/poppins/latin-500.css";
+@import "@fontsource/poppins/latin-600.css";
+@import "@fontsource/poppins/latin-700.css";
+@import "@fontsource/exo-2/latin-600.css";
+@import "@fontsource/exo-2/latin-700.css";
+@import "@fontsource/exo-2/latin-800.css";
+@import "@fontsource/exo-2/latin-700-italic.css";
+@import "@fontsource/exo-2/latin-800-italic.css";
 
 @tailwind base;
 @tailwind components;
@@ -29,17 +32,17 @@
    * A different format will require also updating the theme in tailwind.config.ts.
   */
   :root {
-    /* CFFB foundation: dark field, distinct working surfaces, restrained blue/gold. */
-    --background-canvas: 222 44% 5%;
-    --background-sidebar: 222 33% 7%;
-    --background-surface: 221 28% 10%;
-    --background-surface-raised: 220 24% 14%;
-    --background-surface-hover: 218 22% 18%;
-    --border-subtle: 216 20% 23%;
-    --border-strong: 215 22% 33%;
-    --text-primary: 210 40% 96%;
-    --text-secondary: 215 25% 78%;
-    --text-muted: 216 14% 61%;
+    /* Flat charcoal working surfaces. Existing brand blue and semantic colors stay intact. */
+    --background-canvas: 0 0% 9%;
+    --background-sidebar: 0 0% 12%;
+    --background-surface: 0 0% 14%;
+    --background-surface-raised: 0 0% 17%;
+    --background-surface-hover: 0 0% 20%;
+    --border-subtle: 0 0% 25%;
+    --border-strong: 0 0% 38%;
+    --text-primary: 0 0% 96%;
+    --text-secondary: 0 0% 78%;
+    --text-muted: 0 0% 65%;
     --brand-primary: 207 90% 63%;
     --brand-primary-hover: 207 92% 72%;
     --accent-crimson: 342.659 71.37% 53.137%;
@@ -57,32 +60,32 @@
     --unavailable: 215 16% 52%;
     --locked: 24 94% 58%;
 
-    --background: 222 45% 5%;
-    --foreground: 210 40% 96%;
+    --background: 0 0% 9%;
+    --foreground: 0 0% 96%;
 
-    --card: 220 29% 9%;
-    --card-foreground: 210 40% 96%;
+    --card: 0 0% 14%;
+    --card-foreground: 0 0% 96%;
 
-    --popover: 220 29% 9%;
-    --popover-foreground: 210 40% 96%;
+    --popover: 0 0% 14%;
+    --popover-foreground: 0 0% 96%;
 
     --primary: 207 95% 62%;
-    --primary-foreground: 222 45% 5%;
+    --primary-foreground: 0 0% 8%;
 
-    --secondary: 220 26% 13%;
-    --secondary-foreground: 210 40% 96%;
+    --secondary: 0 0% 17%;
+    --secondary-foreground: 0 0% 96%;
 
-    --muted: 220 22% 15%;
-    --muted-foreground: 215 18% 66%;
+    --muted: 0 0% 17%;
+    --muted-foreground: 0 0% 65%;
 
-    --accent: 219 23% 16%;
+    --accent: 0 0% 20%;
     --accent-foreground: 207 95% 62%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 96%;
 
-    --border: 215 23% 20%;
-    --input: 215 23% 24%;
+    --border: 0 0% 25%;
+    --input: 0 0% 30%;
     --ring: 207 95% 62%;
 
     /* One compact spacing/radius scale for every product surface. */
@@ -93,31 +96,31 @@
     --space-5: 1.25rem;
     --space-6: 1.5rem;
     --radius: 0.375rem;
-    --radius-control: 0.25rem;
+    --radius-control: 0.375rem;
     --radius-surface: 0.5rem;
     --transition-fast: 150ms;
 
-    --sidebar-background: 222 35% 7%;
-    --sidebar-foreground: 210 40% 96%;
+    --sidebar-background: 0 0% 12%;
+    --sidebar-foreground: 0 0% 96%;
     --sidebar-primary: 207 95% 62%;
-    --sidebar-primary-foreground: 222 45% 5%;
-    --sidebar-accent: 219 23% 16%;
+    --sidebar-primary-foreground: 0 0% 8%;
+    --sidebar-accent: 0 0% 20%;
     --sidebar-accent-foreground: 207 95% 62%;
-    --sidebar-border: 215 23% 20%;
+    --sidebar-border: 0 0% 25%;
     --sidebar-ring: 207 95% 62%;
   }
 
   .dark {
-    --background-canvas: 222 44% 5%;
-    --background-sidebar: 222 33% 7%;
-    --background-surface: 221 28% 10%;
-    --background-surface-raised: 220 24% 14%;
-    --background-surface-hover: 218 22% 18%;
-    --border-subtle: 216 20% 23%;
-    --border-strong: 215 22% 33%;
-    --text-primary: 210 40% 96%;
-    --text-secondary: 215 25% 78%;
-    --text-muted: 216 14% 61%;
+    --background-canvas: 0 0% 9%;
+    --background-sidebar: 0 0% 12%;
+    --background-surface: 0 0% 14%;
+    --background-surface-raised: 0 0% 17%;
+    --background-surface-hover: 0 0% 20%;
+    --border-subtle: 0 0% 25%;
+    --border-strong: 0 0% 38%;
+    --text-primary: 0 0% 96%;
+    --text-secondary: 0 0% 78%;
+    --text-muted: 0 0% 65%;
     --brand-primary: 207 90% 63%;
     --brand-primary-hover: 207 92% 72%;
     --accent-crimson: 342.659 71.37% 53.137%;
@@ -134,41 +137,41 @@
     --unavailable: 215 16% 52%;
     --locked: 24 94% 58%;
 
-    --background: 222 45% 5%;
-    --foreground: 210 40% 96%;
+    --background: 0 0% 9%;
+    --foreground: 0 0% 96%;
 
-    --card: 220 29% 9%;
-    --card-foreground: 210 40% 96%;
+    --card: 0 0% 14%;
+    --card-foreground: 0 0% 96%;
 
-    --popover: 220 29% 9%;
-    --popover-foreground: 210 40% 96%;
+    --popover: 0 0% 14%;
+    --popover-foreground: 0 0% 96%;
 
     --primary: 207 95% 62%;
-    --primary-foreground: 222 45% 5%;
+    --primary-foreground: 0 0% 8%;
 
-    --secondary: 220 26% 13%;
-    --secondary-foreground: 210 40% 96%;
+    --secondary: 0 0% 17%;
+    --secondary-foreground: 0 0% 96%;
 
-    --muted: 220 22% 15%;
-    --muted-foreground: 215 18% 66%;
+    --muted: 0 0% 17%;
+    --muted-foreground: 0 0% 65%;
 
-    --accent: 219 23% 16%;
+    --accent: 0 0% 20%;
     --accent-foreground: 207 95% 62%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 96%;
 
-    --border: 215 23% 20%;
-    --input: 215 23% 24%;
+    --border: 0 0% 25%;
+    --input: 0 0% 30%;
     --ring: 207 95% 62%;
 
-    --sidebar-background: 222 35% 7%;
-    --sidebar-foreground: 210 40% 96%;
+    --sidebar-background: 0 0% 12%;
+    --sidebar-foreground: 0 0% 96%;
     --sidebar-primary: 207 95% 62%;
-    --sidebar-primary-foreground: 222 45% 5%;
-    --sidebar-accent: 219 23% 16%;
+    --sidebar-primary-foreground: 0 0% 8%;
+    --sidebar-accent: 0 0% 20%;
     --sidebar-accent-foreground: 207 95% 62%;
-    --sidebar-border: 215 23% 20%;
+    --sidebar-border: 0 0% 25%;
     --sidebar-ring: 207 95% 62%;
   }
 }
@@ -204,7 +207,7 @@
   }
 
   h1 {
-    @apply font-display;
+    @apply font-display font-extrabold italic;
   }
 
   :where(h2, h3, h4, h5, h6, button, [role="button"], label, th) {
@@ -290,144 +293,49 @@
 @layer components {
   .cfb-panel {
     @apply rounded-md border border-cfb-border-subtle bg-cfb-surface text-card-foreground;
-    background-image:
-      linear-gradient(135deg, hsl(210 40% 96% / 0.018), transparent 42%),
-      linear-gradient(180deg, hsl(207 90% 63% / 0.018), transparent 58%);
-    box-shadow:
-      inset 0 1px 0 hsl(210 40% 96% / 0.035),
-      0 12px 30px rgb(2 6 23 / 0.12);
   }
 
   .cfb-panel-strong {
     @apply rounded-md border border-cfb-border-subtle bg-cfb-surface-raised text-card-foreground;
-    background-image:
-      linear-gradient(135deg, hsl(210 40% 96% / 0.024), transparent 44%),
-      linear-gradient(180deg, hsl(207 90% 63% / 0.022), transparent 60%);
-    box-shadow:
-      inset 0 1px 0 hsl(210 40% 96% / 0.045),
-      0 14px 34px rgb(2 6 23 / 0.16);
   }
 
-  /* Shared visual hierarchy: app navigation stays matte, data cards get a
-   * barely-there printed edge, and only editorial/featured surfaces receive
-   * the more expressive field-note artwork. */
+  /* All working surfaces are matte: no field textures, gold streaks or glow. */
   .cfb-shell-sidebar,
   .cfb-shell-topbar,
-  .cfb-shell-mobile-nav {
-    background-image:
-      linear-gradient(180deg, hsl(210 40% 96% / 0.018), transparent 36%),
-      repeating-linear-gradient(108deg, hsl(45 84% 59% / 0.014) 0 1px, transparent 1px 26px);
-    box-shadow: inset 0 1px 0 hsl(210 40% 96% / 0.035);
+  .cfb-shell-mobile-nav,
+  .cfb-surface-card,
+  .cfb-stat-card,
+  .cfb-feature-surface,
+  .cfb-matte-surface,
+  .cfb-playbook-pattern,
+  .cfb-yard-lines,
+  .cfb-school-grid {
+    background-image: none;
+    box-shadow: none;
   }
 
-  .cfb-shell-sidebar {
-    box-shadow:
-      inset -1px 0 0 hsl(45 84% 59% / 0.10),
-      inset 0 1px 0 hsl(210 40% 96% / 0.035);
-  }
-
-  .cfb-surface-card {
-    isolation: isolate;
-    box-shadow:
-      inset 0 1px 0 hsl(210 40% 96% / 0.04),
-      0 10px 24px rgb(2 6 23 / 0.12);
-  }
-
-  .cfb-surface-card::before {
-    content: "";
-    pointer-events: none;
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    background-image:
-      linear-gradient(135deg, hsl(210 40% 96% / 0.018), transparent 36%),
-      repeating-linear-gradient(116deg, hsl(45 84% 59% / 0.018) 0 0.5px, transparent 0.5px 17px);
-  }
-
-  .cfb-surface-card > * {
-    position: relative;
-    z-index: 1;
+  .cfb-surface-card::before,
+  .cfb-feature-surface::after,
+  .cfb-league-matchup-card::before,
+  .cfb-matte-surface::before,
+  .cfb-page-header::after {
+    content: none;
+    display: none;
   }
 
   .cfb-feature-surface {
-    isolation: isolate;
-    background-image:
-      radial-gradient(ellipse 72% 130% at 0% 0%, hsl(207 90% 63% / 0.15), transparent 62%),
-      linear-gradient(120deg, hsl(45 84% 59% / 0.08), transparent 30% 72%, hsl(207 90% 63% / 0.08));
-    box-shadow:
-      inset 0 1px 0 hsl(45 84% 86% / 0.24),
-      0 18px 42px rgb(2 6 23 / 0.22);
-  }
-
-  .cfb-feature-surface::after {
-    content: "";
-    pointer-events: none;
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    background-image:
-      repeating-linear-gradient(113deg, hsl(45 84% 86% / 0.12) 0 0.6px, transparent 0.7px 16px),
-      linear-gradient(90deg, transparent 0 5%, hsl(45 84% 59% / 0.11) 5% 5.2%, transparent 5.2% 100%);
-    mix-blend-mode: soft-light;
-    opacity: 0.55;
-  }
-
-  .cfb-feature-surface > * {
-    position: relative;
-    z-index: 1;
+    border-top: 2px solid hsl(var(--text-primary));
   }
 
   .cfb-league-matchup-card {
     position: relative;
-    isolation: isolate;
     overflow: hidden;
   }
 
-  .cfb-league-matchup-card::before {
-    content: "";
-    pointer-events: none;
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    background:
-      linear-gradient(105deg, hsl(207 90% 63% / 0.09), transparent 42%),
-      repeating-linear-gradient(116deg, hsl(45 84% 59% / 0.025) 0 0.6px, transparent 0.7px 22px);
-  }
-
-  .cfb-league-matchup-card > * {
-    position: relative;
-    z-index: 1;
-  }
-
-  .cfb-page-header {
-    position: relative;
-  }
-
-  .cfb-page-header::after {
-    content: "";
-    position: absolute;
-    right: 0;
-    bottom: -1px;
-    left: 0;
-    height: 1px;
-    background: linear-gradient(90deg, hsl(45 84% 59% / 0.72), hsl(207 90% 63% / 0.42) 34%, transparent 72%);
-  }
-
-  /* The home league carousel owns the only animated divider in this area.
-   * Suppress PageHeader's static decorative rule so the two treatments do
-   * not render as duplicate glowing bars on narrow screens. */
-  .cfb-home-league-header::after {
-    display: none;
-  }
-
-  .cfb-stat-card {
-    box-shadow:
-      inset 0 1px 0 hsl(210 40% 96% / 0.045),
-      0 8px 18px rgb(2 6 23 / 0.10);
-  }
+  .cfb-page-header { position: relative; }
 
   .cfb-control {
-    @apply rounded-sm border border-cfb-border-subtle bg-cfb-surface text-foreground transition-colors duration-150;
+    @apply rounded-md border border-cfb-border-subtle bg-cfb-canvas text-foreground transition-colors duration-150;
   }
 
   .cfb-control:hover {
@@ -436,28 +344,24 @@
 
   .cfb-control:focus-visible,
   .cfb-control[data-state="open"] {
-    @apply border-cfb-brand/50 ring-2 ring-cfb-brand/25;
+    @apply border-cfb-brand ring-2 ring-cfb-brand/25;
   }
 
   .cfb-micro-label {
-    @apply font-ui text-[11px] font-semibold uppercase tracking-[0.1em] text-cfb-text-muted;
+    @apply font-ui text-[11px] font-semibold uppercase tracking-[0.075em] text-cfb-text-muted;
   }
 
   .cfb-section-title {
-    @apply font-ui text-foreground font-semibold tracking-[-0.015em] leading-tight;
+    @apply font-display font-extrabold uppercase italic text-foreground tracking-[-0.015em] leading-tight;
   }
 
   .cfb-display-title {
-    @apply font-display text-foreground font-semibold tracking-[-0.025em] leading-[1.02];
+    @apply font-display font-extrabold uppercase italic text-foreground tracking-[-0.02em] leading-[1.1];
   }
 
-  /*
-   * Matchup totals need to stay clear at a glance on narrow phone viewports.
-   * Keep the condensed display face for headings, but use the wider UI face
-   * at a restrained weight for score numerals so digits do not run together.
-   */
+  /* Scores stay upright and readable rather than adopting heading italics. */
   .cfb-score-value {
-    @apply font-sans font-semibold tabular-nums tracking-[-0.025em] leading-none;
+    @apply font-ui font-semibold tabular-nums tracking-[-0.025em] leading-none;
   }
 
   .cfb-body {
@@ -469,18 +373,15 @@
   }
 
   .cfb-stat-value {
-    @apply font-display font-semibold leading-none tracking-[-0.025em] tabular-nums;
+    @apply font-ui font-semibold leading-none tracking-[-0.025em] tabular-nums;
   }
 
-  :where(.tabular-nums) {
-    @apply font-display;
-  }
+  :where(.tabular-nums) { @apply font-ui; }
 
   .cfb-button-label {
-    @apply font-ui font-semibold tracking-[0.025em];
+    @apply font-ui font-semibold tracking-normal;
   }
 
-  /* Shared structural patterns for dense fantasy data screens. */
   .cfb-data-section {
     @apply border-y border-cfb-border-subtle bg-cfb-surface;
   }
@@ -490,104 +391,23 @@
   }
 
   .cfb-data-row {
-    @apply border-b border-cfb-border-subtle last:border-b-0 transition-colors duration-150 hover:bg-cfb-surface-hover/55;
+    @apply border-b border-cfb-border-subtle last:border-b-0 transition-colors duration-150 hover:bg-cfb-surface-hover;
   }
 
   .cfb-icon-button {
-    @apply inline-flex h-9 w-9 items-center justify-center rounded-sm border border-transparent text-cfb-text-secondary transition-colors duration-150 hover:border-cfb-border-subtle hover:bg-cfb-surface-hover hover:text-cfb-text-primary;
+    @apply inline-flex h-10 w-10 items-center justify-center rounded-md border border-cfb-border-subtle text-cfb-text-secondary transition-colors duration-150 hover:border-cfb-brand/50 hover:bg-cfb-surface-hover hover:text-cfb-text-primary;
   }
 
-  .cfb-yard-lines { background-image: none; }
-
-  /*
-   * The sign-in feature panel is the sole existing decorative surface that
-   * receives this treatment. The static, layered background adds a faint
-   * printed-paper character without creating a stacking context or changing
-   * layout, pointer behavior, focus rings, or content contrast.
-   */
-  .cfb-playbook-pattern {
-    background-image:
-      repeating-linear-gradient(0deg, hsl(45 84% 59% / 0.018) 0 1px, transparent 1px 5px),
-      repeating-linear-gradient(90deg, hsl(210 40% 96% / 0.012) 0 1px, transparent 1px 7px);
-  }
-
-  /*
-   * A single, opt-in printed-fiber recipe for editorial artwork only. The
-   * layers stay beneath content and use a 1--2% effective opacity so player
-   * names, numbers, faces, controls, and data tables remain completely crisp.
-   */
+  /* Legacy decoration hooks can still exist in older content, but never paint. */
   .cfb-matte-grain-layer,
-  .cfb-matte-surface::before {
-    background-image:
-      radial-gradient(circle at 18% 20%, hsl(45 84% 59% / 0.72) 0 0.55px, transparent 0.8px),
-      radial-gradient(circle at 72% 68%, hsl(210 40% 96% / 0.55) 0 0.45px, transparent 0.7px),
-      repeating-linear-gradient(116deg, hsl(45 84% 59% / 0.28) 0 0.45px, transparent 0.7px 11px);
-    background-size: 11px 11px, 17px 17px, 19px 19px;
-    mix-blend-mode: soft-light;
-    opacity: 0.02;
-  }
-
-  .cfb-matte-surface {
-    isolation: isolate;
-  }
-
-  .cfb-matte-surface::before {
-    content: "";
-    pointer-events: none;
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-  }
-
-  .cfb-matte-surface > * {
-    position: relative;
-    z-index: 1;
-  }
-
-  /* The player-card artwork uses one stronger, static printed-ink recipe.
-   * It stays behind content, remains position-color agnostic, and is limited
-   * to the card header so working data surfaces stay clean. */
-  .cfb-player-card-grain-layer {
-    background-image:
-      radial-gradient(ellipse at 18% 24%, hsl(45 84% 82% / 0.8) 0 0.45px, transparent 0.9px),
-      radial-gradient(ellipse at 72% 64%, hsl(222 44% 5% / 0.88) 0 0.65px, transparent 1px),
-      repeating-linear-gradient(104deg, hsl(45 84% 86% / 0.34) 0 0.5px, transparent 0.75px 13px),
-      repeating-linear-gradient(8deg, hsl(222 44% 5% / 0.28) 0 0.6px, transparent 0.85px 17px);
-    background-size: 13px 13px, 19px 19px, 23px 23px, 31px 31px;
-    mix-blend-mode: soft-light;
-    opacity: 0.075;
-  }
-
-  /* Sparse halftone and a single short brush underline complete the printed
-   * card treatment without entering the portrait, type, or controls layer. */
-  .cfb-player-card-halftone {
-    background-image: radial-gradient(circle, hsl(45 84% 84% / 0.45) 0 0.7px, transparent 0.95px);
-    background-position: 0 0;
-    background-size: 8px 8px;
-    mask-image: linear-gradient(115deg, transparent 0 55%, black 77% 100%);
-    opacity: 0.055;
-  }
-
+  .cfb-player-card-grain-layer,
+  .cfb-player-card-halftone,
   .cfb-player-card-brush {
-    width: 4.75rem;
-    height: 0.2rem;
-    background: linear-gradient(90deg, hsl(45 84% 59% / 0.72), hsl(45 84% 59% / 0.28) 78%, transparent);
-    clip-path: polygon(0 40%, 86% 0, 100% 42%, 72% 72%, 28% 100%, 0 70%);
-    opacity: 0.6;
+    display: none;
   }
 
-  /* A one-pixel, slightly broken print edge separates the illustrated header
-   * from the metric rail without changing either surface's dimensions. */
   .cfb-player-card-ink-edge {
-    background-image:
-      repeating-linear-gradient(90deg, hsl(45 84% 84% / 0.45) 0 4px, transparent 4px 7px, hsl(222 44% 5% / 0.5) 7px 13px),
-      linear-gradient(90deg, hsl(45 84% 84% / 0.18), hsl(210 40% 96% / 0.42) 52%, hsl(222 44% 5% / 0.5));
-    background-blend-mode: soft-light;
-    opacity: 0.8;
-  }
-
-  .cfb-school-grid {
-    background-image: none;
+    background: hsl(var(--border-subtle));
   }
 
   /* A selected roster position badge is the first half of the two-tap swap. */

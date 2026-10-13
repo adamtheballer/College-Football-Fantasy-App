@@ -79,7 +79,7 @@ export function DraftBoard({
     >
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-cfb-border-subtle px-4 py-4 sm:px-5">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.22em] text-amber-200">Draft board</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.06em] text-amber-200">Draft board</p>
           <p className="mt-1 text-[9px] font-bold uppercase tracking-[0.15em] text-muted-foreground">Every pick, live in draft order</p>
         </div>
         <div className="flex items-center gap-1 border border-cfb-border-subtle bg-cfb-surface p-1">
@@ -105,7 +105,7 @@ export function DraftBoard({
       </div>
       <div ref={scrollRef} data-testid="draft-board-scroll" className="overflow-x-auto overscroll-x-contain p-3 sm:p-5">
         <div className="grid min-w-max gap-1.5" style={{ gridTemplateColumns: `4.5rem repeat(${Math.max(1, teams.length)}, minmax(8.5rem, 1fr))` }}>
-          <div className="flex items-end px-2 pb-2 text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">Round</div>
+          <div className="flex items-end px-2 pb-2 text-[9px] font-black uppercase tracking-[0.06em] text-muted-foreground">Round</div>
           {teams.map(([teamId, teamName]) => {
             const isUser = slots.some((slot) => slot.teamId === teamId && slot.isUser);
             return (
@@ -141,7 +141,7 @@ export function DraftBoard({
                       slot.isCurrent && slot.playerName && "ring-1 ring-inset ring-cfb-gold/70",
                     )}
                   >
-                    <p className="text-[8px] font-black tabular-nums tracking-[0.16em] text-muted-foreground">{slot.round}.{slot.roundPick}</p>
+                    <p className="text-[8px] font-black tabular-nums tracking-[0.06em] text-muted-foreground">{slot.round}.{slot.roundPick}</p>
                     <p className="mt-2 truncate text-xs font-black text-white">{slot.playerName ?? "On deck"}</p>
                     <p className="mt-1 truncate text-[8px] font-black uppercase tracking-[0.12em] text-muted-foreground">{slot.playerPosition ?? (slot.isCurrent ? "On the clock" : slot.teamName)}</p>
                   </div>

@@ -222,30 +222,26 @@ export default function Login() {
 
   return (
     <main className="relative mx-auto grid min-h-[calc(100vh-8rem)] w-full max-w-7xl items-center gap-6 overflow-hidden px-4 py-8 sm:px-6 lg:grid-cols-[1.02fr_0.98fr] lg:px-8">
-      <div aria-hidden="true" className="pointer-events-none absolute -left-20 top-10 h-32 w-96 rotate-[-18deg] rounded-full bg-gradient-to-r from-cfb-crimson/35 via-cfb-brand/30 to-transparent blur-2xl" />
-      <div aria-hidden="true" className="pointer-events-none absolute -right-24 top-24 h-32 w-[30rem] rotate-[-16deg] rounded-full bg-gradient-to-r from-transparent via-cfb-cyan/30 to-cfb-gold/24 blur-2xl" />
-      <div aria-hidden="true" className="pointer-events-none absolute bottom-8 left-20 h-24 w-[26rem] rotate-[-10deg] rounded-full bg-gradient-to-r from-cfb-gold/24 via-cfb-brand/18 to-transparent blur-2xl" />
-
       <section className="relative hidden lg:block">
         <SurfaceCard variant="scoreboard" padding="spacious" className="cfb-playbook-pattern min-h-[560px]">
           <div className="relative flex h-full flex-col justify-between gap-10">
             <div className="space-y-7">
               <Link
                 to="/"
-                className="inline-flex items-center gap-2 rounded-full border border-cfb-brand/35 bg-cfb-brand/[0.12] px-4 py-2 text-[11px] font-black uppercase tracking-[0.18em] text-blue-100 transition hover:border-cfb-brand/55 hover:bg-cfb-brand/20"
+                className="inline-flex items-center gap-2 rounded-full border border-cfb-brand/35 bg-cfb-brand/[0.12] px-4 py-2 text-[11px] font-black uppercase tracking-[0.06em] text-blue-100 transition hover:border-cfb-brand/55 hover:bg-cfb-brand/20"
               >
                 <Trophy className="h-4 w-4 text-cfb-gold" aria-hidden="true" />
                 College Fantasy Football
               </Link>
 
               <div className="max-w-2xl space-y-4">
-                <p className="inline-flex items-center gap-2 rounded-full border border-cfb-gold/30 bg-cfb-gold/[0.10] px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-yellow-100">
+                <p className="inline-flex items-center gap-2 rounded-full border border-cfb-gold/30 bg-cfb-gold/[0.10] px-4 py-2 text-[10px] font-black uppercase tracking-[0.06em] text-yellow-100">
                   <Zap className="h-3.5 w-3.5" aria-hidden="true" />
                   Game week starts here
                 </p>
-                <h1 className="cfb-display-title text-6xl leading-[0.92] xl:text-7xl">
+                <h1 className="cfb-display-title text-4xl xl:text-5xl">
                   Lock in your
-                  <span className="block bg-gradient-to-r from-cfb-cyan via-cfb-brand to-cfb-gold bg-clip-text text-transparent">
+                  <span className="block text-cfb-brand">
                     title chase
                   </span>
                 </h1>
@@ -283,12 +279,12 @@ export default function Login() {
       <section className="relative mx-auto w-full max-w-[520px]">
         <SurfaceCard variant="raised" padding="none" className="relative overflow-hidden">
           <PlaybookDecor className="opacity-25" />
-          <div className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-cfb-cyan via-cfb-gold to-cfb-crimson" />
+          <div className="absolute inset-x-0 top-0 h-0.5 bg-cfb-brand" />
 
           <div className="relative space-y-8 p-6 sm:p-8">
             <div className="space-y-4 text-center">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-cfb-gold via-cfb-cyan to-cfb-brand shadow-[0_0_38px_hsl(var(--brand-primary)/0.28)]">
-                <Trophy className="h-7 w-7 text-slate-950" aria-hidden="true" />
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-md border border-cfb-brand/40 bg-cfb-brand/10">
+                <Trophy className="h-6 w-6 text-cfb-brand" aria-hidden="true" />
               </div>
               <div>
                 <p className="cfb-micro-label text-cfb-brand">
@@ -311,7 +307,7 @@ export default function Login() {
                   <label htmlFor="login-email" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">Email address</label>
                   <span className="group relative block">
                     <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted transition-colors group-focus-within:text-cfb-cyan" />
-                    <Input id="login-email" type="email" placeholder="coach@saturday.com" className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-base font-bold text-cfb-text-primary placeholder:text-cfb-text-muted transition focus:border-cfb-brand/60 focus:ring-cfb-brand/25 md:text-sm" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                    <Input id="login-email" type="email" placeholder="coach@saturday.com" className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-base font-bold text-cfb-text-primary placeholder:text-cfb-text-muted transition focus:border-cfb-brand/60 focus:ring-cfb-brand/25 md:text-sm" value={email} onChange={(e) => setEmail(e.target.value)} required />
                   </span>
                 </div>
                 <div className="space-y-2">
@@ -323,7 +319,7 @@ export default function Login() {
                   </span>
                   <span className="group relative block">
                     <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted transition-colors group-focus-within:text-cfb-cyan" />
-                    <Input id="login-password" type={showPassword ? "text" : "password"} placeholder="••••••••" className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 pr-12 text-base font-bold text-cfb-text-primary placeholder:text-cfb-text-muted transition focus:border-cfb-brand/60 focus:ring-cfb-brand/25 md:text-sm" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                    <Input id="login-password" type={showPassword ? "text" : "password"} placeholder="••••••••" className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 pr-12 text-base font-bold text-cfb-text-primary placeholder:text-cfb-text-muted transition focus:border-cfb-brand/60 focus:ring-cfb-brand/25 md:text-sm" value={password} onChange={(e) => setPassword(e.target.value)} required />
                     <button type="button" aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} onClick={() => setShowPassword((value) => !value)} className="absolute right-4 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-cfb-text-muted transition hover:bg-white/10 hover:text-cfb-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-cyan/60">
                       {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
                     </button>
@@ -331,18 +327,18 @@ export default function Login() {
                 </div>
                 {resetSuccess ? <div className="rounded-2xl border border-cfb-gold/35 bg-cfb-gold/[0.12] px-4 py-3 text-xs font-bold text-yellow-100">Password reset successfully. Sign in with your new password.</div> : null}
                 {error ? <div role="alert" className="rounded-2xl border border-cfb-danger/35 bg-cfb-danger/[0.14] px-4 py-3 text-xs font-bold text-red-100">{error}</div> : null}
-                <Button type="submit" className="group h-14 w-full rounded-2xl bg-gradient-to-r from-cfb-cyan to-cfb-brand text-[11px] font-black uppercase tracking-[0.2em] text-slate-950 shadow-[0_18px_42px_hsl(var(--brand-primary)/0.26)] hover:brightness-110" disabled={isLoading}>
+                <Button type="submit" className="group h-12 w-full rounded-2xl bg-cfb-brand text-sm font-semibold text-primary-foreground shadow-none hover:brightness-110" disabled={isLoading}>
                   {isLoading ? <span className="h-5 w-5 rounded-full border-2 border-slate-950/30 border-t-slate-950 animate-spin" /> : <span className="flex items-center gap-2 transition-all group-hover:gap-4">Sign in to dashboard <ArrowRight className="h-4 w-4" aria-hidden="true" /></span>}
                 </Button>
               </form>
             ) : (
               <form onSubmit={handleSignupSubmit} className="space-y-5">
-                <div className="space-y-2"><label htmlFor="signup-name" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">First name</label><span className="group relative block"><User className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" /><Input id="signup-name" type="text" placeholder="Your first name" maxLength={50} className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-base font-bold text-cfb-text-primary md:text-sm" value={firstName} onChange={(event) => setFirstName(event.target.value)} required /></span></div>
-                <div className="space-y-2"><label htmlFor="signup-email" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">Email address</label><span className="group relative block"><Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" /><Input id="signup-email" type="email" placeholder="coach@saturday.com" className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-base font-bold text-cfb-text-primary md:text-sm" value={email} onChange={(event) => setEmail(event.target.value)} required /></span></div>
-                <div className="space-y-2"><label htmlFor="signup-password" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">Password</label><span className="group relative block"><Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" /><Input id="signup-password" type={showPassword ? "text" : "password"} placeholder="••••••••" className="h-14 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 pr-12 text-base font-bold text-cfb-text-primary md:text-sm" value={password} onChange={(event) => setPassword(event.target.value)} required /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((value) => !value)} className="absolute right-4 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-cfb-text-muted">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></span></div>
+                <div className="space-y-2"><label htmlFor="signup-name" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">First name</label><span className="group relative block"><User className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" /><Input id="signup-name" type="text" placeholder="Your first name" maxLength={50} className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-base font-bold text-cfb-text-primary md:text-sm" value={firstName} onChange={(event) => setFirstName(event.target.value)} required /></span></div>
+                <div className="space-y-2"><label htmlFor="signup-email" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">Email address</label><span className="group relative block"><Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" /><Input id="signup-email" type="email" placeholder="coach@saturday.com" className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-base font-bold text-cfb-text-primary md:text-sm" value={email} onChange={(event) => setEmail(event.target.value)} required /></span></div>
+                <div className="space-y-2"><label htmlFor="signup-password" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">Password</label><span className="group relative block"><Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" /><Input id="signup-password" type={showPassword ? "text" : "password"} placeholder="••••••••" className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 pr-12 text-base font-bold text-cfb-text-primary md:text-sm" value={password} onChange={(event) => setPassword(event.target.value)} required /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((value) => !value)} className="absolute right-4 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-cfb-text-muted">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></span></div>
                 <p className="rounded-2xl border border-cfb-border-subtle bg-cfb-surface/60 px-4 py-3 text-xs font-semibold text-cfb-text-secondary">{PASSWORD_POLICY_MESSAGE}</p>
                 {error ? <div role="alert" className="rounded-2xl border border-cfb-danger/35 bg-cfb-danger/[0.14] px-4 py-3 text-xs font-bold text-red-100">{error}</div> : null}
-                <Button type="submit" className="group h-14 w-full rounded-2xl bg-gradient-to-r from-cfb-cyan to-cfb-brand text-[11px] font-black uppercase tracking-[0.2em] text-slate-950 shadow-[0_18px_42px_hsl(var(--brand-primary)/0.26)] hover:brightness-110" disabled={isLoading}>{isLoading ? <span className="h-5 w-5 rounded-full border-2 border-slate-950/30 border-t-slate-950 animate-spin" /> : <span className="flex items-center gap-2 transition-all group-hover:gap-4">Create account <ArrowRight className="h-4 w-4" aria-hidden="true" /></span>}</Button>
+                <Button type="submit" className="group h-12 w-full rounded-2xl bg-cfb-brand text-sm font-semibold text-primary-foreground shadow-none hover:brightness-110" disabled={isLoading}>{isLoading ? <span className="h-5 w-5 rounded-full border-2 border-slate-950/30 border-t-slate-950 animate-spin" /> : <span className="flex items-center gap-2 transition-all group-hover:gap-4">Create account <ArrowRight className="h-4 w-4" aria-hidden="true" /></span>}</Button>
               </form>
             )}
 

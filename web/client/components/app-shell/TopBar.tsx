@@ -25,7 +25,7 @@ export function TopBar({ isLoggedIn, user }: TopBarProps) {
             <AppBrandLockup variant="compact" />
           </Link>
         </div>
-        <div className="hidden h-px flex-1 bg-cfb-border-subtle md:block" />
+        <p className="hidden flex-1 font-display text-sm font-bold uppercase italic tracking-wide text-cfb-text-primary lg:block">College Fantasy Football</p>
         <div className="flex shrink-0 items-center gap-3">
           {isLoggedIn ? (
             <div className="flex items-center gap-3">

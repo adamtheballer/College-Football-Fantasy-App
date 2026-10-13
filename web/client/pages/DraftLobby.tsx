@@ -166,7 +166,7 @@ export default function DraftLobby() {
     return (
       <div className="max-w-3xl mx-auto py-20 text-center">
         <Card className="bg-card/40 border-border/60 rounded-[2.5rem] p-12">
-          <p className="text-sm font-bold uppercase tracking-[0.2em] text-muted-foreground">Loading draft lobby...</p>
+          <p className="text-sm font-bold uppercase tracking-[0.06em] text-muted-foreground">Loading draft lobby...</p>
         </Card>
       </div>
     );
@@ -286,7 +286,7 @@ export default function DraftLobby() {
             {canReschedule ? (
               <Button
                 type="button"
-                className="h-11 rounded-2xl bg-amber-300 px-5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-950 hover:bg-amber-200"
+                className="h-11 rounded-2xl bg-amber-300 px-5 text-[10px] font-black uppercase tracking-[0.06em] text-slate-950 hover:bg-amber-200"
                 onClick={() => {
                   setDismissedPoolWarning(true);
                   setShowReschedule(true);
@@ -298,7 +298,7 @@ export default function DraftLobby() {
             <Button
               type="button"
               variant="outline"
-              className="h-11 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em]"
+              className="h-11 rounded-2xl text-[10px] font-black uppercase tracking-[0.06em]"
               onClick={() => setDismissedPoolWarning(true)}
             >
               Review Lobby
@@ -334,7 +334,7 @@ export default function DraftLobby() {
             }}
           >
             <div className="rounded-2xl border border-white/10 bg-black/15 p-4 text-sm">
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Current schedule</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.06em] text-slate-500">Current schedule</p>
               <p className="mt-2 font-black text-slate-50">
                 {formatLeagueDraftDateTime(draftTime, league.draft?.timezone || "UTC")}
               </p>
@@ -344,7 +344,7 @@ export default function DraftLobby() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="grid gap-2" htmlFor="draft-reschedule-date">
-                <span className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">New date</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">New date</span>
                 <Input
                   id="draft-reschedule-date"
                   type="date"
@@ -355,7 +355,7 @@ export default function DraftLobby() {
                 />
               </label>
               <label className="grid gap-2" htmlFor="draft-reschedule-time">
-                <span className="text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">New time</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">New time</span>
                 <Input
                   id="draft-reschedule-time"
                   type="time"
@@ -374,7 +374,7 @@ export default function DraftLobby() {
               <Button
                 type="button"
                 variant="outline"
-                className="h-11 rounded-2xl text-[10px] font-black uppercase tracking-[0.18em]"
+                className="h-11 rounded-2xl text-[10px] font-black uppercase tracking-[0.06em]"
                 onClick={() => setShowReschedule(false)}
                 disabled={rescheduleDraft.isPending}
               >
@@ -382,7 +382,7 @@ export default function DraftLobby() {
               </Button>
               <Button
                 type="submit"
-                className="h-11 rounded-2xl bg-primary px-5 text-[10px] font-black uppercase tracking-[0.18em] text-primary-foreground"
+                className="h-11 rounded-2xl bg-primary px-5 text-[10px] font-black uppercase tracking-[0.06em] text-primary-foreground"
                 disabled={rescheduleDraft.isPending}
               >
                 {rescheduleDraft.isPending ? "Saving..." : "Save New Draft Time"}
@@ -393,20 +393,20 @@ export default function DraftLobby() {
       </Dialog>
 
       <div className="space-y-3">
-        <h1 className="text-6xl font-black italic uppercase text-foreground">{league.name}</h1>
-        <p className="text-sm font-medium text-muted-foreground uppercase tracking-[0.2em]">
+        <h1 className="text-3xl font-extrabold italic uppercase sm:text-4xl text-foreground">{league.name}</h1>
+        <p className="text-sm font-medium text-muted-foreground uppercase tracking-[0.06em]">
           Draft Lobby • {league.members.length}/{league.max_teams} members
         </p>
       </div>
 
       <Card className="bg-card/40 border-border/60 rounded-[2.5rem]">
         <CardHeader className="flex flex-col gap-4 px-10 pt-10 sm:flex-row sm:items-center sm:justify-between">
-          <CardTitle className="text-xl font-black uppercase tracking-[0.2em]">Draft Countdown</CardTitle>
+          <CardTitle className="text-xl font-black uppercase tracking-[0.06em]">Draft Countdown</CardTitle>
           {canReschedule ? (
             <Button
               type="button"
               variant="outline"
-              className="h-11 rounded-2xl border-sky-200/25 bg-sky-300/10 px-5 text-[10px] font-black uppercase tracking-[0.2em] text-sky-100 hover:bg-sky-300/15"
+              className="h-11 rounded-2xl border-sky-200/25 bg-sky-300/10 px-5 text-[10px] font-black uppercase tracking-[0.06em] text-sky-100 hover:bg-sky-300/15"
               onClick={() => {
                 setRescheduleError(null);
                 setRescheduleSuccess(null);
@@ -452,7 +452,7 @@ export default function DraftLobby() {
               ].map(({ label, compactLabel, value }) => (
                 <div key={label} className="min-w-0 rounded-2xl border border-white/10 bg-black/15 px-2 py-3 text-center sm:p-4">
                   <p className="whitespace-nowrap text-[clamp(1.55rem,8.5vw,1.875rem)] font-black leading-none tabular-nums text-slate-50">{value}</p>
-                  <p aria-label={label} className="mt-2 whitespace-nowrap text-[8px] font-black uppercase tracking-[0.08em] text-slate-500 sm:text-[9px] sm:tracking-[0.18em]">
+                  <p aria-label={label} className="mt-2 whitespace-nowrap text-[8px] font-black uppercase tracking-[0.08em] text-slate-500 sm:text-[9px] sm:tracking-[0.06em]">
                     <span className="sm:hidden">{compactLabel}</span>
                     <span className="hidden sm:inline">{label}</span>
                   </p>
@@ -461,7 +461,7 @@ export default function DraftLobby() {
             </div>
           ) : null}
 
-          <div className="space-y-2 text-sm font-bold uppercase tracking-[0.2em] text-muted-foreground">
+          <div className="space-y-2 text-sm font-bold uppercase tracking-[0.06em] text-muted-foreground">
             <p>Draft Order: {league.draft_order?.draft_order_mode === "custom" ? "Commissioner set" : "Random at start"}</p>
             <p>Timezone: {getLeagueTimezoneLabel(league.draft?.timezone || "UTC")}</p>
             <p>Draft Time: {formatLeagueDraftDateTime(draftTime, league.draft?.timezone || "UTC")}</p>
@@ -472,7 +472,7 @@ export default function DraftLobby() {
 
       <Card className="bg-card/40 border-border/60 rounded-[2.5rem]">
         <CardHeader className="px-10 pt-10">
-          <CardTitle className="text-xl font-black uppercase tracking-[0.2em]">Draft Order</CardTitle>
+          <CardTitle className="text-xl font-black uppercase tracking-[0.06em]">Draft Order</CardTitle>
           <p className="text-sm font-medium text-muted-foreground">
             {league.draft_order?.draft_order_mode === "custom"
               ? "The commissioner can build this order as managers join. Empty slots are allowed now, but every slot must be filled before the draft starts."
@@ -489,7 +489,7 @@ export default function DraftLobby() {
                   className="h-auto min-h-16 justify-start rounded-2xl px-5 py-4 text-left"
                   onClick={() => setDraftOrderMode("random")}
                 >
-                  <span><span className="block text-xs font-black uppercase tracking-[0.18em]">Random order</span><span className="mt-1 block text-xs font-medium normal-case">Generated once at draft start.</span></span>
+                  <span><span className="block text-xs font-black uppercase tracking-[0.06em]">Random order</span><span className="mt-1 block text-xs font-medium normal-case">Generated once at draft start.</span></span>
                 </Button>
                 <Button
                   type="button"
@@ -497,7 +497,7 @@ export default function DraftLobby() {
                   className="h-auto min-h-16 justify-start rounded-2xl px-5 py-4 text-left"
                   onClick={() => setDraftOrderMode("custom")}
                 >
-                  <span><span className="block text-xs font-black uppercase tracking-[0.18em]">Custom order</span><span className="mt-1 block text-xs font-medium normal-case">Assign joined managers as they arrive.</span></span>
+                  <span><span className="block text-xs font-black uppercase tracking-[0.06em]">Custom order</span><span className="mt-1 block text-xs font-medium normal-case">Assign joined managers as they arrive.</span></span>
                 </Button>
               </div>
 
@@ -512,7 +512,7 @@ export default function DraftLobby() {
                     );
                     return (
                       <label key={slot} className="rounded-2xl border border-white/10 bg-black/15 p-4">
-                        <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Pick {slot}</span>
+                        <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.06em] text-slate-500">Pick {slot}</span>
                         <Select
                           value={selectedTeamId ? String(selectedTeamId) : `unassigned-${slot}`}
                           onValueChange={(value) => {
@@ -546,7 +546,7 @@ export default function DraftLobby() {
               {draftOrderSuccess ? <p role="status" className="text-sm font-bold text-emerald-300">{draftOrderSuccess}</p> : null}
               <Button
                 type="button"
-                className="h-11 rounded-2xl px-5 text-[10px] font-black uppercase tracking-[0.18em]"
+                className="h-11 rounded-2xl px-5 text-[10px] font-black uppercase tracking-[0.06em]"
                 onClick={() => void saveDraftOrder()}
                 disabled={updateDraftOrder.isPending}
               >
@@ -570,27 +570,27 @@ export default function DraftLobby() {
       {isCommissioner ? (
         <Card className="border-amber-300/20 bg-amber-300/[0.06] rounded-[2.5rem]">
           <CardHeader className="px-10 pt-10">
-            <CardTitle className="text-xl font-black uppercase tracking-[0.2em]">Invite Recovery</CardTitle>
+            <CardTitle className="text-xl font-black uppercase tracking-[0.06em]">Invite Recovery</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 px-10 pb-10">
             {activeInviteCode && activeInviteLink ? (
               <>
                 <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/15 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
                   <div className="min-w-0">
-                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">Invite Code</p>
+                    <p className="text-[9px] font-black uppercase tracking-[0.06em] text-slate-500">Invite Code</p>
                     <p className="mt-1 break-all font-mono text-lg font-black text-slate-50">{activeInviteCode}</p>
                   </div>
-                  <Button type="button" variant="outline" className="h-11 rounded-xl text-[10px] font-black uppercase tracking-[0.16em]" onClick={() => void copyInviteValue("code", activeInviteCode)}>
+                  <Button type="button" variant="outline" className="h-11 rounded-xl text-[10px] font-black uppercase tracking-[0.06em]" onClick={() => void copyInviteValue("code", activeInviteCode)}>
                     <Copy className="mr-2 h-4 w-4" />
                     {copiedInviteField === "code" ? "Copied" : "Copy Code"}
                   </Button>
                 </div>
                 <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/15 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
                   <div className="min-w-0">
-                    <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">Invite Link</p>
+                    <p className="text-[9px] font-black uppercase tracking-[0.06em] text-slate-500">Invite Link</p>
                     <p className="mt-1 break-all font-mono text-xs font-bold text-slate-300">{activeInviteLink}</p>
                   </div>
-                  <Button type="button" variant="outline" className="h-11 rounded-xl text-[10px] font-black uppercase tracking-[0.16em]" onClick={() => void copyInviteValue("link", activeInviteLink)}>
+                  <Button type="button" variant="outline" className="h-11 rounded-xl text-[10px] font-black uppercase tracking-[0.06em]" onClick={() => void copyInviteValue("link", activeInviteLink)}>
                     <Link2 className="mr-2 h-4 w-4" />
                     {copiedInviteField === "link" ? "Copied" : "Copy Link"}
                   </Button>
@@ -602,12 +602,12 @@ export default function DraftLobby() {
               </p>
             )}
             <div className="flex flex-wrap gap-3">
-              <Button type="button" variant="outline" className="h-11 rounded-xl text-[10px] font-black uppercase tracking-[0.16em]" onClick={() => void handleRotateInvite()} disabled={rotateInvite.isPending}>
+              <Button type="button" variant="outline" className="h-11 rounded-xl text-[10px] font-black uppercase tracking-[0.06em]" onClick={() => void handleRotateInvite()} disabled={rotateInvite.isPending}>
                 <RefreshCw className="mr-2 h-4 w-4" />
                 {rotateInvite.isPending ? "Generating..." : activeInviteCode ? "Rotate Invite" : "Generate Invite"}
               </Button>
               {activeInviteCode ? (
-                <Button type="button" variant="outline" className="h-11 rounded-xl border-red-300/25 text-[10px] font-black uppercase tracking-[0.16em] text-red-200 hover:bg-red-400/10" onClick={() => void handleRevokeInvite()} disabled={revokeInvite.isPending}>
+                <Button type="button" variant="outline" className="h-11 rounded-xl border-red-300/25 text-[10px] font-black uppercase tracking-[0.06em] text-red-200 hover:bg-red-400/10" onClick={() => void handleRevokeInvite()} disabled={revokeInvite.isPending}>
                   {revokeInvite.isPending ? "Revoking..." : "Revoke Invite"}
                 </Button>
               ) : null}
@@ -635,7 +635,7 @@ export default function DraftLobby() {
               )}
             </div>
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-sky-300">
+              <p className="text-[10px] font-black uppercase tracking-[0.06em] text-sky-300">
                 Draft Room
               </p>
               <h2 className="mt-1 text-2xl font-black uppercase italic text-slate-50">
@@ -651,7 +651,7 @@ export default function DraftLobby() {
             </div>
           </div>
           <Button
-            className="h-12 rounded-2xl bg-primary px-8 text-[10px] font-black uppercase tracking-[0.2em] text-primary-foreground disabled:cursor-not-allowed disabled:opacity-45"
+            className="h-12 rounded-2xl bg-primary px-8 text-[10px] font-black uppercase tracking-[0.06em] text-primary-foreground disabled:cursor-not-allowed disabled:opacity-45"
             disabled={!draftIsReadyToCommence}
             onClick={() => navigate(draftRoomPath)}
           >
@@ -662,11 +662,11 @@ export default function DraftLobby() {
 
       <Card className="bg-card/40 border-border/60 rounded-[2.5rem]">
         <CardHeader className="px-10 pt-10">
-          <CardTitle className="text-xl font-black uppercase tracking-[0.2em]">Participants</CardTitle>
+          <CardTitle className="text-xl font-black uppercase tracking-[0.06em]">Participants</CardTitle>
         </CardHeader>
         <CardContent className="px-10 pb-10 space-y-4">
           {!isFull && (
-            <div className="rounded-[2rem] border border-amber-300/20 bg-amber-400/10 p-5">
+            <div className="rounded-md border border-amber-300/20 bg-amber-400/10 p-5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex gap-4">
                   <AlertTriangle className="mt-1 h-5 w-5 shrink-0 text-amber-300" />
@@ -685,7 +685,7 @@ export default function DraftLobby() {
           )}
           {league.members.map((member) => (
             <div key={member.id} className="flex items-center justify-between px-6 py-4 rounded-2xl bg-white/5 border border-white/10">
-              <span className="text-sm font-black uppercase tracking-[0.2em] text-foreground">User {member.user_id}</span>
+              <span className="text-sm font-black uppercase tracking-[0.06em] text-foreground">User {member.user_id}</span>
               <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{member.role}</span>
             </div>
           ))}
@@ -693,14 +693,14 @@ export default function DraftLobby() {
       </Card>
 
       {(!isFull || !canEnterDraft) && (
-        <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground/70">
+        <p className="text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground/70">
           Draft room access stays locked until the league is full and the scheduled draft time has arrived.
         </p>
       )}
 
       <div className="flex items-center gap-4">
         <Button
-          className="h-12 px-8 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.2em] disabled:cursor-not-allowed disabled:opacity-45"
+          className="h-12 px-8 rounded-2xl bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-[0.06em] disabled:cursor-not-allowed disabled:opacity-45"
           disabled={!draftIsReadyToCommence}
           onClick={() => navigate(draftRoomPath)}
         >
@@ -708,7 +708,7 @@ export default function DraftLobby() {
         </Button>
         <Button
           variant="outline"
-          className="h-12 px-6 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em]"
+          className="h-12 px-6 rounded-2xl text-[10px] font-black uppercase tracking-[0.06em]"
           onClick={() => navigate(`/league/${league.id}`)}
         >
           Back to League

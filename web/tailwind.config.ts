@@ -91,22 +91,25 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        xl: "var(--radius)",
+        "2xl": "var(--radius-surface)",
+        "3xl": "var(--radius-surface)",
       },
       fontFamily: {
         display: [
-          "Josefin Sans",
+          '"Exo 2"',
           "ui-sans-serif",
           "system-ui",
           "sans-serif",
         ],
         ui: [
-          "Josefin Sans",
+          "Poppins",
           "ui-sans-serif",
           "system-ui",
           "sans-serif",
         ],
         sans: [
-          "Josefin Sans",
+          "Poppins",
           "ui-sans-serif",
           "system-ui",
           "sans-serif",

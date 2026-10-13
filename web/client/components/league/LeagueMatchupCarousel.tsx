@@ -162,14 +162,14 @@ export function LeagueMatchupCarousel({
       >
         <span
           aria-hidden="true"
-          className="absolute top-0 h-px w-12 rounded-full bg-gradient-to-r from-cfb-gold via-cfb-brand to-cfb-brand/15 shadow-[0_0_14px_rgba(74,169,255,0.9)] transition-[left] duration-500 ease-out motion-reduce:transition-none"
+          className="absolute top-0 h-px w-12 bg-cfb-brand transition-[left] duration-500 ease-out motion-reduce:transition-none"
           style={{ left: `calc(${carouselProgress}% - ${carouselProgress * 0.48}px)` }}
         />
       </div>
       <div className="mb-3 flex items-center justify-between gap-3 px-1 sm:mb-4">
         <div>
           <p className="cfb-micro-label text-cfb-brand">Your leagues</p>
-          <h2 id="league-matchup-carousel-title" className="mt-1 text-xl font-black text-cfb-text-primary sm:text-2xl">
+          <h2 id="league-matchup-carousel-title" className="cfb-section-title mt-1 text-xl sm:text-2xl">
             Matchups at a glance
           </h2>
         </div>

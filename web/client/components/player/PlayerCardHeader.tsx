@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { UserRound, X } from "lucide-react";
 
 import type { PlayerCardResponse } from "@/hooks/use-players";
@@ -44,17 +44,9 @@ export const resolvePlayerCardStatus = (
   contextualStatus?: string | null,
 ) => formatPlayerCardStatus(card?.current_injury_status ?? contextualStatus ?? "UNREPORTED");
 
-const playbookMarks = [
-  { label: "X", className: "left-[58%] top-8" },
-  { label: "O", className: "left-[69%] top-14" },
-  { label: "X", className: "left-[78%] top-7" },
-  { label: "12", className: "left-[87%] bottom-7 text-[18px]" },
-];
-
 export function PlayerCardHeader({
   card,
   onClose,
-  palette,
   player,
   position,
   title,
@@ -91,36 +83,21 @@ export function PlayerCardHeader({
     { label: "Class", mobileLabel: "Class", value: card?.about.player_class ?? player.playerClass ?? "—" },
     { label: "Status", mobileLabel: "Status", value: playerStatus },
   ];
-  const headerStreakStyle: CSSProperties = {
-    backgroundImage: [
-      `repeating-linear-gradient(168deg, transparent 0 18px, ${palette.markerA} 19px 27px, transparent 29px 54px)`,
-      `linear-gradient(101deg, transparent 0 11%, ${palette.markerB} 11.5% 23%, transparent 24% 100%)`,
-      `linear-gradient(116deg, transparent 0 42%, ${palette.markerC} 42.5% 49%, transparent 50% 100%)`,
-      "repeating-linear-gradient(90deg, rgba(255,255,255,0.11) 0 1px, transparent 1px 86px)",
-    ].join(", "),
-    backgroundPosition: "0 0, 0 0, 0 0, 18px 0",
-  };
-
   return (
     <>
       <button
         type="button"
         aria-label="Close player card"
         onClick={onClose}
-        className="absolute right-3 top-3 z-30 inline-flex h-9 w-9 items-center justify-center rounded-sm border border-white/15 bg-black/25 text-white/75 backdrop-blur transition hover:bg-white/10 hover:text-white sm:right-4 sm:top-4 sm:h-11 sm:w-11"
+        className="absolute right-3 top-3 z-30 inline-flex h-11 w-11 items-center justify-center rounded-md border border-cfb-border-subtle bg-cfb-surface text-cfb-text-secondary transition hover:border-cfb-brand/50 hover:bg-cfb-surface-hover hover:text-white sm:right-4 sm:top-4"
       >
         <X className="h-5 w-5" />
       </button>
 
-      <header className={cn("relative min-h-[15.5rem] shrink-0 overflow-hidden bg-gradient-to-br px-5 py-5 sm:min-h-[17.75rem] sm:px-10 sm:py-7", palette.headerBase)}>
-        <div className="absolute inset-0 opacity-50 mix-blend-screen" style={headerStreakStyle} />
-        <div className="absolute inset-0 bg-[linear-gradient(112deg,rgba(4,8,18,0.14)_0%,transparent_44%,rgba(2,6,23,0.42)_100%)]" />
-        <div aria-hidden="true" className="cfb-player-card-grain-layer pointer-events-none absolute inset-0" />
-        <div aria-hidden="true" className="cfb-player-card-halftone pointer-events-none absolute inset-0" />
-        <div aria-hidden="true" className="cfb-player-card-brush pointer-events-none absolute bottom-4 left-5 sm:bottom-6 sm:left-10" />
+      <header data-testid="player-card-header" className="relative min-h-[15.5rem] shrink-0 overflow-hidden border-t-2 border-cfb-brand bg-cfb-surface-raised px-5 py-5 sm:min-h-[15.75rem] sm:px-8 sm:py-6">
         <div
           data-testid="player-card-hero-portrait"
-          className="pointer-events-none absolute bottom-0 right-0 z-[5] h-[14.5rem] w-[12.5rem] sm:h-[17.5rem] sm:w-[17.5rem]"
+          className="pointer-events-none absolute bottom-0 right-0 z-[5] h-[13rem] w-[11rem] sm:h-[14.5rem] sm:w-[15rem]"
         >
           {card?.about.headshot_url && !headshotFailed ? (
             <img
@@ -130,39 +107,18 @@ export function PlayerCardHeader({
               onError={() => setHeadshotFailed(true)}
             />
           ) : (
-            <div className={cn("flex h-full w-full items-end justify-center bg-gradient-to-l opacity-85 [mask-image:linear-gradient(to_right,transparent_0%,black_18%,black_100%)]", palette.silhouette)}>
+            <div className="flex h-full w-full items-end justify-center">
               <UserRound className="mb-4 h-32 w-32 text-white/75 sm:mb-6 sm:h-44 sm:w-44" />
             </div>
           )}
         </div>
-        <div
-          className="pointer-events-none absolute inset-0 hidden text-white/20 [mask-image:linear-gradient(to_right,black_0%,black_58%,transparent_74%)] lg:block"
-          aria-hidden="true"
-        >
-          <div className="absolute left-[40%] top-11 h-px w-36 rotate-[14deg] bg-white/25" />
-          <div className="absolute left-[49%] top-[4.25rem] h-px w-32 -rotate-[18deg] bg-white/20" />
-          <div className="absolute left-[55%] top-10 h-px w-28 rotate-[25deg] bg-white/15" />
-          {playbookMarks.map((mark) => (
-            <span
-              key={`${mark.label}-${mark.className}`}
-              className={cn(
-                "absolute -translate-x-[18%] font-black italic leading-none tracking-normal text-white/25",
-                mark.label.length > 1 ? "text-base" : "text-3xl",
-                mark.className,
-              )}
-            >
-              {mark.label}
-            </span>
-          ))}
-        </div>
-        <div aria-hidden="true" className="cfb-player-card-ink-edge pointer-events-none absolute inset-x-0 bottom-0 z-20 h-px" />
-        <div data-testid="player-card-identity" className="relative z-10 flex min-h-[12.5rem] min-w-0 flex-col justify-center pr-[10.25rem] text-left sm:min-h-[15rem] sm:max-w-[60%] sm:-translate-y-3 sm:pr-0">
-          <p className="mb-3 text-[9px] font-black uppercase tracking-[0.24em] text-white/65 sm:mb-4 sm:text-[10px] sm:tracking-[0.28em]">{title}</p>
+        <div data-testid="player-card-identity" className="relative z-10 flex min-h-[12.5rem] min-w-0 flex-col justify-center pr-[10.5rem] text-left sm:min-h-[12.75rem] sm:max-w-[62%] sm:pr-0">
+          <p className="cfb-micro-label mb-4 text-cfb-brand sm:mb-5">{title}</p>
           <div className="min-w-0 max-w-xl">
-            <h2 id="player-card-title" className="break-words text-[1.8rem] font-black uppercase leading-[0.92] tracking-[-0.035em] text-[#F3F0E7] [text-shadow:0_2px_16px_rgba(2,6,23,0.7)] sm:text-[3.35rem]">
+            <h2 id="player-card-title" className="break-words font-ui text-[1.5rem] font-semibold leading-[1.15] tracking-[-0.025em] text-cfb-text-primary sm:text-[2.75rem]">
               {player.name}
             </h2>
-            <p className="mt-2 truncate text-[10px] font-black uppercase tracking-[0.13em] text-white/80 sm:mt-3 sm:text-xs sm:tracking-[0.18em]">
+            <p className="mt-2 text-[11px] font-medium leading-relaxed text-cfb-text-secondary sm:mt-3 sm:text-sm">
               {[position || player.position, card?.about.team ?? player.school].filter(Boolean).join("  •  ")}
             </p>
             <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[9px] font-bold sm:mt-3 sm:text-[11px]">
@@ -177,14 +133,14 @@ export function PlayerCardHeader({
           </div>
         </div>
       </header>
-      <div data-testid="player-card-metric-rail" className="grid shrink-0 grid-cols-4 divide-x divide-white/10 border-b border-white/10 bg-[#090c11]">
+      <div data-testid="player-card-metric-rail" className="grid shrink-0 grid-cols-4 divide-x divide-cfb-border-subtle border-y border-cfb-border-subtle bg-cfb-surface">
         {metricCards.map(({ label, mobileLabel, value }) => (
           <div key={label} className="min-w-0 px-2 py-3 text-center sm:px-4 sm:py-4">
             <p className="truncate text-[8px] font-black uppercase tracking-[0.1em] text-white/45 sm:text-[9px] sm:tracking-[0.18em]">
               <span className="sm:hidden" aria-label={label}>{mobileLabel}</span>
               <span className="hidden sm:inline">{label}</span>
             </p>
-            <p className="mt-1 truncate text-base font-black tabular-nums text-white sm:mt-1.5 sm:text-2xl">{value}</p>
+            <p className="mt-1 break-words text-[13px] font-semibold leading-tight tabular-nums text-white sm:mt-1.5 sm:text-2xl">{value}</p>
           </div>
         ))}
       </div>
