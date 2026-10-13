@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 
 import { formatPlayerCardPositionRank, PlayerCardHeader, resolvePlayerCardStatus } from "./PlayerCardHeader";
+import { getPlayerCardPalette } from "./PlayerCardModal";
 
 afterEach(cleanup);
 
@@ -19,14 +20,7 @@ describe("PlayerCardHeader injury status", () => {
           historical_stats: null,
         } as never}
         onClose={vi.fn()}
-        palette={{
-          headerBase: "bg-slate-900",
-          markerA: "rgba(255,255,255,0.1)",
-          markerB: "rgba(255,255,255,0.1)",
-          markerC: "rgba(255,255,255,0.1)",
-          pill: "bg-slate-800",
-          silhouette: "from-slate-700 to-slate-800",
-        }}
+        palette={getPlayerCardPalette("WR")}
         player={{ id: 1, name: "Portrait Player", position: "WR", school: "Miami" }}
         position="WR"
         title="Player Card"
@@ -44,10 +38,12 @@ describe("PlayerCardHeader injury status", () => {
     expect(portrait.querySelector("img")?.className).toContain("mask-image");
     expect(screen.getByTestId("player-card-identity").className).toContain("pr-[10.5rem]");
     expect(screen.getByText("Player Card").className).toContain("mb-4");
-    expect(screen.getByTestId("player-card-header").className).toContain("bg-cfb-surface-raised");
-    expect(screen.getByTestId("player-card-header").className).not.toContain("bg-gradient");
+    expect(screen.getByTestId("player-card-header").className).toContain(getPlayerCardPalette("WR").headerBase);
+    expect(screen.getByTestId("player-card-header").className).toContain("bg-gradient-to-r");
     expect(screen.getByTestId("player-card-header").querySelector("[style]" )).toBeNull();
-    expect(screen.getByText(/WR\s+•\s+Miami/)).toBeTruthy();
+    expect(screen.getByTestId("player-card-position-badge").className).toContain(getPlayerCardPalette("WR").pill);
+    expect(screen.getByTestId("player-card-position-badge").textContent).toBe("WR");
+    expect(screen.getByText(/• Miami/)).toBeTruthy();
   });
 
   it("treats a missing official injury report as ACTIVE", () => {
