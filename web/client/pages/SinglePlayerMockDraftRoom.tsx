@@ -452,8 +452,8 @@ export default function SinglePlayerMockDraftRoom() {
       <div className="shrink-0 border-b border-white/10 p-3 sm:p-5">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-amber-200 sm:text-[11px] sm:tracking-[0.24em]">Available Players</p>
-            <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground sm:mt-2 sm:block sm:text-[10px] sm:tracking-[0.18em]">
+            <p className="text-[10px] font-black uppercase tracking-[0.06em] text-amber-200 sm:text-[11px] sm:tracking-[0.06em]">Available Players</p>
+            <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground sm:mt-2 sm:block sm:text-[10px] sm:tracking-[0.06em]">
               <span className="sm:block">Needs: {userDraftBoardTeam?.name ?? "Your Team"}</span>
               <span className="text-emerald-100/80 sm:mt-1 sm:block">Legal: {userLegalPositions.length ? userLegalPositions.join(" · ") : "None"}</span>
             </div>
@@ -475,10 +475,10 @@ export default function SinglePlayerMockDraftRoom() {
                   type="button"
                   onClick={() => setPosition(value)}
                   className={cn(
-                    "h-9 shrink-0 whitespace-nowrap rounded-full border px-3 text-[10px] font-bold uppercase tracking-[0.03em] transition sm:h-10 sm:px-4 sm:text-[10px] sm:font-black sm:tracking-[0.14em]",
+                    "h-9 shrink-0 whitespace-nowrap rounded-full border px-3 text-[10px] font-bold uppercase tracking-[0.03em] transition sm:h-10 sm:px-4 sm:text-[10px] sm:font-black sm:tracking-[0.06em]",
                     position === value
-                      ? "border-amber-200/55 bg-amber-200 text-slate-950"
-                      : "border-white/10 bg-white/5 text-muted-foreground hover:border-amber-200/35 hover:text-amber-100"
+                      ? "border-cfb-brand bg-cfb-brand text-slate-950"
+                      : "border-white/10 bg-white/5 text-muted-foreground hover:border-cfb-brand/50 hover:text-cfb-brand"
                   )}
                 >
                   {value}
@@ -489,7 +489,7 @@ export default function SinglePlayerMockDraftRoom() {
         </div>
       </div>
 
-      <div className="grid grid-cols-[28px_minmax(0,1fr)_54px_78px] items-center gap-x-2 border-b border-white/10 px-3 py-2 text-[8px] font-black uppercase tracking-[0.14em] text-muted-foreground sm:grid-cols-[56px_minmax(0,1fr)_72px_88px_120px] sm:gap-3 sm:px-5 sm:py-3 sm:text-[9px] sm:tracking-[0.22em]">
+      <div className="grid grid-cols-[28px_minmax(0,1fr)_54px_78px] items-center gap-x-2 border-b border-white/10 px-3 py-2 text-[8px] font-black uppercase tracking-[0.06em] text-muted-foreground sm:grid-cols-[56px_minmax(0,1fr)_72px_88px_120px] sm:gap-3 sm:px-5 sm:py-3 sm:text-[9px] sm:tracking-[0.06em]">
         <span>RK</span>
         <span>Player</span>
         <span className="hidden text-right sm:block">ADP</span>
@@ -499,15 +499,15 @@ export default function SinglePlayerMockDraftRoom() {
 
       <div data-testid="draft-player-list">
         {isLoading ? (
-          <div className="flex min-h-40 items-center justify-center gap-3 px-6 text-center text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">
+          <div className="flex min-h-40 items-center justify-center gap-3 px-6 text-center text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" /> Loading draft board...
           </div>
         ) : isError ? (
-          <div className="flex min-h-40 items-center justify-center px-6 text-center text-[10px] font-black uppercase tracking-[0.22em] text-red-300">
+          <div className="flex min-h-40 items-center justify-center px-6 text-center text-[10px] font-black uppercase tracking-[0.06em] text-red-300">
             {formatPlayerPoolError(playerPoolError)}
           </div>
         ) : availablePlayers.length === 0 ? (
-          <div className="flex min-h-40 items-center justify-center px-6 text-center text-[10px] font-black uppercase tracking-[0.22em] text-muted-foreground">
+          <div className="flex min-h-40 items-center justify-center px-6 text-center text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">
             {userLegalPositions.length === 0
               ? "Roster is full. No legal picks remain."
               : position !== "ALL" &&
@@ -545,7 +545,7 @@ export default function SinglePlayerMockDraftRoom() {
                 className={cn(
                   "grid min-h-[66px] cursor-pointer grid-cols-[28px_minmax(0,1fr)_54px_78px] items-center gap-x-2 border-b border-white/10 px-3 py-2 outline-none transition-[background-color,box-shadow,color] duration-200 sm:min-h-0 sm:grid-cols-[56px_minmax(0,1fr)_72px_88px_120px] sm:items-center sm:gap-3 sm:px-5 sm:py-3",
                   positionHoverClass,
-                  isSelected && "border-l-2 border-l-amber-200/70 bg-amber-300/[0.075]"
+                  isSelected && "border-l-2 border-l-cfb-brand bg-cfb-brand/[0.075]"
                 )}
               >
                 <p className="self-center text-base font-bold tabular-nums text-muted-foreground sm:text-xl sm:font-black">{visibleRank}</p>
@@ -554,7 +554,7 @@ export default function SinglePlayerMockDraftRoom() {
                     <p className="truncate text-sm font-black leading-4 text-foreground transition-colors hover:text-amber-100 sm:text-base sm:leading-normal">{player.name}</p>
                   </PlayerAvailabilityIndicator>
                   <div className="mt-0.5 flex min-w-0 items-center gap-1.5 sm:mt-1 sm:gap-2">
-                    <p className="truncate text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground sm:text-[10px] sm:tracking-[0.18em]">{player.school}</p>
+                    <p className="truncate text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground sm:text-[10px] sm:tracking-[0.06em]">{player.school}</p>
                     <span className={cn("shrink-0 rounded-md border px-1.5 py-0.5 text-[8px] font-black sm:rounded-full sm:px-2 sm:text-[9px]", positionClass)}>{player.pos}</span>
                   </div>
                 </div>
@@ -562,7 +562,7 @@ export default function SinglePlayerMockDraftRoom() {
                 <p className="text-right text-[10px] font-black tabular-nums text-foreground sm:text-sm">{formatDraftProjection({ restOfSeasonProjection: player.restOfSeasonProjectedPoints, seasonProjection: player.sheetProjectedSeasonPoints, fallbackSeasonProjection: player.sheetProjectionStats?.fpts })}</p>
                   <Button
                     className={cn(
-                      "h-10 min-h-[44px] w-[78px] rounded-lg px-1 text-[8px] font-black uppercase tracking-[0.04em] sm:h-10 sm:min-h-0 sm:w-[140px] sm:rounded-xl sm:px-3 sm:text-[10px] sm:tracking-[0.14em]",
+                      "h-10 min-h-[44px] w-[78px] rounded-lg px-1 text-[8px] font-black uppercase tracking-[0.04em] sm:h-10 sm:min-h-0 sm:w-[140px] sm:rounded-xl sm:px-3 sm:text-[10px] sm:tracking-[0.06em]",
                       actionIsDraft
                         ? "border border-cfb-brand/55 bg-cfb-brand text-slate-950 transition hover:bg-cfb-brand/90"
                         : "border border-cfb-border-subtle bg-cfb-surface text-cfb-text-primary transition hover:border-cfb-brand/45 hover:bg-cfb-surface-hover"
@@ -620,13 +620,13 @@ export default function SinglePlayerMockDraftRoom() {
   };
 
   const renderQueue = () => (
-    <section className="rounded-[2rem] border border-white/10 bg-card/45 p-6">
+    <section className="rounded-md border border-white/10 bg-card/45 p-6">
       <div className="mb-5 flex items-center justify-between gap-4">
-        <p className="text-[11px] font-black uppercase tracking-[0.24em] text-primary">Draft Queue</p>
-        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">{queuedPlayers.length} queued</p>
+        <p className="text-[11px] font-black uppercase tracking-[0.06em] text-primary">Draft Queue</p>
+        <p className="text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">{queuedPlayers.length} queued</p>
       </div>
       {queuedPlayers.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-white/10 bg-white/[0.03] p-8 text-center text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+        <div className="rounded-3xl border border-dashed border-white/10 bg-white/[0.03] p-8 text-center text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">
           Queue players from the draft tab.
         </div>
       ) : (
@@ -637,13 +637,13 @@ export default function SinglePlayerMockDraftRoom() {
             <div key={player.id} className="rounded-3xl border border-white/10 bg-white/[0.035] p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">Queue {index + 1}</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">Queue {index + 1}</p>
                   <PlayerAvailabilityIndicator status={player.status}>
                     <p className="mt-2 text-base font-black text-foreground">{player.name}</p>
                   </PlayerAvailabilityIndicator>
-                  <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">RK {player.draftRank} • {player.school}</p>
+                  <p className="mt-1 text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">RK {player.draftRank} • {player.school}</p>
                   {!isLegalForCurrentPick ? (
-                    <p className="mt-2 text-[9px] font-black uppercase tracking-[0.16em] text-amber-200">
+                    <p className="mt-2 text-[9px] font-black uppercase tracking-[0.06em] text-amber-200">
                       No open roster slot for this pick
                     </p>
                   ) : null}
@@ -651,10 +651,10 @@ export default function SinglePlayerMockDraftRoom() {
                 <span className={cn("rounded-full border px-3 py-1 text-xs font-black", POSITION_STYLES[player.pos])}>{player.pos}</span>
               </div>
               <div className="mt-4 flex gap-2">
-                <Button variant="outline" className="h-10 flex-1 rounded-2xl text-[10px] font-black uppercase tracking-[0.14em]" onClick={() => toggleQueue(player.id)}>
+                <Button variant="outline" className="h-10 flex-1 rounded-2xl text-[10px] font-black uppercase tracking-[0.06em]" onClick={() => toggleQueue(player.id)}>
                   Remove
                 </Button>
-                <Button className="h-10 flex-1 rounded-2xl bg-cfb-brand text-[10px] font-black uppercase tracking-[0.14em] text-slate-950 hover:bg-cfb-brand/90" disabled={!canPick || !isLegalForCurrentPick} onClick={() => draftPlayer(player.id)}>
+                <Button className="h-10 flex-1 rounded-2xl bg-cfb-brand text-[10px] font-black uppercase tracking-[0.06em] text-slate-950 hover:bg-cfb-brand/90" disabled={!canPick || !isLegalForCurrentPick} onClick={() => draftPlayer(player.id)}>
                   {isLegalForCurrentPick ? "Draft" : "No Slot"}
                 </Button>
               </div>
@@ -702,8 +702,8 @@ export default function SinglePlayerMockDraftRoom() {
     };
 
     return (
-      <section data-testid="draft-roster-table" className="overflow-hidden rounded-xl border border-white/12 bg-[#17191b] shadow-[0_8px_20px_rgba(2,6,23,0.18)]">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-white/10 bg-[#151719] px-3 py-3 sm:px-5">
+      <section data-testid="draft-roster-table" className="overflow-hidden rounded-xl border border-white/12 bg-cfb-surface shadow-none">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-white/10 bg-cfb-canvas px-3 py-3 sm:px-5">
           <div className="flex items-center gap-3">
             <p className="text-sm font-bold text-slate-100">{selectedRosterTeam?.id === draftState.userTeamId ? "My Team" : "Team"}</p>
             <label className="sr-only" htmlFor="mock-roster-team-select">
@@ -713,7 +713,7 @@ export default function SinglePlayerMockDraftRoom() {
               id="mock-roster-team-select"
               value={selectedRosterTeam?.id ?? draftState.userTeamId}
               onChange={(event) => setSelectedRosterTeamId(Number(event.target.value))}
-              className="h-8 min-w-0 max-w-[13rem] rounded-md border border-white/15 bg-[#202328] px-2.5 text-[10px] font-semibold text-slate-100 outline-none transition focus:border-slate-300/60 focus:ring-2 focus:ring-white/10 sm:min-w-[13rem]"
+              className="h-8 min-w-0 max-w-[13rem] rounded-md border border-white/15 bg-cfb-surface-raised px-2.5 text-[10px] font-semibold text-slate-100 outline-none transition focus:border-slate-300/60 focus:ring-2 focus:ring-white/10 sm:min-w-[13rem]"
             >
               {draftState.teams.map((team) => (
                 <option key={team.id} value={team.id}>
@@ -725,7 +725,7 @@ export default function SinglePlayerMockDraftRoom() {
           <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">{filledSlots}/{selectedRoster.length} filled</p>
         </div>
 
-        <div className="grid grid-cols-[3.35rem_minmax(0,1fr)] items-center border-b border-white/10 bg-[#1a1c1e] px-3 py-2 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:px-5">
+        <div className="grid grid-cols-[3.35rem_minmax(0,1fr)] items-center border-b border-white/10 bg-cfb-surface-raised px-3 py-2 sm:grid-cols-[4.5rem_minmax(0,1fr)] sm:px-5">
           <p className="text-center text-[9px] font-bold uppercase tracking-[0.08em] text-slate-100">Slot</p>
           <p className="text-[9px] font-bold uppercase tracking-[0.08em] text-slate-100">Player</p>
         </div>
@@ -736,26 +736,26 @@ export default function SinglePlayerMockDraftRoom() {
   };
 
   const renderHistory = () => (
-    <section className="rounded-[2rem] border border-white/10 bg-card/45 p-6">
-      <p className="mb-5 text-[11px] font-black uppercase tracking-[0.24em] text-primary">Draft History</p>
+    <section className="rounded-md border border-white/10 bg-card/45 p-6">
+      <p className="mb-5 text-[11px] font-black uppercase tracking-[0.06em] text-primary">Draft History</p>
       {historyRounds.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-white/10 bg-white/[0.03] p-8 text-center text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+        <div className="rounded-3xl border border-dashed border-white/10 bg-white/[0.03] p-8 text-center text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">
           Picks will appear here once the draft starts.
         </div>
       ) : (
         <div className="space-y-5">
           {historyRounds.map(([round, picks]) => (
             <div key={round}>
-              <p className="mb-3 text-[10px] font-black uppercase tracking-[0.2em] text-cyan-100">Round {round}</p>
+              <p className="mb-3 text-[10px] font-black uppercase tracking-[0.06em] text-cfb-brand">Round {round}</p>
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {picks.map((pick) => (
                   <div key={pick.overallPick} className="rounded-3xl border border-white/10 bg-white/[0.035] p-4">
                     <div className="flex items-center justify-between gap-3">
-                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">Pick {pick.overallPick}</p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">Pick {pick.overallPick}</p>
                       <span className={cn("rounded-full border px-3 py-1 text-[10px] font-black", POSITION_STYLES[pick.position])}>{pick.position}</span>
                     </div>
                     <p className="mt-2 text-base font-black text-foreground">{pick.playerName}</p>
-                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">{pick.teamName} • RK {pick.draftRank}</p>
+                    <p className="mt-1 text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">{pick.teamName} • RK {pick.draftRank}</p>
                   </div>
                 ))}
               </div>
@@ -789,13 +789,13 @@ export default function SinglePlayerMockDraftRoom() {
     <div data-draft-room="mock" className="relative min-h-[100dvh] overflow-x-clip text-foreground">
       <DraftRoomVisuals />
 
-      <div className="relative flex min-h-0 w-full flex-1 flex-col space-y-2 pb-[5.75rem] pt-[max(2.75rem,calc(env(safe-area-inset-top)+2.25rem))] sm:mx-auto sm:block sm:max-w-[1800px] sm:space-y-6 sm:px-4 sm:pb-[calc(env(safe-area-inset-bottom)+7.5rem)] sm:pt-14 md:px-6 md:pb-28">
-        <div className="relative z-20 flex h-12 shrink-0 items-center gap-2 border-y border-white/12 bg-[#0b121a]/92 px-3 shadow-none sm:hidden">
+      <div className="relative flex min-h-0 w-full flex-1 flex-col space-y-2 pb-[5.75rem] pt-[max(2.75rem,calc(env(safe-area-inset-top)+2.25rem))] sm:mx-auto sm:block sm:max-w-[1800px] sm:space-y-4 sm:px-4 sm:pb-[calc(env(safe-area-inset-bottom)+7.5rem)] sm:pt-24 md:px-6 md:pb-28">
+        <div className="relative z-20 flex h-12 shrink-0 items-center gap-2 border-y border-white/12 bg-cfb-canvas px-3 shadow-none sm:hidden">
           <Button
             type="button"
             variant="outline"
             size="icon"
-            className="h-9 w-9 shrink-0 rounded-lg border-white/15 bg-[#0b121a] text-slate-200"
+            className="h-9 w-9 shrink-0 rounded-lg border-white/15 bg-cfb-canvas text-slate-200"
             aria-label="Exit mock draft room"
             onClick={() => navigate("/draft")}
           >
@@ -803,9 +803,9 @@ export default function SinglePlayerMockDraftRoom() {
           </Button>
           <div className="min-w-0 flex-1">
             <p className="truncate text-[9px] font-black uppercase tracking-[0.12em] text-muted-foreground">{draftState.status === "complete" ? "Draft results" : "On the clock"} · Pick {getRoundNumber(draftState.currentPick, teamCount)}.{getRoundPick(draftState.currentPick, teamCount)}</p>
-            <p className="truncate text-sm font-black text-cyan-100">{draftState.status === "complete" ? exhausted ? "Draft stopped" : "Draft complete" : currentTeam?.name ?? "Loading"}</p>
+            <p className="truncate text-sm font-black text-cfb-brand">{draftState.status === "complete" ? exhausted ? "Draft stopped" : "Draft complete" : currentTeam?.name ?? "Loading"}</p>
           </div>
-          {draftState.status !== "complete" ? <div className={cn("shrink-0 text-right", timerDanger ? "text-red-300" : "text-cyan-100")}>
+          {draftState.status !== "complete" ? <div className={cn("shrink-0 text-right", timerDanger ? "text-red-300" : "text-cfb-brand")}>
             <p className="text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground">Timer</p>
             <p className="text-2xl font-black leading-none tabular-nums">{formatTimer(secondsRemaining)}</p>
           </div> : null}
@@ -813,7 +813,7 @@ export default function SinglePlayerMockDraftRoom() {
             type="button"
             variant="outline"
             size="icon"
-            className="h-9 w-9 shrink-0 rounded-lg border-white/15 bg-[#0b121a] text-slate-200"
+            className="h-9 w-9 shrink-0 rounded-lg border-white/15 bg-cfb-canvas text-slate-200"
             aria-label="Reset mock draft"
             onClick={resetDraft}
           >
@@ -827,34 +827,34 @@ export default function SinglePlayerMockDraftRoom() {
               type="button"
               variant="outline"
               size="icon"
-              className="h-12 w-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface-raised text-cfb-text-primary shadow-[0_8px_20px_rgba(0,0,0,0.24)] hover:border-cfb-gold/55 hover:bg-cfb-gold/10 hover:text-white"
+              className="h-12 w-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface-raised text-cfb-text-primary shadow-none hover:border-cfb-brand/55 hover:bg-cfb-brand/10 hover:text-white"
               aria-label="Exit mock draft room"
               title="Exit mock draft room"
               onClick={() => navigate("/draft")}
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <Button asChild variant="outline" className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface-raised px-5 text-[10px] font-black uppercase tracking-[0.18em] text-cfb-text-primary hover:border-cfb-gold/55 hover:bg-cfb-gold/10 hover:text-white">
+            <Button asChild variant="outline" className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface-raised px-5 text-[10px] font-black uppercase tracking-[0.06em] text-cfb-text-primary hover:border-cfb-brand/55 hover:bg-cfb-brand/10 hover:text-white">
               <Link to="/draft">Exit</Link>
             </Button>
           </div>
 
-          {draftState.status !== "complete" ? <div data-testid="mock-draft-room-timer" className="pointer-events-none order-3 flex w-full justify-center sm:fixed sm:left-1/2 sm:top-40 sm:z-[1250] sm:w-auto sm:-translate-x-1/2">
+          {draftState.status !== "complete" ? <div data-testid="mock-draft-room-timer" className="pointer-events-none flex shrink-0 justify-center">
             <div
               className={cn(
-                  "rounded-3xl border border-cfb-border-subtle bg-cfb-surface-raised/95 px-6 py-3 text-center shadow-[0_10px_24px_rgba(0,0,0,0.30)] backdrop-blur-sm transition sm:px-8",
+                  "rounded-md border border-cfb-border-subtle bg-cfb-surface-raised px-6 py-3 text-center shadow-none backdrop-blur-none transition sm:px-8",
                 timerDanger
                   ? "border-red-300/50 bg-red-400/10"
                     : "border-white/14"
               )}
             >
-              <p className="text-[9px] font-black uppercase tracking-[0.26em] text-muted-foreground">
+              <p className="text-[9px] font-black uppercase tracking-[0.06em] text-muted-foreground">
                 {draftState.status === "intermission" ? "Draft Starts In" : "Pick Timer"}
               </p>
               <p
                 className={cn(
                   "mt-1 text-4xl font-black tabular-nums leading-none tracking-tight",
-                  timerDanger ? "text-red-300" : "text-cyan-100"
+                  timerDanger ? "text-red-300" : "text-cfb-brand"
                 )}
               >
                 {formatTimer(secondsRemaining)}
@@ -863,24 +863,24 @@ export default function SinglePlayerMockDraftRoom() {
           </div> : null}
 
           <div className="flex flex-wrap items-center justify-end gap-3">
-            <div className="rounded-3xl border border-cfb-border-subtle bg-cfb-surface-raised/95 px-6 py-4 text-right shadow-[0_10px_24px_rgba(0,0,0,0.30)] backdrop-blur-sm">
-              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-cfb-brand">
+            <div className="rounded-md border border-cfb-border-subtle bg-cfb-surface-raised px-4 py-3 text-right shadow-none backdrop-blur-none">
+              <p className="text-[10px] font-black uppercase tracking-[0.06em] text-cfb-brand">
                 Your Draft Position: <span className="text-xl tabular-nums">{draftState.userTeamId}</span>
               </p>
-              <p className="mt-1 text-[9px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+              <p className="mt-1 text-[9px] font-black uppercase tracking-[0.06em] text-muted-foreground">
                 {userDraftBoardTeam?.name ?? "Your Team"}
               </p>
             </div>
             <div
               className={cn(
-                "rounded-3xl border border-cfb-border-subtle bg-cfb-surface-raised/95 px-6 py-4 text-right shadow-[0_10px_24px_rgba(0,0,0,0.30)] backdrop-blur-sm",
-                userOnClock && "border-amber-200/45 bg-amber-300/10"
+                "rounded-md border border-cfb-border-subtle bg-cfb-surface-raised px-4 py-3 text-right shadow-none backdrop-blur-none",
+                userOnClock && "border-cfb-brand bg-cfb-brand/10"
               )}
             >
-              <p className="text-[10px] font-black uppercase tracking-[0.24em] text-muted-foreground">On Clock</p>
-              <p className="text-xl font-black uppercase text-cyan-100">{draftState.status === "complete" ? exhausted ? "Stopped" : "Complete" : currentTeam?.name ?? "Loading"}</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">On Clock</p>
+              <p className="text-xl font-black uppercase text-cfb-brand">{draftState.status === "complete" ? exhausted ? "Stopped" : "Complete" : currentTeam?.name ?? "Loading"}</p>
             </div>
-            <Button variant="outline" className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface-raised/90 px-5 text-[10px] font-black uppercase tracking-[0.18em] text-white hover:bg-cfb-surface-hover" onClick={resetDraft}>
+            <Button variant="outline" className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface-raised/90 px-5 text-[10px] font-black uppercase tracking-[0.06em] text-white hover:bg-cfb-surface-hover" onClick={resetDraft}>
               <RefreshCcw className="mr-2 h-4 w-4" /> Reset
             </Button>
           </div>
@@ -896,7 +896,7 @@ export default function SinglePlayerMockDraftRoom() {
         <section data-testid="mobile-draft-order" className={cn("shrink-0 overflow-hidden sm:hidden", draftMattePanelClass)}>
           <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
             <div>
-              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-amber-200">Draft order</p>
+              <p className="text-[9px] font-black uppercase tracking-[0.06em] text-amber-200">Draft order</p>
               <p className="mt-0.5 text-[8px] font-bold uppercase tracking-[0.08em] text-muted-foreground">Swipe for future rounds</p>
             </div>
             <p className="text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground">{draftState.currentPick} / {totalPicks}</p>
@@ -935,9 +935,9 @@ export default function SinglePlayerMockDraftRoom() {
                       "relative flex w-[4.15rem] shrink-0 flex-col items-center rounded-lg border px-1 py-1.5 text-center",
                       slot.overallPick >= FIRST_CENTERED_DRAFT_PICK ? "snap-center" : "snap-start",
                       isCurrent
-                        ? "border-amber-200/70 bg-amber-300/12 text-amber-100"
+                        ? "border-cfb-brand bg-cfb-brand/15 text-cfb-brand"
                         : isUser
-                          ? "border-emerald-200/45 bg-emerald-300/10 text-emerald-100"
+                          ? "border-cfb-brand/50 bg-cfb-brand/10 text-cfb-brand"
                           : "border-white/10 bg-white/[0.025] text-muted-foreground"
                     )}
                   >
@@ -945,7 +945,7 @@ export default function SinglePlayerMockDraftRoom() {
                       <div
                         role="status"
                         aria-label="Current pick scope"
-                        className="absolute top-1 left-1/2 z-10 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border border-amber-100/70 bg-[#0b121a] text-amber-100"
+                        className="absolute top-1 left-1/2 z-10 flex h-5 w-5 -translate-x-1/2 items-center justify-center rounded-full border border-amber-100/70 bg-cfb-canvas text-amber-100"
                       >
                         <LocateFixed className="h-3 w-3" />
                       </div>
@@ -968,21 +968,21 @@ export default function SinglePlayerMockDraftRoom() {
         <section className={cn("hidden overflow-hidden sm:block", draftMattePanelClass)}>
           <div className="relative flex min-h-[76px] items-center justify-between gap-4 border-b border-white/10 px-5 py-4">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.26em] text-amber-200">Draft Order</p>
-              <p className="mt-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">Scroll every pick left to right</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.06em] text-amber-200">Draft Order</p>
+              <p className="mt-1 text-[9px] font-black uppercase tracking-[0.06em] text-muted-foreground">Scroll every pick left to right</p>
             </div>
             <button
               type="button"
               onClick={recenterDraftCarousel}
-              className="absolute left-1/2 top-1/2 inline-flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[1.15rem] border border-white/16 bg-[#0b121a] text-amber-100 shadow-[0_8px_20px_rgba(2,6,23,0.32)] transition hover:border-amber-200/45 hover:bg-amber-300/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/60"
+              className="absolute left-1/2 top-1/2 inline-flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[1.15rem] border border-white/16 bg-cfb-canvas text-amber-100 shadow-none transition hover:border-amber-200/45 hover:bg-amber-300/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-200/60"
               aria-label="Center draft order on the current pick"
               title="Center current pick"
             >
               <LocateFixed className="h-5 w-5" />
             </button>
             <div className="ml-auto text-right">
-              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{totalPicks} Picks</p>
-              <p className="mt-1 text-[9px] font-black uppercase tracking-[0.22em] text-muted-foreground">{totalPicks - draftedCount} Unlocked</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">{totalPicks} Picks</p>
+              <p className="mt-1 text-[9px] font-black uppercase tracking-[0.06em] text-muted-foreground">{totalPicks - draftedCount} Unlocked</p>
             </div>
           </div>
           <div
@@ -1009,9 +1009,9 @@ export default function SinglePlayerMockDraftRoom() {
                     }
                   }}
                   className={cn(
-                    "relative min-w-[142px] snap-start rounded-2xl border border-white/10 bg-[#131c27] p-3 shadow-[0_8px_18px_rgba(2,6,23,0.22)] transition",
+                    "relative min-w-[142px] snap-start rounded-2xl border border-white/10 bg-cfb-surface p-3 shadow-none transition",
                     isCurrent
-                      ? "border-amber-200/70 bg-amber-300/12"
+                      ? "border-cfb-brand bg-cfb-brand/12"
                       : isUser
                         ? "border-emerald-200/40 bg-emerald-300/10"
                       : "hover:border-white/25 hover:bg-white/[0.055]",
@@ -1021,7 +1021,7 @@ export default function SinglePlayerMockDraftRoom() {
                   {isCurrent && draftState.currentPick >= FIRST_CENTERED_DRAFT_PICK ? (
                     <div
                       aria-label="Current pick"
-                      className="absolute -top-3 left-1/2 z-10 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full border border-amber-100/70 bg-[#0b121a] text-amber-100"
+                      className="absolute -top-3 left-1/2 z-10 flex h-7 w-7 -translate-x-1/2 items-center justify-center rounded-full border border-amber-100/70 bg-cfb-canvas text-amber-100"
                     >
                       <LocateFixed className="h-3.5 w-3.5" />
                     </div>
@@ -1040,7 +1040,7 @@ export default function SinglePlayerMockDraftRoom() {
         </section>
 
         {draftState.status === "intermission" ? (
-          <div className="shrink-0 rounded-xl border border-amber-300/20 bg-amber-300/10 p-2 text-center text-[9px] font-black uppercase tracking-[0.1em] text-amber-100 sm:rounded-[2rem] sm:p-5 sm:text-[10px] sm:tracking-[0.2em]">
+          <div className="shrink-0 rounded-xl border border-amber-300/20 bg-amber-300/10 p-2 text-center text-[9px] font-black uppercase tracking-[0.1em] text-amber-100 sm:rounded-md sm:p-5 sm:text-[10px] sm:tracking-[0.06em]">
             Draft is about to begin. Bot pick #1 starts after the pre-draft reveal.
           </div>
         ) : null}
@@ -1066,7 +1066,7 @@ export default function SinglePlayerMockDraftRoom() {
               <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl border border-cfb-brand/30 bg-cfb-brand/10 text-cfb-brand">
                 <Trophy className="h-10 w-10" />
               </div>
-              <p className="mt-6 text-[10px] font-black uppercase tracking-[0.28em] text-cfb-brand">
+              <p className="mt-6 text-[10px] font-black uppercase tracking-[0.06em] text-cfb-brand">
                 {exhausted ? "Mock draft stopped" : "Mock Draft Complete"}
               </p>
               <DialogTitle
@@ -1081,7 +1081,7 @@ export default function SinglePlayerMockDraftRoom() {
             <div className="grid gap-3 px-8 py-6 sm:grid-cols-3">
               <Button
                 type="button"
-                className="h-12 rounded-2xl bg-cfb-brand px-6 text-[10px] font-black uppercase tracking-[0.16em] text-slate-950 hover:bg-cfb-brand/90"
+                className="h-12 rounded-2xl bg-cfb-brand px-6 text-[10px] font-black uppercase tracking-[0.06em] text-slate-950 hover:bg-cfb-brand/90"
                 onClick={viewDraftedRoster}
               >
                 <ClipboardList className="mr-2 h-4 w-4" />
@@ -1090,7 +1090,7 @@ export default function SinglePlayerMockDraftRoom() {
               <Button
                 type="button"
                 variant="outline"
-                className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface px-6 text-[10px] font-black uppercase tracking-[0.16em] text-cfb-text-primary hover:border-cfb-brand/45 hover:bg-cfb-surface-hover"
+                className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface px-6 text-[10px] font-black uppercase tracking-[0.06em] text-cfb-text-primary hover:border-cfb-brand/45 hover:bg-cfb-surface-hover"
                 onClick={() => navigate("/draft")}
               >
                 Exit to Draft Center
@@ -1098,7 +1098,7 @@ export default function SinglePlayerMockDraftRoom() {
               <Button
                 type="button"
                 variant="outline"
-                className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface px-6 text-[10px] font-black uppercase tracking-[0.16em] text-cfb-text-primary hover:border-cfb-brand/45 hover:bg-cfb-surface-hover"
+                className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface px-6 text-[10px] font-black uppercase tracking-[0.06em] text-cfb-text-primary hover:border-cfb-brand/45 hover:bg-cfb-surface-hover"
                 onClick={resetDraft}
               >
                 <RefreshCcw className="mr-2 h-4 w-4" />
@@ -1109,7 +1109,7 @@ export default function SinglePlayerMockDraftRoom() {
         </Dialog>
       ) : null}
 
-      <div data-testid="draft-room-tabs" className="fixed inset-x-0 bottom-0 z-[1200] border-t border-cfb-border-subtle bg-cfb-surface-raised/96 p-0 shadow-[0_-8px_24px_rgba(0,0,0,0.26)] backdrop-blur-xl sm:pointer-events-none sm:inset-x-auto sm:bottom-3 sm:left-1/2 sm:flex sm:w-[min(100vw-3rem,60rem)] sm:-translate-x-1/2 sm:border-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:shadow-none sm:backdrop-blur-none">
+      <div data-testid="draft-room-tabs" className="fixed inset-x-0 bottom-0 z-[1200] border-t border-cfb-border-subtle bg-cfb-surface-raised p-0 shadow-none backdrop-blur-none sm:pointer-events-none sm:inset-x-auto sm:bottom-3 sm:left-1/2 sm:flex sm:w-[min(100vw-3rem,60rem)] sm:-translate-x-1/2 sm:border-0 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:shadow-none sm:backdrop-blur-none">
         <div className={cn("grid w-full grid-cols-5 overflow-hidden sm:pointer-events-auto sm:mx-auto sm:rounded-2xl", draftMatteControlClass)}>
           {MOCK_TABS.map((tab) => (
             <button
@@ -1118,7 +1118,7 @@ export default function SinglePlayerMockDraftRoom() {
               onClick={() => setActiveTab(tab.value)}
               aria-current={activeTab === tab.value ? "page" : undefined}
               className={cn(
-                "relative inline-flex min-h-[4.75rem] min-w-0 touch-manipulation items-center justify-center whitespace-nowrap px-2 py-3 text-xs font-black uppercase leading-none tracking-[0.02em] transition after:absolute after:inset-x-2 after:bottom-0 after:h-1 after:bg-transparent focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand focus-visible:ring-inset sm:min-h-[3.75rem] sm:px-5 sm:py-4 sm:text-[11px] sm:tracking-[0.14em]",
+                "relative inline-flex min-h-[4.75rem] min-w-0 touch-manipulation items-center justify-center whitespace-nowrap px-2 py-3 text-xs font-black uppercase leading-none tracking-[0.02em] transition after:absolute after:inset-x-2 after:bottom-0 after:h-1 after:bg-transparent focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-brand focus-visible:ring-inset sm:min-h-[3.75rem] sm:px-5 sm:py-4 sm:text-[11px] sm:tracking-[0.06em]",
                 activeTab === tab.value
                   ? "bg-white/[0.04] text-white after:bg-cfb-brand"
                   : "text-muted-foreground hover:bg-white/[0.035] hover:text-white"

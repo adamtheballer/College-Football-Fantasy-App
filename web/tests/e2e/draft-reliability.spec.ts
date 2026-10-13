@@ -122,7 +122,7 @@ test("confirmed pick animates once without moving list; next timer keeps running
   await expect(page.getByTestId("pick-confirmation")).toHaveCount(0);
 });
 
-test("desktop timer stays clear of the fixed last-pick header and confirmation", async ({ page }) => {
+test("desktop inline timer stays clear of the fixed last-pick header and confirmation", async ({ page }) => {
   await fixture(page);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/league/77/draft");
@@ -140,16 +140,29 @@ test("desktop timer stays clear of the fixed last-pick header and confirmation",
     return {
       timerPosition: getComputedStyle(timer).position,
       timerTop: timer.getBoundingClientRect().top,
+      timerLeft: timer.getBoundingClientRect().left,
+      timerRight: timer.getBoundingClientRect().right,
+      timerBottom: timer.getBoundingClientRect().bottom,
       headerBottom: header.getBoundingClientRect().bottom,
       confirmationBottom: confirmation.getBoundingClientRect().bottom,
       thumbnailBottom: thumbnail.getBoundingClientRect().bottom,
+      confirmationTop: confirmation.getBoundingClientRect().top,
+      confirmationLeft: confirmation.getBoundingClientRect().left,
+      confirmationRight: confirmation.getBoundingClientRect().right,
     };
   });
 
   expect(layout).not.toBeNull();
-  expect(layout?.timerPosition).toBe("fixed");
+  expect(layout?.timerPosition).toBe("static");
   expect(layout?.timerTop).toBeGreaterThanOrEqual((layout?.headerBottom ?? 0) + 16);
-  expect(layout?.timerTop).toBeGreaterThanOrEqual((layout?.thumbnailBottom ?? 0) + 16);
+  // The timer is now in the normal header flow. The confirmation may share
+  // its vertical band but must never cover it or its clock text.
+  expect(
+    (layout?.timerTop ?? 0) >= (layout?.confirmationBottom ?? 0) ||
+    (layout?.timerBottom ?? 0) <= (layout?.confirmationTop ?? 0) ||
+    (layout?.timerLeft ?? 0) >= (layout?.confirmationRight ?? 0) ||
+    (layout?.timerRight ?? 0) <= (layout?.confirmationLeft ?? 0)
+  ).toBeTruthy();
 });
 
 test("poll failure retains board, disables picks and recovers; conflicts never celebrate", async ({ page }) => {

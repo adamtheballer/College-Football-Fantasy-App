@@ -7,17 +7,18 @@ const globalCss = readFileSync(fileURLToPath(new URL("./global.css", import.meta
 const tailwindConfig = readFileSync(fileURLToPath(new URL("../tailwind.config.ts", import.meta.url)), "utf8");
 
 describe("college football typography system", () => {
-  it("loads Josefin Sans with swap behavior", () => {
-    expect(globalCss).toContain("family=Josefin+Sans:");
-    expect(globalCss).toContain("display=swap");
-    expect(globalCss).not.toContain("family=Barlow");
+  it("self-hosts rounded body and athletic display fonts", () => {
+    expect(globalCss).toContain('@import "@fontsource/poppins/latin-400.css"');
+    expect(globalCss).toContain('@import "@fontsource/exo-2/latin-800-italic.css"');
+    expect(globalCss).not.toContain("fonts.googleapis.com");
   });
 
-  it("uses Josefin Sans for every body, operational UI, and display token", () => {
-    expect(tailwindConfig).toMatch(/sans:\s*\[\s*"Josefin Sans"/);
-    expect(tailwindConfig).toMatch(/ui:\s*\[\s*"Josefin Sans"/);
-    expect(tailwindConfig).toMatch(/display:\s*\[\s*"Josefin Sans"/);
-    expect(tailwindConfig).not.toContain('"Barlow');
+  it("uses Poppins for operational UI and quotes the numeric Exo 2 font name", () => {
+    expect(tailwindConfig).toMatch(/sans:\s*\[\s*"Poppins"/);
+    expect(tailwindConfig).toMatch(/ui:\s*\[\s*"Poppins"/);
+    // A numeric family name is invalid CSS unless quoted; browsers otherwise
+    // silently discard it and render every heading in the body font.
+    expect(tailwindConfig).toMatch(/display:\s*\[\s*'"Exo 2"'/);
   });
 
   it("provides semantic text utilities and preserves mobile input readability", () => {

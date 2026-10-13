@@ -12,7 +12,7 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      "inline-flex min-h-12 items-center justify-center rounded-[1.25rem] border border-white/10 bg-white/5 p-1.5 text-muted-foreground backdrop-blur-md",
+      "inline-flex min-h-12 items-center justify-center rounded-md border border-cfb-border-subtle bg-cfb-surface p-1 text-muted-foreground",
       className,
     )}
     {...props}
@@ -27,7 +27,7 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "font-ui inline-flex items-center justify-center whitespace-nowrap rounded-2xl px-4 py-2 text-[11px] font-bold uppercase tracking-[0.06em] ring-offset-background transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-white/10 data-[state=active]:text-foreground data-[state=active]:shadow-[0_8px_24px_rgba(0,0,0,0.18)] data-[state=active]:border data-[state=active]:border-primary/20",
+      "font-ui inline-flex items-center justify-center whitespace-nowrap rounded-sm border border-transparent px-4 py-2 text-xs font-semibold ring-offset-background transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-cfb-brand/10 data-[state=active]:text-cfb-brand data-[state=active]:border-cfb-brand/40",
       className,
     )}
     {...props}
