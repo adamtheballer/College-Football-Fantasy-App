@@ -141,7 +141,8 @@ test.describe("player card modal", () => {
     await page.route("**/stats/**", (route) => route.fulfill({ json: { data: [] } }));
     await page.route("**/projections/1**", (route) => route.fulfill({ json: { player_id: 1, fantasy_points: 19.7 } }));
     await page.route("**/players**", async (route) => {
-      const path = new URL(route.request().url()).pathname;
+      const url = new URL(route.request().url());
+      const path = url.pathname;
       if (path.endsWith("/players/1/card")) {
         await route.fulfill({ json: {
           player, about: { height: "5'10\"", weight: "190 lbs", player_class: "Senior", position: "WR", team: "Oklahoma", source: "verified_sheet" },
@@ -162,7 +163,9 @@ test.describe("player card modal", () => {
       } else if (path.endsWith("/players/1")) {
         await route.fulfill({ json: player });
       } else {
-        await route.fulfill({ json: canonicalDraftPool(board, { limit: 200, ranking_week: 1 }) });
+        const limit = Number(url.searchParams.get("limit") ?? 100);
+        const offset = Number(url.searchParams.get("offset") ?? 0);
+        await route.fulfill({ json: canonicalDraftPool(board.slice(offset, offset + limit), { total: board.length, limit, offset, ranking_week: 1 }) });
       }
     });
     await page.goto("/draft/mock/single-player?new=1&teams=4&timer=60");

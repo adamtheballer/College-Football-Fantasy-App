@@ -1,3 +1,4 @@
+import { canonicalDraftPool } from "./fixtures/draft-pool";
 import { expect, test } from "@playwright/test";
 
 const mockAuthPayload = {
@@ -128,7 +129,7 @@ test.describe("critical browser workflows", () => {
     await page.screenshot({ path: testInfo.outputPath("login-typography-320x568.png"), fullPage: false });
   });
 
-  test("Saturday Pick 6 dashboard action opens the contest instead of league creation", async ({ page }) => {
+  test("archived Pick 6 is reachable directly without a homepage promotion", async ({ page }) => {
     await seedAuthenticatedSession(page);
     await page.route("**/leagues?**", async (route) => {
       await route.fulfill({
@@ -182,8 +183,10 @@ test.describe("critical browser workflows", () => {
     });
 
     await page.goto("/");
-    await page.getByRole("link", { name: "Make Your Pick", exact: true }).click();
-
+    await expect(page.getByRole("heading", { name: /Good to see you/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Make Your Pick", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Open Saturday Pick 6 event" })).toHaveCount(0);
+    await page.goto("/saturday-pick-6");
     await expect(page).toHaveURL(/\/saturday-pick-6$/);
     await expect(page.getByRole("heading", { name: "MAKE YOUR PICK", exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "BUILD YOUR LEAGUE", exact: true })).not.toBeVisible();
@@ -1145,12 +1148,7 @@ test.describe("critical browser workflows", () => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({
-          data: players,
-          total: players.length,
-          limit: 250,
-          offset: 0,
-        }),
+        body: JSON.stringify(canonicalDraftPool(players)),
       });
     });
 
@@ -2778,12 +2776,7 @@ test.describe("critical browser workflows", () => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({
-          data: players.slice(offset, offset + limit),
-          total: players.length,
-          limit,
-          offset,
-        }),
+        body: JSON.stringify(canonicalDraftPool(players.slice(offset, offset + limit), { total: players.length, limit, offset })),
       });
     });
 
@@ -3015,7 +3008,7 @@ test.describe("critical browser workflows", () => {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          data: [
+          ...canonicalDraftPool([
             {
               id: 101,
               name: "Ian Strong",
@@ -3026,7 +3019,7 @@ test.describe("critical browser workflows", () => {
               sheet_adp: 136,
               sheet_projected_season_points: 190.2,
             },
-          ],
+          ]),
           total: 1,
           limit: 100,
           offset: 0,
