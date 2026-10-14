@@ -48,10 +48,6 @@ class NotificationEventDefinition:
     quiet_hours_apply: bool
     time_critical: bool
     privacy_scope: NotificationScope
-    # Player-play alerts are intentionally declared here, rather than hidden
-    # in a future provider adapter.  This keeps the product threshold visible
-    # in the API contract before live scoring is enabled.
-    minimum_yards: int | None = None
 
 
 def _event(
@@ -70,7 +66,6 @@ def _event(
     quiet_hours_apply: bool = True,
     time_critical: bool = False,
     privacy_scope: NotificationScope = NotificationScope.DIRECT_USER,
-    minimum_yards: int | None = None,
 ) -> NotificationEventDefinition:
     if time_critical:
         quiet_hours_apply = False
@@ -91,13 +86,17 @@ def _event(
         quiet_hours_apply=quiet_hours_apply,
         time_critical=time_critical,
         privacy_scope=privacy_scope,
-        minimum_yards=minimum_yards,
     )
 
 
 # The alpha event matrix.  Every producer must enqueue one of these events;
 # gameplay services never call providers directly.
 NOTIFICATION_EVENTS: dict[str, NotificationEventDefinition] = {
+    "MAJOR_NEWS": _event(
+        "MAJOR_NEWS", "NEWS", "admin-confirmed announcement", "explicitly opted-in users", "admin confirmed",
+        "College football news", "Open your approved announcement.", "announcement", "news:{announcement_id}:{recipient_user_id}",
+        "push_major_news", None, privacy_scope=NotificationScope.SYSTEM,
+    ),
     "DRAFT_1H": _event(
         "DRAFT_1H", "DRAFT", "draft scheduling", "each eligible human manager",
         "official scheduled draft at least one hour away", "Your draft starts in 1 hour",
@@ -226,33 +225,6 @@ NOTIFICATION_EVENTS: dict[str, NotificationEventDefinition] = {
         "postseason:champion:{bracket_id}:{recipient_user_id}", "matchup_result_alerts", "matchup_result_alerts",
         privacy_scope=NotificationScope.LEAGUE_MEMBER,
     ),
-    # ``big_play_alerts`` is a master preference, not its own push event.
-    # A recipient chooses which of the three long-play event types below can
-    # pass through that master gate.
-    "TOUCHDOWN": _event(
-        "TOUCHDOWN", "PLAYER", "canonical live-play intake", "eligible subscribed roster manager",
-        "canonical provider touchdown event and production flag enabled", "Player scoring update", "{player_name} scored a touchdown.", "league",
-        "big_play:{provider}:{provider_game_id}:{provider_play_id}:{recipient_user_id}", "touchdown_alerts", "touchdown_alerts",
-        privacy_scope=NotificationScope.LEAGUE_MEMBER,
-    ),
-    "LONG_RUSH": _event(
-        "LONG_RUSH", "PLAYER", "canonical live-play intake", "eligible subscribed roster manager",
-        "canonical provider rushing play of at least 30 yards and production flag enabled", "Long rush", "{player_name} had a 30+ yard rushing play.", "league",
-        "big_play:{provider}:{provider_game_id}:{provider_play_id}:{recipient_user_id}", "long_rush_alerts", "long_rush_alerts",
-        privacy_scope=NotificationScope.LEAGUE_MEMBER, minimum_yards=30,
-    ),
-    "LONG_RECEPTION": _event(
-        "LONG_RECEPTION", "PLAYER", "canonical live-play intake", "eligible subscribed roster manager",
-        "canonical provider reception of at least 40 yards and production flag enabled", "Long reception", "{player_name} had a 40+ yard reception.", "league",
-        "big_play:{provider}:{provider_game_id}:{provider_play_id}:{recipient_user_id}", "long_reception_alerts", "long_reception_alerts",
-        privacy_scope=NotificationScope.LEAGUE_MEMBER, minimum_yards=40,
-    ),
-    "LONG_PASS": _event(
-        "LONG_PASS", "PLAYER", "canonical live-play intake", "eligible subscribed roster manager",
-        "canonical provider completed pass of at least 40 yards and production flag enabled", "Long pass", "{player_name} completed a 40+ yard pass.", "league",
-        "big_play:{provider}:{provider_game_id}:{provider_play_id}:{recipient_user_id}", "long_pass_alerts", "long_pass_alerts",
-        privacy_scope=NotificationScope.LEAGUE_MEMBER, minimum_yards=40,
-    ),
     "CHAT_DIRECT_MESSAGE": _event(
         "CHAT_DIRECT_MESSAGE", "CHAT", "private chat service", "private chat recipient only", "message committed", "New direct message",
         "You have a new direct message.", "chat", "chat_direct_message:{thread_id}:{recipient_user_id}", "chat_alerts", None,
@@ -305,7 +277,7 @@ NOTIFICATION_EVENTS: dict[str, NotificationEventDefinition] = {
     ),
     "INJURY": _event(
         "INJURY", "PLAYER", "legacy player feed", "eligible roster manager", "legacy feed event", "Player injury update",
-        "A rostered player has an injury update.", "league", "injury:{event_id}:{recipient_user_id}", "injury_alerts", "injury_alerts",
+        "A rostered player has an injury update.", "player", "injury:{event_id}:{recipient_user_id}", "injury_alerts", "injury_alerts",
         privacy_scope=NotificationScope.LEAGUE_MEMBER,
     ),
     "USAGE": _event(
@@ -319,6 +291,15 @@ NOTIFICATION_EVENTS: dict[str, NotificationEventDefinition] = {
         privacy_scope=NotificationScope.LEAGUE_MEMBER,
     ),
 }
+
+
+# Tombstones only: legacy events must never re-enter delivery or app history.
+RETIRED_PLAY_EVENTS = frozenset({"BIG_PLAY", "TOUCHDOWN", "LONG_RUSH", "LONG_RECEPTION", "LONG_PASS"})
+RETIRED_PLAY_PREFERENCES = ("touchdown_alerts", "big_play_alerts", "long_rush_alerts", "long_reception_alerts", "long_pass_alerts")
+
+
+def is_retired_play_event(*event_types: str | None, event_key: str | None = None) -> bool:
+    return any((value or "").strip().upper() in RETIRED_PLAY_EVENTS for value in event_types) or (event_key or "").strip().lower().startswith("big_play:")
 
 
 # Existing database rows and producer calls are normalized at the outbox
@@ -454,6 +435,12 @@ def destination_for_event(event_type: str, *, league_id: int | None, payload: di
         destination["resource_id"] = resource_id
     if definition.destination_type == "matchup" and payload.get("matchup_id") is not None:
         destination["resource_id"] = payload["matchup_id"]
+    if definition.destination_type == "player":
+        destination["resource_id"] = payload.get("player_id")
+    if definition.destination_type == "announcement":
+        destination["resource_id"] = payload.get("announcement_id")
+    if definition.destination_type == "matchup" and payload.get("week") is not None:
+        destination["week"] = payload["week"]
     return destination
 
 

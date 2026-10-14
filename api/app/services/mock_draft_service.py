@@ -152,23 +152,19 @@ def make_mock_pick(db: Session, mock_draft_id: int, owner_user_id: int, player_i
 
 def auto_pick_mock_draft(db: Session, mock_draft_id: int, owner_user_id: int) -> MockDraft:
     mock_draft = get_mock_draft(db, mock_draft_id, owner_user_id)
-    picked_player_ids = (
-        db.query(MockDraftPick.player_id).filter(MockDraftPick.mock_draft_id == mock_draft.id).subquery()
-    )
-    player = (
-        db.query(Player)
-        .filter(
-            ~Player.id.in_(picked_player_ids),
-            canonical_fantasy_player_filter(MOCK_DRAFT_SEASON),
-        )
-        .order_by(
-            Player.sheet_adp.is_(None),
-            Player.sheet_adp.asc(),
-            Player.sheet_projected_season_points.desc().nullslast(),
-            Player.name.asc(),
-        )
-        .first()
-    )
+    from collegefootballfantasy_api.app.services.draft_rankings import build_draft_ranking_snapshot, DEFAULT_SLOTS
+    snapshot = build_draft_ranking_snapshot(db, season=MOCK_DRAFT_SEASON, config={"leagueSize": mock_draft.league_size, "totalRosterSpots": mock_draft.rounds, "rosterSlots": DEFAULT_SLOTS})
+    unavailable = {row[0] for row in db.query(MockDraftPick.player_id).filter(MockDraftPick.mock_draft_id == mock_draft.id).all()}
+    from types import SimpleNamespace
+    from collegefootballfantasy_api.app.services.roster_legality import assign_best_roster_slot_for_position
+    _,_,team_index=_round_pick_for_pick(mock_draft.current_pick,mock_draft.league_size)
+    limits={"QB":1,"RB":2,"WR":2,"TE":1,"K":1,"FLEX":1,"BENCH":5}
+    roster=[]
+    for pick in sorted(mock_draft.picks,key=lambda pick:pick.pick_number):
+        if pick.team_index==team_index:
+            slot=assign_best_roster_slot_for_position(pick.player_position,roster,limits)
+            if slot:roster.append(SimpleNamespace(slot=slot))
+    player = next((snapshot["players"][row["id"]] for row in sorted(snapshot["board"].values(), key=lambda row: (row["masterDraftRank"], row["id"])) if row["id"] not in unavailable and assign_best_roster_slot_for_position(row["pos"],roster,limits)), None)
     if not player:
         raise MockDraftConflict("no available players remain")
     return make_mock_pick(db, mock_draft.id, owner_user_id, player.id)

@@ -57,8 +57,8 @@ from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_f
 from collegefootballfantasy_api.app.services.auth_security import enforce_auth_rate_limit
 from collegefootballfantasy_api.app.services.injury_status import (
     is_current_injury_designation,
-    is_out_for_season,
     normalize_injury_status,
+    reviewed_injuries_for_week,
 )
 from collegefootballfantasy_api.app.services.league_weeks import calendar_cfb_week
 from collegefootballfantasy_api.app.services.player_pool_filters import is_retired_canonical_preseason_player
@@ -69,7 +69,7 @@ router = APIRouter()
 @router.get("/{player_id}/trade-values", response_model=PlayerTradeValueHistoryRead)
 def get_player_trade_values_endpoint(
     player_id: int,
-    season: int = Query(default=2026, ge=2020, le=2100),
+    season: int = Query(default=settings.current_season_year, ge=2020, le=2100),
     db: Session = Depends(get_db),
 ) -> PlayerTradeValueHistoryRead:
     if db.get(Player, player_id) is None:
@@ -80,7 +80,7 @@ def get_player_trade_values_endpoint(
 @router.get("/{player_id}/trajectory", response_model=PlayerTrajectoryRead)
 def get_player_trajectory_endpoint(
     player_id: int,
-    season: int = Query(default=2026, ge=2020, le=2100),
+    season: int = Query(default=settings.current_season_year, ge=2020, le=2100),
     league_id: int | None = Query(default=None, ge=1),
     db: Session = Depends(get_db),
 ) -> PlayerTrajectoryRead:
@@ -272,8 +272,32 @@ def list_players_endpoint(
     available_only: bool = False,
     draft_eligible: bool = False,
     sort: str | None = None,
+    season: int | None = Query(default=None, ge=2000, le=2100),
+    draft_config: str | None = Query(default=None, max_length=1000),
     db: Session = Depends(get_db),
 ) -> PlayerList:
+    from collegefootballfantasy_api.app.services.draft_rankings import build_draft_ranking_snapshot
+    import json
+    snapshot = None
+    if draft_eligible:
+        config = None
+        if draft_config:
+            try:
+                config = json.loads(draft_config)
+                if not isinstance(config, dict) or type(config.get("leagueSize",12)) is not int or not 2 <= config.get("leagueSize",12) <= 32:
+                    raise ValueError("invalid league size")
+                if set(config)-{"leagueSize","rosterSlots","totalRosterSpots"}:
+                    raise ValueError("unknown configuration keys")
+                if not isinstance(config.get("rosterSlots", {}), dict) or set(config.get("rosterSlots",{})) - {"QB","RB","WR","TE","K","BE","IR"} or any(type(v) is not int or not 0 <= v <= 30 for v in config.get("rosterSlots", {}).values()):
+                    raise ValueError("invalid roster slots")
+                if type(config.get("totalRosterSpots",13)) is not int or not 1 <= config.get("totalRosterSpots",13) <= 100:
+                    raise ValueError("invalid roster size")
+            except (ValueError, TypeError) as exc:
+                raise HTTPException(status_code=422, detail="invalid draft ranking configuration") from exc
+        try:
+            snapshot = build_draft_ranking_snapshot(db, season=season or settings.current_season_year, league_id=league_id, config=config)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
     players, total = list_players(
         db,
         limit=limit,
@@ -284,29 +308,35 @@ def list_players_endpoint(
         league_id=league_id,
         available_only=available_only,
         draft_eligible=draft_eligible,
-        sort=sort,
+        sort=(sort or "draft_rank") if draft_eligible else sort,
+        ranking_snapshot=snapshot,
+        season=snapshot["season"] if snapshot else season,
     )
     if not draft_eligible:
         return PlayerList(data=players, total=total, limit=limit, offset=offset)
 
-    board_outlook = build_rest_of_season_draft_board(db, season=2026)
     data = []
     for player in players:
-        outlook = board_outlook.get(player.id)
-        if outlook is None:
-            data.append(PlayerRead.model_validate(player))
-            continue
-        data.append(
-            PlayerRead.model_validate(player).model_copy(
-                update={
-                    "rest_of_season_projected_points": outlook.projected_points,
-                    "rest_of_season_rank": outlook.rank,
-                    "rest_of_season_as_of_week": outlook.completed_week,
-                    "rest_of_season_updated_at": outlook.updated_at,
-                }
-            )
-        )
-    return PlayerList(data=data, total=total, limit=limit, offset=offset)
+        ranking = snapshot["board"].get(player.id)
+        read = PlayerRead.model_validate(player)
+        if ranking is not None:
+            read = read.model_copy(update={
+                "rest_of_season_projected_points": ranking.get("restOfSeasonProjectedPoints"),
+                "rest_of_season_rank": ranking.get("restOfSeasonRank"),
+                "rest_of_season_as_of_week": ranking.get("restOfSeasonAsOfWeek"),
+                "rest_of_season_updated_at": ranking.get("restOfSeasonUpdatedAt"),
+                "master_draft_rank": ranking["masterDraftRank"],
+                "draft_projected_points": ranking["projectedPoints"],
+                "draft_projection_missing": ranking["projectionMissing"],
+                "draft_source_rank": ranking["sourceBoardRank"],
+                "draft_tier": ranking["tier"],
+                "draft_final_score": ranking["finalDraftScore"],
+                "draft_talent_score": ranking["cfb27TalentScore"],
+                "draft_ranking_version": snapshot["version"],
+                "draft_ranking_policy": snapshot["policy"],
+            })
+        data.append(read)
+    return PlayerList(data=data, total=total, limit=limit, offset=offset, ranking_version=snapshot["version"], ranking_policy=snapshot["policy"], ranking_season=snapshot["season"], ranking_week=snapshot["week"])
 
 
 @router.get("/{player_id}", response_model=PlayerRead)
@@ -391,25 +421,14 @@ def get_player_card_endpoint(
     # by roster, matchup, waiver, and scoring flows instead of pinning every
     # player to Week 1 for the entire season.
     current_injury_week = injury_week or calendar_cfb_week(current_injury_season)
-    current_injury_row = (
-        db.query(Injury)
-        .filter(
-            Injury.player_id == player.id,
-            Injury.season == current_injury_season,
-            Injury.week == current_injury_week,
-        )
-        .order_by(Injury.updated_at.desc(), Injury.id.desc())
-        .first()
-    )
+    current_injury_row = reviewed_injuries_for_week(
+        db, season=current_injury_season, week=current_injury_week, player_ids={player.id}
+    ).get(player.id)
     current_injury_status = (
         normalize_injury_status(current_injury_row.status)
         if current_injury_row and is_current_injury_designation(current_injury_row.status)
         else None
     )
-    if current_injury_status is None and is_out_for_season(
-        db, player_id=player.id, season=current_injury_season
-    ):
-        current_injury_status = "OUT_FOR_SEASON"
     injury_rows = (
         db.query(Injury)
         .filter(Injury.player_id == player.id)

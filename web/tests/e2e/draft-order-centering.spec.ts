@@ -1,3 +1,4 @@
+import {canonicalDraftPool} from "./fixtures/draft-pool";
 import { expect, test } from "@playwright/test";
 
 const mockPlayers = [
@@ -46,7 +47,7 @@ test("centers the active mock-draft manager from pick three onward", async ({ pa
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ data: mockPlayers, total: mockPlayers.length, limit: 200, offset: 0 }),
+      body: JSON.stringify(canonicalDraftPool(mockPlayers)),
     });
   });
 

@@ -10,9 +10,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
+import logging
 import httpx
 
 from collegefootballfantasy_api.app.core.config import settings
+
+
+class _ProviderRequestFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        # Provider identity URLs contain opaque subscription IDs. Keep them out of routine HTTP logs.
+        return "api.onesignal.com" not in record.getMessage()
+
+logging.getLogger("httpx").addFilter(_ProviderRequestFilter())
 
 
 @dataclass(frozen=True)
@@ -29,6 +38,10 @@ class PushNotificationProvider(Protocol):
         self,
         *,
         external_user_id: str,
+        subscription_id: str,
+        ttl: int = 3600,
+        badge_count: int = 0,
+        private_alert: bool = False,
         title: str,
         body: str,
         data: dict,
@@ -70,6 +83,10 @@ class OneSignalPushProvider:
         self,
         *,
         external_user_id: str,
+        subscription_id: str,
+        ttl: int = 3600,
+        badge_count: int = 0,
+        private_alert: bool = False,
         title: str,
         body: str,
         data: dict,
@@ -89,10 +106,15 @@ class OneSignalPushProvider:
                 json={
                     "app_id": settings.onesignal_app_id,
                     "target_channel": "push",
-                    "include_aliases": {"external_id": [external_user_id]},
-                    "headings": {"en": title},
-                    "contents": {"en": body},
-                    "data": data,
+                    "include_subscription_ids": [subscription_id],
+                    "ttl": ttl, "mutable_content": True, "ios_badgeType": "Set", "ios_badgeCount": badge_count,
+                    "ios_sound": "default",
+                    # If iOS bypasses its service extension, only generic copy
+                    # can be shown. Private league/roster text is promoted by
+                    # the native extension after its current-account check.
+                    "headings": {"en": "CFFB" if private_alert else title},
+                    "contents": {"en": "Open CFFB to view your alert." if private_alert else body},
+                    "data": {**data, "alert_title": title, "alert_body": body} if private_alert else data,
                     # Deterministic across a retry after a crash between the
                     # provider response and the database commit.
                     "idempotency_key": idempotency_key,
@@ -104,22 +126,39 @@ class OneSignalPushProvider:
         except httpx.HTTPError:
             return ProviderDeliveryResult(accepted=False, retryable=True, error="OneSignal network request failed")
 
-        if 200 <= response.status_code < 300:
-            try:
-                payload = response.json() if response.content else {}
-            except ValueError:
-                payload = {}
-            message_id = payload.get("id") if isinstance(payload, dict) else None
-            return ProviderDeliveryResult(accepted=True, provider_message_id=str(message_id) if message_id else None)
-
-        retryable = response.status_code == 429 or response.status_code >= 500
+        try:
+            payload = response.json() if response.content else {}
+        except ValueError:
+            payload = {}
+        errors = payload.get("errors", {}) if isinstance(payload, dict) else {}
+        invalid_ids = errors.get("invalid_player_ids", []) if isinstance(errors, dict) else []
+        invalid_ids += errors.get("invalid_subscription_ids", []) if isinstance(errors, dict) else []
+        if subscription_id in invalid_ids:
+            return ProviderDeliveryResult(accepted=False, invalid_subscription_id=subscription_id, error="OneSignal subscription is invalid")
+        message_id = payload.get("id") if isinstance(payload, dict) else None
+        if 200 <= response.status_code < 300 and isinstance(message_id, str) and message_id:
+            return ProviderDeliveryResult(accepted=True, provider_message_id=message_id)
         return ProviderDeliveryResult(
-            accepted=False,
-            retryable=retryable,
-            # Do not expose provider response bodies: they can contain target
-            # identifiers, diagnostic request data, or future provider secrets.
+            accepted=False, retryable=response.status_code == 429 or response.status_code >= 500,
             error=f"OneSignal rejected notification (HTTP {response.status_code})",
         )
+
+
+def verify_subscription_identity(subscription_id: str, external_user_id: str) -> None:
+    """Check provider ownership server-side before accepting an opaque subscription ID."""
+    from urllib.parse import quote
+    try:
+        response = httpx.get(
+            f"https://api.onesignal.com/apps/{quote(settings.onesignal_app_id or '', safe='')}/subscriptions/{quote(subscription_id, safe='')}/user/identity",
+            headers={"Authorization": f"Key {settings.onesignal_app_api_key}"}, timeout=10.0,
+        )
+        payload = response.json() if response.is_success else {}
+    except (httpx.HTTPError, ValueError) as exc:
+        raise RuntimeError("Push registration could not be verified. Try again.") from exc
+    if response.status_code == 429 or response.status_code >= 500:
+        raise RuntimeError("Push registration could not be verified. Try again.")
+    if not isinstance(payload, dict) or not isinstance(payload.get("identity"), dict) or payload["identity"].get("external_id") != external_user_id:
+        raise PermissionError("subscription identity does not match")
 
 
 class DisabledEmailProvider:

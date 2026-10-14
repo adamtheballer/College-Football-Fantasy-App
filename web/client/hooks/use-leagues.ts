@@ -250,7 +250,12 @@ export function matchupRefreshInterval(data: LeagueMatchupTabResponse | undefine
     }
     return LIVE_MATCHUP_REFRESH_MS;
   }
-  if (status === "final" || status === "stat_corrected") return false;
+  // Final pages must keep discovering applied records and the weekly rollover.
+  // Use the server's existing presentation boundary, not an independent timer.
+  if (status === "final" || status === "stat_corrected") {
+    const rollover = data?.matchup_week_rollover_at ? Date.parse(data.matchup_week_rollover_at) : NaN;
+    return Number.isFinite(rollover) && rollover > now ? Math.max(1_000, Math.min(30_000, rollover - now)) : 30_000;
+  }
   return 30_000;
 }
 
@@ -275,23 +280,33 @@ export function useLeagueMatchupTab(
   leagueId?: number,
   week?: number,
   matchupId?: number,
-  enabled = true
+  enabled = true,
+  season?: number,
 ) {
   return useQuery({
-    queryKey: ["league", leagueId, "matchup", week ?? "auto", matchupId ?? "mine"],
+    queryKey: ["league", leagueId, "matchup", week ?? "auto", matchupId ?? "mine", season ?? "league-season"],
     enabled: enabled && typeof leagueId === "number" && !Number.isNaN(leagueId),
     staleTime: 30_000,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
     retry: (failureCount, error) => {
       if (error instanceof ApiError && [401, 403, 404].includes(error.status)) {
         return false;
       }
       return failureCount < 2;
     },
-    queryFn: () =>
-      apiGet<LeagueMatchupTabResponse>(`/leagues/${leagueId}/matchup`, {
+    queryFn: async ({ signal }) => {
+      const payload = await apiGet<LeagueMatchupTabResponse>(`/leagues/${leagueId}/matchup`, {
         week: typeof week === "number" ? week : undefined,
         matchup_id: typeof matchupId === "number" ? matchupId : undefined,
-      }),
+      }, signal);
+      if (payload.league_id !== leagueId || (week !== undefined && payload.week !== week) ||
+          (matchupId !== undefined && payload.matchup_id !== matchupId) ||
+          (season !== undefined && payload.season !== season)) {
+        throw new Error("Matchup response does not match the selected league, season, week or opponent.");
+      }
+      return payload;
+    },
     refetchInterval: (query) => matchupRefreshInterval(query.state.data),
     refetchIntervalInBackground: true,
   });

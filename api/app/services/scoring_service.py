@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from collegefootballfantasy_api.app.domain.matchup_records import FINAL_MATCHUP_STATUSES, finalized_matchup_records, record_application_fingerprint
 from collegefootballfantasy_api.app.domain.scoring_engine import (
     calculate_player_fantasy_points,
     is_starting_slot,
@@ -34,7 +35,6 @@ from collegefootballfantasy_api.app.services.notification_service import (
 )
 
 
-FINAL_MATCHUP_STATUSES = {"final", "stat_corrected"}
 DELAYED_SCORE_STATUSES = {"delayed", "unavailable", "stale"}
 
 
@@ -454,35 +454,12 @@ def recalculate_standings_for_week(db: Session, league_id: int, season: int, wee
     else:
         through_week = week
     teams = db.query(Team).filter(Team.league_id == league_id).all()
-    records = {
-        team.id: {"wins": 0, "losses": 0, "ties": 0, "points_for": 0.0, "points_against": 0.0}
-        for team in teams
-    }
     final_matchups = (
         db.query(Matchup)
         .filter(Matchup.league_id == league_id, Matchup.season == season, Matchup.week <= through_week)
         .all()
     )
-    for matchup in final_matchups:
-        if (matchup.status or "").lower() not in FINAL_MATCHUP_STATUSES:
-            continue
-        home = records.setdefault(matchup.home_team_id, {"wins": 0, "losses": 0, "ties": 0, "points_for": 0.0, "points_against": 0.0})
-        away = records.setdefault(matchup.away_team_id, {"wins": 0, "losses": 0, "ties": 0, "points_for": 0.0, "points_against": 0.0})
-        home_score = float(matchup.home_score or 0.0)
-        away_score = float(matchup.away_score or 0.0)
-        home["points_for"] += home_score
-        home["points_against"] += away_score
-        away["points_for"] += away_score
-        away["points_against"] += home_score
-        if home_score > away_score:
-            home["wins"] += 1
-            away["losses"] += 1
-        elif away_score > home_score:
-            away["wins"] += 1
-            home["losses"] += 1
-        else:
-            home["ties"] += 1
-            away["ties"] += 1
+    records = finalized_matchup_records(final_matchups, (team.id for team in teams))
     for team_id, record in records.items():
         _upsert_standing(
             db,
@@ -496,6 +473,11 @@ def recalculate_standings_for_week(db: Session, league_id: int, season: int, wee
             float(record["points_for"]),
             float(record["points_against"]),
         )
+    for matchup in final_matchups:
+        if matchup.week == through_week:
+            matchup.record_application_fingerprint = record_application_fingerprint(
+                matchup, records.get(matchup.home_team_id), records.get(matchup.away_team_id),
+            )
     if records:
         db.flush()
     return len(records)

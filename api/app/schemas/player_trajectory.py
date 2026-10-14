@@ -6,9 +6,10 @@ from pydantic import BaseModel, Field
 
 class PlayerProjectionTrajectoryPointRead(BaseModel):
     week: int = Field(ge=1, le=13)
-    points: float | None = Field(default=None, ge=0)
-    actual_points: float | None = Field(default=None, ge=0)
-    source: Literal["published", "actual", "bye"]
+    points: float | None = Field(default=None, allow_inf_nan=False)
+    actual_points: float | None = Field(default=None, allow_inf_nan=False)
+    source: Literal["published", "actual", "bye", "unavailable"]
+    is_finalized: bool = False
     projection_status: str
     projection_version: str | None = None
     published_at: datetime | None = None

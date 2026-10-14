@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+import math
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -22,6 +23,8 @@ from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameSta
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.scoring import calculate_fantasy_points
+from collegefootballfantasy_api.app.services.projection_scoring import points_for_projection
+from collegefootballfantasy_api.app.services.player_chart_publication import points_from_verified_stats
 from collegefootballfantasy_api.app.services.player_pool_filters import (
     canonical_fantasy_player_filter,
 )
@@ -43,20 +46,14 @@ MAX_SEASON_FORM_ADJUSTMENT_SHARE = 0.50
 
 @dataclass(frozen=True)
 class DraftBoardOutlook:
-    projected_points: float
+    projected_points: float | None
     rank: int
     completed_week: int
     updated_at: datetime | None
 
 
-def _fantasy_points(stats: dict | None, *, position: str) -> float | None:
-    if not stats:
-        return None
-    for key in ("fantasy_points", "fantasyPoints", "fpts"):
-        value = stats.get(key)
-        if isinstance(value, (int, float)) and not isinstance(value, bool):
-            return float(value)
-    return calculate_fantasy_points(stats, position=position)
+def _fantasy_points(stats: dict | None, *, position: str, scoring_rules: dict | None = None) -> float | None:
+    return points_from_verified_stats(stats or {}, position=position, rules=scoring_rules)
 
 
 def _latest_completed_week(db: Session, *, season: int) -> int:
@@ -108,15 +105,24 @@ def _finalized_weeks_by_player(
     return finalized
 
 
-def _fallback_weekly_projection(player: Player) -> float:
-    season_total = float(player.sheet_projected_season_points or 0.0)
-    return max(0.0, season_total / 12.0)
+def _fallback_weekly_projection(player: Player) -> float | None:
+    value = player.sheet_projected_season_points
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        season_total = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(season_total) or season_total < 0:
+        return None
+    return season_total / 12.0
 
 
 def build_rest_of_season_draft_board(
     db: Session,
     *,
     season: int,
+    scoring_rules: dict | None = None,
 ) -> dict[int, DraftBoardOutlook]:
     """Calculate the current master-board rest-of-season totals and ranks.
 
@@ -165,29 +171,46 @@ def build_rest_of_season_draft_board(
                 PlayerStat.player_id.in_(position_by_player_id),
             )
         ).all()
-        if (points := _fantasy_points(row.stats, position=position_by_player_id.get(row.player_id, ""))) is not None
+        if (points := _fantasy_points(row.stats, position=position_by_player_id.get(row.player_id, ""), scoring_rules=scoring_rules)) is not None
     }
 
-    totals: list[tuple[Player, float, datetime | None]] = []
+    totals: list[tuple[Player, float | None, datetime | None]] = []
     for player in players:
         observed_weeks = set(range(1, globally_completed_week + 1))
         observed_weeks.update(finalized_weeks_by_player.get(player.id, set()))
         future_weeks = tuple(week for week in all_weeks if week not in observed_weeks)
-        fallback_weekly = _fallback_weekly_projection(player)
+        custom_season = points_from_verified_stats(player.sheet_projection_stats or {},position=player.position,rules=scoring_rules) if scoring_rules else None
+        fallback_weekly = (custom_season/12 if custom_season is not None else None) if scoring_rules else _fallback_weekly_projection(player)
+        missing_inputs = False
         future_total = 0.0
         untouched_preseason_weeks = 0
         latest_updated_at: datetime | None = None
         for week in future_weeks:
             projection = projections_by_player_week.get((player.id, week))
             if projection is None:
+                if fallback_weekly is None:
+                    missing_inputs = True
+                    continue
                 future_total += fallback_weekly
                 untouched_preseason_weeks += 1
                 continue
-            future_total += max(0.0, float(projection.fantasy_points or 0.0))
+            scored_projection = points_for_projection(player,projection,scoring_rules)
+            if scored_projection is None:
+                missing_inputs = True
+                continue
+            future_total += max(0.0, scored_projection)
             if projection.projection_version == "PRESEASON":
                 untouched_preseason_weeks += 1
             if latest_updated_at is None or projection.updated_at > latest_updated_at:
                 latest_updated_at = projection.updated_at
+
+        # A season-only source describes twelve games, not thirteen calendar
+        # weeks. Do not inflate it by adding an invented bye-week forecast.
+        # Published weekly snapshots remain authoritative when present.
+        if fallback_weekly is not None and not any(
+            (player.id, week) in projections_by_player_week for week in all_weeks
+        ):
+            future_total = fallback_weekly * max(0, 12 - len(observed_weeks))
 
         residuals: list[float] = []
         for week in sorted(observed_weeks):
@@ -195,7 +218,10 @@ def build_rest_of_season_draft_board(
             projection = projections_by_player_week.get((player.id, week))
             if actual is None or projection is None:
                 continue
-            expected = max(4.0, float(projection.fantasy_points or 0.0))
+            scored_projection = points_for_projection(player,projection,scoring_rules)
+            if scored_projection is None:
+                continue
+            expected = max(4.0, scored_projection)
             # A final breakout should be visible immediately in a draft room,
             # while the cap still prevents a single game from doubling a
             # player's remaining forecast.  Downside remains limited to the
@@ -212,11 +238,11 @@ def build_rest_of_season_draft_board(
             maximum_adjustment = future_total * MAX_SEASON_FORM_ADJUSTMENT_SHARE
             form_adjustment = max(-maximum_adjustment, min(maximum_adjustment, raw_form_adjustment))
 
-        totals.append((player, round(max(0.0, future_total + form_adjustment), 1), latest_updated_at))
+        totals.append((player, None if missing_inputs else round(max(0.0, future_total + form_adjustment), 1), latest_updated_at))
 
     ordered = sorted(
         totals,
-        key=lambda item: (-item[1], item[0].position, item[0].name.casefold(), item[0].id),
+        key=lambda item: (item[1] is None, -item[1] if item[1] is not None else 0, item[0].position, item[0].name.casefold(), item[0].id),
     )
     return {
         player.id: DraftBoardOutlook(

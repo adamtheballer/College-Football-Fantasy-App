@@ -1,3 +1,5 @@
+import { Capacitor } from "@capacitor/core";
+import { Link } from "react-router-dom";
 import { Bell, Check, Info, LoaderCircle, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -7,11 +9,16 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/use-auth";
 import { apiGet, apiPost } from "@/lib/api";
-import { enableBrowserPush, getBrowserPushState, prepareBrowserPush, resolvePushState, type BrowserPushState } from "@/lib/push-notifications";
+import { withoutRetiredPlayPreferences } from "@/lib/notifications";
+import { enableBrowserPush, getBrowserPushState, openPhoneNotificationSettings, prepareBrowserPush, resolvePushState, type BrowserPushState } from "@/lib/push-notifications";
 
 type Preferences = {
   push_enabled: boolean;
   email_enabled: boolean;
+  push_drafts: boolean;
+  push_matchups: boolean;
+  push_injuries: boolean;
+  push_major_news: boolean;
   draft_alerts: boolean;
   injury_alerts: boolean;
   injury_alert_scope: "ALL" | "SELECTED";
@@ -24,10 +31,6 @@ type Preferences = {
   matchup_results: boolean;
   matchup_start_alerts: boolean;
   matchup_result_alerts: boolean;
-  big_play_alerts: boolean;
-  long_rush_alerts: boolean;
-  long_reception_alerts: boolean;
-  long_pass_alerts: boolean;
   quiet_hours_start: string | null;
   quiet_hours_end: string | null;
   timezone: string;
@@ -43,18 +46,13 @@ type PreferenceToggleKey =
   | "trade_alerts"
   | "chat_alerts"
   | "matchup_start_alerts"
-  | "matchup_result_alerts"
-  | "big_play_alerts"
-  | "long_rush_alerts"
-  | "long_reception_alerts"
-  | "long_pass_alerts";
+  | "matchup_result_alerts";
 
 type LeaguePreference = {
   league_id: number;
   league_name: string | null;
   enabled: boolean;
   injury_alerts: boolean;
-  big_play_alerts: boolean;
   projection_alerts: boolean;
   draft_alerts: boolean;
   trade_alerts: boolean;
@@ -62,9 +60,6 @@ type LeaguePreference = {
   matchup_start_alerts: boolean;
   matchup_result_alerts: boolean;
   lineup_reminders: boolean;
-  long_rush_alerts: boolean;
-  long_reception_alerts: boolean;
-  long_pass_alerts: boolean;
 };
 
 type LeaguePreferencesResponse = { data: LeaguePreference[] };
@@ -79,13 +74,7 @@ const rows: Array<{ key: PreferenceToggleKey; label: string; description: string
   { key: "chat_alerts", label: "Chat", description: "Private direct-message alerts." },
 ];
 
-const longPlayRows: Array<{ key: "long_rush_alerts" | "long_reception_alerts" | "long_pass_alerts"; label: string; description: string }> = [
-  { key: "long_rush_alerts", label: "Long rushes", description: "30+ yard rushing plays." },
-  { key: "long_reception_alerts", label: "Long receptions", description: "40+ yard receptions." },
-  { key: "long_pass_alerts", label: "Long passes", description: "40+ yard completed passes." },
-];
-
-type LeagueToggleKey = "injury_alerts" | "draft_alerts" | "trade_alerts" | "waiver_alerts" | "matchup_start_alerts" | "matchup_result_alerts" | "lineup_reminders" | "big_play_alerts" | "long_rush_alerts" | "long_reception_alerts" | "long_pass_alerts";
+type LeagueToggleKey = "injury_alerts" | "draft_alerts" | "trade_alerts" | "waiver_alerts" | "matchup_start_alerts" | "matchup_result_alerts" | "lineup_reminders";
 
 const leagueRows: Array<{ key: LeagueToggleKey; label: string }> = [
   { key: "injury_alerts", label: "Injury updates" },
@@ -95,14 +84,13 @@ const leagueRows: Array<{ key: LeagueToggleKey; label: string }> = [
   { key: "matchup_start_alerts", label: "Starts" },
   { key: "matchup_result_alerts", label: "Results" },
   { key: "lineup_reminders", label: "Lineup" },
-  { key: "big_play_alerts", label: "Big plays" },
-  { key: "long_rush_alerts", label: "Long rushes" },
-  { key: "long_reception_alerts", label: "Long receptions" },
-  { key: "long_pass_alerts", label: "Long passes" },
 ];
 
 const permissionCopy: Record<BrowserPushState, string> = {
-  default: "Get alerts for drafts, trades, waivers, and important fantasy updates.",
+  default: "Get draft reminders, matchup alerts, and injury updates for your players.",
+  pending: "Permission is allowed. Waiting for this phone to finish registering…",
+  failed: "Phone registration failed. Retry to register this device.",
+  provisional: "This phone is registered for quiet notifications. Enable prominent alerts in iPhone Settings.",
   granted: "Push notifications are enabled for this browser.",
   denied: "Browser notifications are blocked. Update this site's permission in your browser settings to enable them.",
   unsupported: "This browser cannot receive web push here. On iPhone, add College Fantasy Football to your Home Screen first.",
@@ -111,6 +99,7 @@ const permissionCopy: Record<BrowserPushState, string> = {
 
 export function NotificationSettingsPanel() {
   const { user } = useAuth();
+  const isPhone = Capacitor.isNativePlatform();
   const [preferences, setPreferences] = useState<Preferences | null>(null);
   const [leaguePreferences, setLeaguePreferences] = useState<LeaguePreference[] | null>(null);
   const [permission, setPermission] = useState<BrowserPushState>(getBrowserPushState());
@@ -120,6 +109,7 @@ export function NotificationSettingsPanel() {
   const [pushAttempted, setPushAttempted] = useState(false);
   const mountedRef = useRef(false);
   const requestGenerationRef = useRef(0);
+  const saveSequence = useRef(0);
   const requestControllersRef = useRef(new Set<AbortController>());
 
   useEffect(() => {
@@ -127,9 +117,9 @@ export function NotificationSettingsPanel() {
     void resolvePushState().then((nextPermission) => {
       if (active) setPermission(nextPermission);
     });
-    return () => {
-      active = false;
-    };
+    const refresh = () => { void resolvePushState().then((state) => { if (active) setPermission(state); }); };
+    window.addEventListener("cffb-push-state-changed", refresh);
+    return () => { active = false; window.removeEventListener("cffb-push-state-changed", refresh); };
   }, []);
 
   useEffect(() => {
@@ -157,13 +147,17 @@ export function NotificationSettingsPanel() {
 
   const isAbortError = (error: unknown) => error instanceof DOMException && error.name === "AbortError";
 
-  const pushDeliveryEnabled = permission === "granted" && preferences?.push_enabled === true;
+  const pushDeliveryEnabled = (permission === "granted" || permission === "provisional") && preferences?.push_enabled === true;
   const pushStatus = saving
     ? { label: "Checking permission…", icon: LoaderCircle, className: "text-sky-300" }
     : preparingPush
       ? { label: "Preparing notification request…", icon: LoaderCircle, className: "text-sky-300" }
     : pushDeliveryEnabled
       ? { label: "Enabled", icon: Check, className: "text-emerald-300" }
+      : permission === "pending"
+        ? { label: "Registration pending", icon: LoaderCircle, className: "text-amber-300" }
+      : permission === "failed"
+        ? { label: "Registration failed", icon: X, className: "text-rose-300" }
       : permission === "granted"
         ? { label: "Permission granted — enable delivery below", icon: Info, className: "text-amber-300" }
         : permission === "denied"
@@ -194,8 +188,8 @@ export function NotificationSettingsPanel() {
     ])
       .then(([nextPreferences, leagueResponse]) => {
         if (!isCurrentRequest(controller, generation)) return;
-        setPreferences(nextPreferences);
-        setLeaguePreferences(leagueResponse.data);
+        setPreferences(withoutRetiredPlayPreferences({ push_drafts: true, push_matchups: true, push_injuries: true, push_major_news: false, ...nextPreferences }));
+        setLeaguePreferences(leagueResponse.data.map(withoutRetiredPlayPreferences));
       })
       .catch((error: unknown) => {
         if (!isCurrentRequest(controller, generation) || isAbortError(error)) return;
@@ -223,14 +217,17 @@ export function NotificationSettingsPanel() {
 
   const save = async (next: Preferences) => {
     const { controller, generation } = beginRequest();
-    setPreferences(next);
+    const previous = preferences;
+    const sequence = ++saveSequence.current;
+    setPreferences(withoutRetiredPlayPreferences(next));
     setSaving(true);
     setMessage(null);
     try {
-      const saved = await apiPost<Preferences>("/notifications/preferences", next, undefined, controller.signal);
-      if (isCurrentRequest(controller, generation)) setPreferences(saved);
+      const saved = await apiPost<Preferences>("/notifications/preferences", withoutRetiredPlayPreferences(next), undefined, controller.signal);
+      if (isCurrentRequest(controller, generation) && sequence === saveSequence.current) setPreferences(withoutRetiredPlayPreferences(saved));
     } catch (error) {
       if (!isCurrentRequest(controller, generation) || isAbortError(error)) return;
+      if (sequence === saveSequence.current) setPreferences(previous);
       setMessage("Unable to save notification settings.");
     } finally {
       finishRequest(controller);
@@ -248,8 +245,10 @@ export function NotificationSettingsPanel() {
       const nextPermission = await enableBrowserPush(user.id);
       if (!isCurrentRequest(controller, generation)) return;
       setPermission(nextPermission);
-      if (nextPermission === "granted" && preferences) {
+      if ((nextPermission === "granted" || nextPermission === "provisional") && preferences) {
         await save({ ...preferences, push_enabled: true });
+      } else if (nextPermission === "pending") {
+        setMessage("Permission is allowed, but phone registration is still pending. We will retry when the app returns to the foreground.");
       } else if (nextPermission === "default") {
         setMessage("iPhone did not grant notification permission. Open College Fantasy Football from its Home Screen icon and try again.");
       }
@@ -270,8 +269,8 @@ export function NotificationSettingsPanel() {
     setSaving(true);
     setMessage(null);
     try {
-      const response = await apiPost<LeaguePreferencesResponse>("/notifications/league-preferences", { items: next }, undefined, controller.signal);
-      if (isCurrentRequest(controller, generation)) setLeaguePreferences(response.data);
+      const response = await apiPost<LeaguePreferencesResponse>("/notifications/league-preferences", { items: next.map(withoutRetiredPlayPreferences) }, undefined, controller.signal);
+      if (isCurrentRequest(controller, generation)) setLeaguePreferences(response.data.map(withoutRetiredPlayPreferences));
     } catch (error) {
       if (!isCurrentRequest(controller, generation) || isAbortError(error)) return;
       setMessage("Unable to save league notification settings.");
@@ -291,20 +290,34 @@ export function NotificationSettingsPanel() {
       <CardContent className="space-y-2 p-4 sm:p-5">
         <div className="mb-3 flex flex-col gap-3 rounded-md border border-border bg-muted/20 p-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
-            <p className="text-sm font-bold text-foreground">Push notifications</p>
-            <p className="text-xs leading-relaxed text-muted-foreground">{permissionCopy[permission]}</p>
+            <p className="text-sm font-bold text-foreground">{isPhone ? "Phone notifications" : "Push notifications"}</p>
+            <p className="text-xs leading-relaxed text-muted-foreground">{isPhone && permission === "denied" ? "Notifications are denied. Enable CFFB notifications in iPhone Settings." : isPhone && permission === "granted" ? "This phone is registered. Alerts follow your saved choices." : permissionCopy[permission]}</p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
-            {permission !== "granted" ? (
-              <Button onClick={() => void enablePush()} disabled={saving || preparingPush || permission === "denied" || permission === "unsupported" || permission === "unconfigured"} className="h-9 rounded-md text-[10px] font-black uppercase tracking-[0.12em] shadow-none">
-                {saving ? "Checking permission…" : preparingPush ? "Preparing notifications…" : "Enable push notifications"}
+            {permission !== "granted" && permission !== "provisional" && permission !== "denied" ? (
+              <Button onClick={() => void enablePush()} disabled={saving || preparingPush || permission === "unsupported" || permission === "unconfigured"} className="h-9 rounded-md text-[10px] font-black uppercase tracking-[0.12em] shadow-none">
+                {saving ? "Checking permission…" : preparingPush ? "Preparing notifications…" : isPhone ? "Enable phone notifications" : "Enable push notifications"}
               </Button>
             ) : null}
+            {isPhone && (permission === "denied" || permission === "provisional") ? <Button variant="outline" onClick={() => void openPhoneNotificationSettings().catch(() => setMessage("Open iPhone Settings, then Notifications → CFFB."))}>Open iPhone Settings</Button> : null}
             <span data-testid="push-status" aria-live="polite" className={`inline-flex items-center gap-1 text-xs font-bold ${pushStatus.className}`}>
               <PushStatusIcon className={`h-4 w-4 ${saving || preparingPush ? "animate-spin" : ""}`} /> {pushStatus.label}
             </span>
           </div>
         </div>
+        {preferences ? <div className="space-y-3 border-b border-border/35 py-3">
+          <p className="text-sm font-bold">Phone alert categories</p>
+          {([
+            ["push_drafts", "Drafts", "Your league’s draft starts and existing draft reminders."],
+            ["push_matchups", "Matchups", "Your weekly matchup begins and certified results."],
+            ["push_injuries", "Injuries to my players", "Verified worsening availability for starters, bench, and IR."],
+            ["push_major_news", "Major college-football news", "Opt in to announcements approved by a CFFB admin."],
+          ] as const).map(([key, label, description]) => <div key={key} className="flex items-center justify-between gap-4">
+            <div><p className="text-sm font-semibold">{label}</p><p className="text-xs text-muted-foreground">{description}</p></div>
+            <Switch checked={preferences[key]} disabled={saving} aria-label={`${label} phone alerts`} onCheckedChange={(checked) => void save({ ...preferences, [key]: checked })} />
+          </div>)}
+          {user?.isAdmin ? <Link className="inline-block text-sm text-primary underline" to="/admin/announcements">Manage news announcements</Link> : null}
+        </div> : null}
         {preferences ? <div className="border-b border-border/35 py-3">
           <div className="flex items-center justify-between gap-5">
             <div><p className="text-sm font-bold text-foreground">Injury Updates</p><p className="text-xs text-muted-foreground">Official availability changes for players on your roster.</p></div>
@@ -323,22 +336,10 @@ export function NotificationSettingsPanel() {
             <Switch checked={Boolean(preferences[row.key])} disabled={saving} onCheckedChange={(checked) => void save({ ...preferences, [row.key]: checked })} aria-label={`${row.label} notifications`} />
           </div>
         )) : <p className="text-sm text-muted-foreground">Loading notification settings…</p>}
-        {preferences ? <div className="border-b border-border/35 py-4" data-testid="big-play-alert-group">
-          <div className="flex items-center justify-between gap-5">
-            <div><p className="text-sm font-bold text-foreground">Big Plays</p><p className="text-xs text-muted-foreground">Master control for verified live long-play alerts. Turning it off mutes every sub-alert.</p></div>
-            <Switch checked={preferences.big_play_alerts} disabled={saving} onCheckedChange={(big_play_alerts) => void save({ ...preferences, big_play_alerts })} aria-label="Big Plays notifications" />
-          </div>
-          <div className="ml-3 mt-3 space-y-1 border-l border-primary/30 pl-4 sm:ml-5">
-            {longPlayRows.map((row) => <div key={row.key} className="flex items-center justify-between gap-4 py-2">
-              <div><p className="text-xs font-semibold text-foreground">{row.label}</p><p className="text-[11px] text-muted-foreground">{row.description}</p></div>
-              <Switch checked={Boolean(preferences[row.key])} disabled={saving || !preferences.big_play_alerts} onCheckedChange={(checked) => void save({ ...preferences, [row.key]: checked })} aria-label={`${row.label} notifications`} />
-            </div>)}
-          </div>
-        </div> : null}
         {preferences ? <>
           <div className="flex items-center justify-between gap-5 border-b border-border/35 py-3">
             <div><p className="text-sm font-bold text-foreground">Push delivery</p><p className="text-xs text-muted-foreground">Pause operating-system notifications without removing in-app history.</p></div>
-            <Switch checked={preferences.push_enabled} disabled={saving || permission !== "granted"} onCheckedChange={(checked) => void save({ ...preferences, push_enabled: checked })} aria-label="Push delivery" />
+            <Switch checked={preferences.push_enabled} disabled={saving || (permission !== "granted" && permission !== "provisional")} onCheckedChange={(checked) => void save({ ...preferences, push_enabled: checked })} aria-label="Push delivery" />
           </div>
           <div className="flex items-center justify-between gap-5 border-b border-border/35 py-3">
             <div><p className="text-sm font-bold text-foreground">Email delivery</p><p className="text-xs text-muted-foreground">Receive enabled notification categories by email when this environment has an approved sender.</p></div>

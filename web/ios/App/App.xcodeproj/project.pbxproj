@@ -5,8 +5,27 @@
 	};
 	objectVersion = 60;
 	objects = {
+/* Begin XCRemoteSwiftPackageReference section */
+CFFB00200000000000000014 = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/OneSignal/OneSignal-XCFramework"; requirement = { kind = exactVersion; version = 5.7.0; }; };
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin PBXTargetDependency section */
+CFFB00200000000000000011 = {isa = PBXTargetDependency; target = CFFB0020000000000000000C; };
+/* End PBXTargetDependency section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+CFFB00200000000000000010 = {isa = PBXCopyFilesBuildPhase; buildActionMask = 2147483647; dstPath = ""; dstSubfolderSpec = 13; files = (CFFB00200000000000000007,); name = "Embed App Extensions"; runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXCopyFilesBuildPhase section */
+
 
 /* Begin PBXBuildFile section */
+CFFB00200000000000000001 = {isa = PBXBuildFile; fileRef = CFFB00200000000000000002; };
+CFFB00200000000000000003 = {isa = PBXBuildFile; fileRef = CFFB00200000000000000004; };
+CFFB00200000000000000005 = {isa = PBXBuildFile; productRef = CFFB00200000000000000006; };
+CFFB00200000000000000007 = {isa = PBXBuildFile; fileRef = CFFB00200000000000000008; settings = {ATTRIBUTES = (RemoveHeadersOnCopy,); }; };
+
+		CFFB00100000000000000004 /* AppReviewPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFFB00100000000000000003 /* AppReviewPolicy.swift */; };
+		CFFB00100000000000000002 /* AppReviewPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFFB00100000000000000001 /* AppReviewPlugin.swift */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
@@ -19,6 +38,14 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+CFFB00200000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+CFFB00200000000000000004 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationPrivacyPolicy.swift; sourceTree = "<group>"; };
+CFFB00200000000000000008 = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; path = OneSignalNotificationServiceExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+CFFB00200000000000000009 = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+CFFB0020000000000000000A = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Extension.entitlements; sourceTree = "<group>"; };
+
+		CFFB00100000000000000003 /* AppReviewPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewPolicy.swift; sourceTree = "<group>"; };
+		CFFB00100000000000000001 /* AppReviewPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppReviewPlugin.swift; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -33,6 +60,8 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+CFFB0020000000000000000F = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (CFFB00200000000000000005,); runOnlyForDeploymentPostprocessing = 0; };
+
 		504EC3011FED79650016851F /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -44,12 +73,15 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+CFFB0020000000000000000B = {isa = PBXGroup; children = (CFFB00200000000000000002, CFFB00200000000000000004, CFFB00200000000000000009, CFFB0020000000000000000A,); path = OneSignalNotificationServiceExtension; sourceTree = "<group>"; };
+
 		504EC2FB1FED79650016851F = {
 			isa = PBXGroup;
 			children = (
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
 				504EC3051FED79650016851F /* Products */,
+CFFB0020000000000000000B,
 			);
 			sourceTree = "<group>";
 		};
@@ -57,6 +89,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+CFFB00200000000000000008,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -65,6 +98,8 @@
 			isa = PBXGroup;
 			children = (
 				9582B6822FE993A50072D4E8 /* SceneDelegate.swift */,
+				CFFB00100000000000000003 /* AppReviewPolicy.swift */,
+				CFFB00100000000000000001 /* AppReviewPlugin.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
@@ -80,6 +115,8 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+CFFB0020000000000000000C = {isa = PBXNativeTarget; buildConfigurationList = CFFB0020000000000000000D; buildPhases = (CFFB0020000000000000000E, CFFB0020000000000000000F,); buildRules = (); dependencies = (); name = OneSignalNotificationServiceExtension; productName = OneSignalNotificationServiceExtension; productReference = CFFB00200000000000000008; productType = "com.apple.product-type.app-extension"; packageProductDependencies = (CFFB00200000000000000006,); };
+
 		504EC3031FED79650016851F /* App */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 504EC3161FED79650016851F /* Build configuration list for PBXNativeTarget "App" */;
@@ -87,10 +124,12 @@
 				504EC3001FED79650016851F /* Sources */,
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
+CFFB00200000000000000010,
 			);
 			buildRules = (
 			);
 			dependencies = (
+CFFB00200000000000000011,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -109,10 +148,15 @@
 				LastSwiftUpdateCheck = 0920;
 				LastUpgradeCheck = 0920;
 				TargetAttributes = {
+					CFFB0020000000000000000C = {
+						ProvisioningStyle = Automatic;
+						SystemCapabilities = { com.apple.ApplicationGroups.iOS = { enabled = 1; }; };
+					};
 					504EC3031FED79650016851F = {
 						CreatedOnToolsVersion = 9.2;
 						LastSwiftMigration = 1100;
 						ProvisioningStyle = Automatic;
+						SystemCapabilities = { com.apple.Push = { enabled = 1; }; com.apple.ApplicationGroups.iOS = { enabled = 1; }; com.apple.BackgroundModes = { enabled = 1; }; };
 					};
 				};
 			};
@@ -126,12 +170,14 @@
 			);
 			mainGroup = 504EC2FB1FED79650016851F;
 			packageReferences = (
+CFFB00200000000000000014,
 				D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */,
 			);
 			productRefGroup = 504EC3051FED79650016851F /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+CFFB0020000000000000000C,
 				504EC3031FED79650016851F /* App */,
 			);
 		};
@@ -154,12 +200,16 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+CFFB0020000000000000000E = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (CFFB00200000000000000001, CFFB00200000000000000003,); runOnlyForDeploymentPostprocessing = 0; };
+
 		504EC3001FED79650016851F /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				9582B6832FE993A70072D4E8 /* SceneDelegate.swift in Sources */,
+				CFFB00100000000000000004 /* AppReviewPolicy.swift in Sources */,
+				CFFB00100000000000000002 /* AppReviewPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -185,6 +235,9 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+CFFB00200000000000000012 = {isa = XCBuildConfiguration; name = Debug; buildSettings = {APPLICATION_EXTENSION_API_ONLY = YES; CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = 84TV35F6T5; CODE_SIGN_ENTITLEMENTS = OneSignalNotificationServiceExtension/Extension.entitlements; CURRENT_PROJECT_VERSION = 38; MARKETING_VERSION = 1.0.3; INFOPLIST_FILE = OneSignalNotificationServiceExtension/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 15.0; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@executable_path/../../Frameworks",); PRODUCT_BUNDLE_IDENTIFIER = org.collegefantasyfootball.app.OneSignalNotificationServiceExtension; PRODUCT_NAME = "$(TARGET_NAME)"; SKIP_INSTALL = YES; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; }; };
+CFFB00200000000000000013 = {isa = XCBuildConfiguration; name = Release; buildSettings = {APPLICATION_EXTENSION_API_ONLY = YES; CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = 84TV35F6T5; CODE_SIGN_ENTITLEMENTS = OneSignalNotificationServiceExtension/Extension.entitlements; CURRENT_PROJECT_VERSION = 38; MARKETING_VERSION = 1.0.3; INFOPLIST_FILE = OneSignalNotificationServiceExtension/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 15.0; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@executable_path/../../Frameworks",); PRODUCT_BUNDLE_IDENTIFIER = org.collegefantasyfootball.app.OneSignalNotificationServiceExtension; PRODUCT_NAME = "$(TARGET_NAME)"; SKIP_INSTALL = YES; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; }; };
+
 		504EC3141FED79650016851F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 958DCC722DB07C7200EA8C5F /* debug.xcconfig */;
@@ -302,7 +355,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 84TV35F6T5;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
-				CURRENT_PROJECT_VERSION = 37;
+				CFFB_APNS_ENVIRONMENT = development;
+				CURRENT_PROJECT_VERSION = 38;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -326,7 +380,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_TEAM = 84TV35F6T5;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
-				CURRENT_PROJECT_VERSION = 37;
+				CFFB_APNS_ENVIRONMENT = production;
+				CURRENT_PROJECT_VERSION = 38;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -345,6 +400,8 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+CFFB0020000000000000000D = {isa = XCConfigurationList; buildConfigurations = (CFFB00200000000000000012, CFFB00200000000000000013,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+
 		504EC2FF1FED79650016851F /* Build configuration list for PBXProject "App" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -373,6 +430,8 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+CFFB00200000000000000006 = {isa = XCSwiftPackageProductDependency; package = CFFB00200000000000000014; productName = OneSignalExtension; };
+
 		4D22ABE82AF431CB00220026 /* CapApp-SPM */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = D4C12C0A2AAA248700AAC8A2 /* XCLocalSwiftPackageReference "CapApp-SPM" */;

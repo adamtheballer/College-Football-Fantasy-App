@@ -203,3 +203,20 @@ def resolve_matchup_display_week(
         is not None
     )
     return completed_week if has_completed_week_matchup else active_week
+
+
+def next_matchup_display_rollover_at(
+    db: Session, league: League, current_week: int, now: datetime | None = None,
+) -> datetime | None:
+    """Return only a boundary at which the existing display resolver advances.
+
+    Its Tuesday review window ends Wednesday, unlike the operational reset.
+    Verify the resolver at that boundary; season-end/fallback schedules need
+    not advance, and must not acquire an invented expiry or 24-hour timer.
+    """
+    current = _as_utc(now or datetime.now(timezone.utc))
+    boundary_date = season_week_one_start(league.season_year).date() + timedelta(days=current_week * 7 + 1)
+    boundary = datetime.combine(boundary_date, time.min, tzinfo=_timezone(FANTASY_WEEK_TIMEZONE)).astimezone(timezone.utc)
+    if boundary <= current or resolve_matchup_display_week(db, league, now=boundary) == current_week:
+        return None
+    return boundary

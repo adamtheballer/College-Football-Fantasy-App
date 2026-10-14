@@ -24,6 +24,7 @@ from collegefootballfantasy_api.app.models.player_availability_event import Play
 from collegefootballfantasy_api.app.models.player_news_event import PlayerNewsEvent
 from collegefootballfantasy_api.app.models.player_weekly_context import PlayerWeeklyContext
 from collegefootballfantasy_api.app.services.notification_service import log_official_injury_update
+from collegefootballfantasy_api.app.services.injury_status import normalize_injury_status
 from collegefootballfantasy_api.app.services.player_trade_value import calculate_player_trade_value
 from collegefootballfantasy_api.app.services.availability_corrections import (
     has_active_manual_override,
@@ -114,23 +115,17 @@ def _official_availability_status(raw_status: str | None, timeline: str | None) 
     season_ending_terms = ("OUT FOR SEASON", "SEASON-ENDING", "SEASON ENDING", "LOST FOR THE SEASON")
     if any(term in f"{raw} {timeline or ''}".upper() for term in season_ending_terms):
         return "OUT_FOR_SEASON"
-    if "IR" in raw or "INJURED RESERVE" in raw:
+    if normalize_injury_status(raw) == "IR":
         return "IR"
     if _timeline_indicates_four_or_more_weeks(f"{raw} {timeline or ''}"):
         return "IR"
-    if "OUT" in raw:
-        return "OUT"
-    if "DOUBTFUL" in raw or "QUESTION" in raw or "GAME-TIME" in raw:
-        return "QUESTIONABLE"
-    if "AVAILABLE" in raw or "ACTIVE" in raw or "PROBABLE" in raw:
-        return "FULL"
-    return "FULL"
+    return normalize_injury_status(raw)
 
 
 def _availability_multiplier(status: str) -> tuple[float, float]:
     if status in {"OUT", "IR", "OUT_FOR_SEASON"}:
         return 0.0, 0.0
-    if status == "QUESTIONABLE":
+    if status in {"QUESTIONABLE", "DOUBTFUL", "DAY_TO_DAY", "TBD"}:
         return 0.7, 0.7
     return 1.0, 1.0
 
@@ -540,11 +535,11 @@ def _upsert_official_availability_rows(
 ) -> dict[str, int]:
     """Persist only exact, in-product P4 player matches from official reports."""
     eligible_players = db.query(Player).filter(Player.position.in_(sorted(_OFFENSE_POSITIONS))).all()
-    players_by_identity = {
-        (normalize_school(player.name), normalize_school(player.school)): player
-        for player in eligible_players
-        if conference_for_school(player.school or "")
-    }
+    players_by_identity: dict[tuple[str, str], list[Player]] = {}
+    for player in eligible_players:
+        if conference_for_school(player.school or ""):
+            key = (normalize_school(player.name), normalize_school(resolve_power4_school(player.school) or player.school))
+            players_by_identity.setdefault(key, []).append(player)
     current_injuries = {
         injury.player_id: injury
         for injury in db.query(Injury).filter(Injury.season == season, Injury.week == week).all()
@@ -558,8 +553,12 @@ def _upsert_official_availability_rows(
         if not school or (source_position and source_position not in _OFFENSE_POSITIONS):
             skipped += 1
             continue
-        player = players_by_identity.get((normalize_school(row.get("player_name") or ""), normalize_school(school)))
-        if player is None or player.position.upper() not in _OFFENSE_POSITIONS:
+        matches = players_by_identity.get((normalize_school(row.get("player_name") or ""), normalize_school(school)), [])
+        if len(matches) != 1:
+            skipped += 1
+            continue
+        player = matches[0]
+        if row.get("conference") and row["conference"] != conference_for_school(player.school):
             skipped += 1
             continue
         if source_position and source_position != player.position.upper():
@@ -569,7 +568,10 @@ def _upsert_official_availability_rows(
         status = _official_availability_status(row.get("status"), row.get("return_timeline"))
         content_hash = _availability_hash(row, status)
         probability_active, multiplier = _availability_multiplier(status)
-        existing = current_injuries.get(player.id)
+        db.query(Player).filter(Player.id == player.id).with_for_update().one()
+        existing = db.query(Injury).filter(Injury.player_id == player.id, Injury.season == season, Injury.week == week).order_by(Injury.updated_at.desc(), Injury.id.desc()).populate_existing().first()
+        previous = existing or db.query(Injury).filter(Injury.player_id == player.id, Injury.season == season, Injury.week < week).order_by(Injury.week.desc(), Injury.updated_at.desc(), Injury.id.desc()).first()
+        previous_status = previous.status if previous else None
         # A reviewed manual/team report is intentionally allowed to beat an
         # older or incomplete conference report, but only for the weeks it
         # explicitly covers.  Once the window ends, normal official sync
@@ -682,6 +684,7 @@ def _upsert_official_availability_rows(
         log_official_injury_update(
             db, player=player, season=season, week=week, status=status,
             content_hash=content_hash, source_url=row.get("source_url"), detail=event.notes,
+            previous_status=previous_status, availability_event_id=event.id,
         )
         events_created += 1
 

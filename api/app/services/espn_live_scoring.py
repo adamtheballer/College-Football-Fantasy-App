@@ -23,8 +23,6 @@ from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.integrations.espn import (
     ESPNClient,
     ESPNProviderResponse,
-    extract_espn_long_play_alert_candidates,
-    extract_espn_play_ids,
     extract_player_box_score_stats,
 )
 from collegefootballfantasy_api.app.models.league import League
@@ -37,7 +35,6 @@ from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.provider_identity import PlayerProviderId
 from collegefootballfantasy_api.app.models.provider_game_poll import ProviderGamePoll, ProviderGameSnapshot
 from collegefootballfantasy_api.app.models.roster import RosterEntry
-from collegefootballfantasy_api.app.models.scheduled_notification import ScheduledNotification
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.worker_heartbeat import WorkerHeartbeat
@@ -183,7 +180,7 @@ def prune_espn_snapshot_history(
     """Bound the raw ESPN cache without altering canonical scoring records.
 
     The newest accepted snapshot for each provider game is always retained: it
-    is the source for live-score reads, replay, and long-play comparisons.
+    is the source for live-score reads, replay, and projection reads.
     Older accepted snapshots are kept only for a short audit window and capped
     per game. Rejected snapshots contain only metadata after the storage guard,
     but age out as well so the audit table's row count remains bounded.
@@ -1016,7 +1013,7 @@ def _store_snapshot(
     # payloads that never become public scoring authority. Keep the immutable
     # metadata, canonical hash, and rejection reason; retain the full payload
     # only for an accepted snapshot, which is the only snapshot used for
-    # scoring, history repair, or long-play comparisons.
+    # scoring, history repair, or projection reads.
     stored_payload = summary if decision.accepted else {}
     stored_normalized_rows = normalized_rows if decision.accepted else []
     snapshot = ProviderGameSnapshot(
@@ -1075,72 +1072,6 @@ def _accepted_snapshot(db: Session, row: ProviderGamePoll) -> ProviderGameSnapsh
         .order_by(ProviderGameSnapshot.id.desc())
         .first()
     )
-
-
-def queue_accepted_espn_long_play_notifications(
-    db: Session,
-    *,
-    provider_game_id: str,
-    summary: dict[str, Any],
-    previous_snapshot: ProviderGameSnapshot | None,
-) -> int:
-    """Queue opted-in player alerts from a newly accepted ESPN snapshot.
-
-    The first accepted snapshot of a game establishes a baseline and never
-    backfills alerts.  Later snapshots can only emit for play IDs that were
-    absent from that baseline and whose text maps uniquely to a verified
-    athlete in the same summary's box score.
-    """
-
-    if not settings.live_player_notifications_enabled or previous_snapshot is None:
-        return 0
-    prior_payload = previous_snapshot.raw_payload if isinstance(previous_snapshot.raw_payload, dict) else {}
-    candidates = extract_espn_long_play_alert_candidates(summary, known_play_ids=extract_espn_play_ids(prior_payload))
-    if not candidates:
-        return 0
-    provider_ids = {candidate.provider_player_id for candidate in candidates}
-    mappings = {
-        mapping.provider_player_id: mapping.player_id
-        for mapping in db.query(PlayerProviderId)
-        .filter(
-            PlayerProviderId.provider == ESPN_PROVIDER,
-            PlayerProviderId.provider_player_id.in_(provider_ids),
-            PlayerProviderId.verification_status == "verified",
-        )
-        .all()
-    }
-    player_ids = set(mappings.values())
-    owners_by_player: dict[int, list[tuple[int, int]]] = {}
-    if player_ids:
-        for league_id, owner_user_id, player_id in (
-            db.query(RosterEntry.league_id, Team.owner_user_id, RosterEntry.player_id)
-            .join(Team, Team.id == RosterEntry.team_id)
-            .filter(RosterEntry.status == "active", RosterEntry.player_id.in_(player_ids), Team.owner_user_id.isnot(None))
-            .all()
-        ):
-            owners_by_player.setdefault(player_id, []).append((league_id, owner_user_id))
-    from collegefootballfantasy_api.app.services.notification_service import intake_typed_big_play_notification
-
-    queued = 0
-    for candidate in candidates:
-        player_id = mappings.get(candidate.provider_player_id)
-        if player_id is None:
-            continue
-        for league_id, user_id in owners_by_player.get(player_id, []):
-            event_key = f"big_play:{ESPN_PROVIDER}:{provider_game_id}:{candidate.provider_play_id}:{player_id}:{user_id}"
-            if db.query(ScheduledNotification.id).filter(ScheduledNotification.event_key == event_key).first() is not None:
-                continue
-            notification = intake_typed_big_play_notification(
-                db,
-                league_id=league_id,
-                user_id=user_id,
-                event_type=candidate.event_type,
-                event_key=event_key,
-                player_id=player_id,
-                play_yards=candidate.play_yards,
-            )
-            queued += int(notification is not None)
-    return queued
 
 
 def record_espn_game_success(
@@ -1589,8 +1520,6 @@ def run_espn_scoring_cycle(
             _assert_complete_espn_summary(
                 summary=summary,
             )
-            poll = db.get(ProviderGamePoll, claim.id)
-            previous_snapshot = _accepted_snapshot(db, poll) if poll is not None else None
             decision = record_espn_game_success(
                 db,
                 claim=claim,
@@ -1630,12 +1559,6 @@ def run_espn_scoring_cycle(
 
                     accepted = _accepted_snapshot(db, db.get(ProviderGamePoll, claim.id))
                     if accepted is not None:
-                        queue_accepted_espn_long_play_notifications(
-                            db,
-                            provider_game_id=claim.provider_game_id,
-                            summary=summary,
-                            previous_snapshot=previous_snapshot,
-                        )
                         persist_live_projections_for_snapshot(db, snapshot=accepted)
                         db.commit()
             successful += 1
@@ -1664,6 +1587,10 @@ def run_espn_scoring_cycle(
         from collegefootballfantasy_api.app.services.live_scoring_readiness import assert_public_scoring_ready
 
         assert_public_scoring_ready(db, season=season, week=week, now=current)
+        if week>0:
+            from collegefootballfantasy_api.app.services.chart_forecasts import capture_started_chart_forecasts
+            capture_started_chart_forecasts(db,season=season,week=week,now=current)
+            db.commit()
 
     if mode == "enabled" and pending_promotion:
         # Promotion is intentionally a short database operation after every

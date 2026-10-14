@@ -1,0 +1,16 @@
+meta {
+  name: Account Name Change Eligibility
+  type: http
+  seq: 20
+}
+get {
+  url: {{base_url}}/auth/me/name-change-eligibility
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+docs {
+  Returns verified account ID/current name, server time, last successful change,
+  next eligible instant, remaining_wait_seconds (ceiling), and can_change_name.
+  No previous change means eligible immediately. This request does not mutate.
+}

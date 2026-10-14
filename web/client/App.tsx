@@ -1,3 +1,4 @@
+import { PushNotificationCoordinator } from "@/components/PushNotificationCoordinator";
 import "./global.css";
 
 import { Suspense } from "react";
@@ -40,6 +41,8 @@ const Alerts = lazyWithRouteRecovery(() => import("./pages/Alerts"));
 const Chats = lazyWithRouteRecovery(() => import("./pages/Chats"));
 const InjuryCenter = lazyWithRouteRecovery(() => import("./pages/InjuryCenter"));
 const Trade = lazyWithRouteRecovery(() => import("./pages/Trade"));
+const AdminAnnouncements = lazyWithRouteRecovery(() => import("./pages/AdminAnnouncements"));
+const Announcement = lazyWithRouteRecovery(() => import("./pages/Announcement"));
 const AdminScoring = lazyWithRouteRecovery(() => import("./pages/AdminScoring"));
 const AdminSchedule = lazyWithRouteRecovery(() => import("./pages/AdminSchedule"));
 const ComingSoon = lazyWithRouteRecovery(() => import("./pages/ComingSoon"));
@@ -84,6 +87,7 @@ const LegacyPlayoffsRedirect = () => {
 const ApplicationRoutes = () => (
   <RuntimeCompatibilityGate>
     <AuthProvider>
+      <PushNotificationCoordinator />
       <TooltipProvider>
         <Toaster />
         <Sonner />
@@ -226,6 +230,8 @@ const ApplicationRoutes = () => (
                 <Route path="/leagues/:leagueId/trades/:tradeId" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
                 <Route path="/coming-soon" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
                 <Route path="/saturday-pick-6" element={<ProtectedRoute><SaturdayPick6 /></ProtectedRoute>} />
+                <Route path="/admin/announcements" element={<ProtectedRoute><AdminAnnouncements /></ProtectedRoute>} />
+                <Route path="/announcements/:announcementId" element={<ProtectedRoute><Announcement /></ProtectedRoute>} />
                 <Route path="/admin/scoring" element={<ProtectedRoute><AdminScoring /></ProtectedRoute>} />
                 <Route path="/admin/schedules" element={<ProtectedRoute><AdminSchedule /></ProtectedRoute>} />
                 <Route path="/admin/saturday-pick-6" element={<ProtectedRoute><AdminSaturdayPick6 /></ProtectedRoute>} />

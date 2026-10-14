@@ -407,7 +407,7 @@ export function SideBySideMatchup({
             projectedPoints: selectedProjection,
             opponent: selectedPlayer.opponent,
             playerClass: null,
-            status: selectedPlayer.status,
+            status: selectedPlayer.injury_status,
             hasWeeklyProjection: true,
             projection: {
               fpts: selectedProjection,

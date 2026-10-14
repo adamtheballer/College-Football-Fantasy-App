@@ -1,9 +1,10 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Index, Integer, String, Text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from collegefootballfantasy_api.app.models import Base, TimestampMixin
+from collegefootballfantasy_api.app.core.name_change import next_name_change_at
 
 
 class User(TimestampMixin, Base):
@@ -11,6 +12,11 @@ class User(TimestampMixin, Base):
     __table_args__ = (
         Index("ix_users_email", "email"),
         Index("ix_users_token", "api_token"),
+        CheckConstraint(
+            "(review_request_claimed_at IS NULL AND review_request_app_version IS NULL AND review_request_app_build IS NULL) OR "
+            "(review_request_claimed_at IS NOT NULL AND review_request_app_version IS NOT NULL AND review_request_app_build IS NOT NULL)",
+            name="ck_users_review_request_metadata",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -33,6 +39,10 @@ class User(TimestampMixin, Base):
     password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     manager_name_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     auth_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    # Authorization consumption, never evidence of a displayed/submitted review.
+    review_request_claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    review_request_app_version: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    review_request_app_build: Mapped[str | None] = mapped_column(String(80), nullable=True)
 
     @property
     def early_access_pro_eligible(self) -> bool:
@@ -42,6 +52,4 @@ class User(TimestampMixin, Base):
     @property
     def manager_name_change_available_at(self) -> datetime | None:
         """Return the next self-service manager-name change time, if limited."""
-        if self.manager_name_changed_at is None:
-            return None
-        return self.manager_name_changed_at + timedelta(days=7)
+        return next_name_change_at(self.manager_name_changed_at)

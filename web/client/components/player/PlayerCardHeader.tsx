@@ -42,7 +42,7 @@ export const formatPlayerCardStatus = (value?: string | null) => {
 export const resolvePlayerCardStatus = (
   card?: PlayerCardResponse | null,
   contextualStatus?: string | null,
-) => formatPlayerCardStatus(card?.current_injury_status ?? contextualStatus ?? "UNREPORTED");
+) => formatPlayerCardStatus(card ? card.current_injury_status ?? "UNREPORTED" : contextualStatus ?? "UNREPORTED");
 
 export function PlayerCardHeader({
   card,
@@ -59,8 +59,9 @@ export function PlayerCardHeader({
   position: string;
   title: string;
 }) {
+  const headshotUrl = card?.about.headshot_url ?? card?.player.image_url ?? player.imageUrl;
   const [headshotFailed, setHeadshotFailed] = useState(false);
-  useEffect(() => setHeadshotFailed(false), [card?.about.headshot_url]);
+  useEffect(() => setHeadshotFailed(false), [headshotUrl]);
   const playerStatus = resolvePlayerCardStatus(card, player.status);
   const statusSource = playerStatus;
   const statusBadge = playerAvailabilityBadge(statusSource);
@@ -81,7 +82,7 @@ export function PlayerCardHeader({
       mobileLabel: "Pos Rating",
       value: formatPlayerCardPositionRank(seasonRank),
     },
-    { label: "Class", mobileLabel: "Class", value: card?.about.player_class ?? player.playerClass ?? "—" },
+    { label: "Class", mobileLabel: "Class", value: card?.about.player_class ?? card?.player.player_class ?? player.playerClass ?? "—" },
     { label: "Status", mobileLabel: "Status", value: playerStatus },
   ];
   return (
@@ -100,9 +101,9 @@ export function PlayerCardHeader({
           data-testid="player-card-hero-portrait"
           className="pointer-events-none absolute bottom-0 right-0 z-[5] h-[13rem] w-[11rem] sm:h-[14.5rem] sm:w-[15rem]"
         >
-          {card?.about.headshot_url && !headshotFailed ? (
+          {headshotUrl && !headshotFailed ? (
             <img
-              src={card.about.headshot_url}
+              src={headshotUrl}
               alt={player.name}
               className="h-full w-full object-contain object-bottom opacity-100 [mask-image:linear-gradient(to_right,transparent_0%,black_18%,black_100%)]"
               onError={() => setHeadshotFailed(true)}
@@ -123,7 +124,7 @@ export function PlayerCardHeader({
               {position || player.position ? <span data-testid="player-card-position-badge" className={cn("inline-flex rounded-sm border px-2 py-0.5 text-[10px] font-semibold sm:text-xs", palette.pill)}>{position || player.position}</span> : null}
               {card?.about.team ?? player.school ? <span>{position || player.position ? "• " : ""}{card?.about.team ?? player.school}</span> : null}
             </p>
-            <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[9px] font-bold sm:mt-3 sm:text-[11px]">
+            <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs font-bold sm:mt-3 sm:text-sm">
               <PlayerAvailabilityIndicator status={statusSource} showActive={false}>
                 <span className={cn("inline-flex items-center gap-1.5", statusTextClass)}>
                   <span data-testid="player-card-status-dot" className={cn("h-1.5 w-1.5 rounded-full", playerAvailabilityDotClass(statusSource))} />

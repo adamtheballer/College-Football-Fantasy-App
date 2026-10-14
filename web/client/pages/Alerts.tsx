@@ -1,4 +1,4 @@
-import { Activity, Bell, CheckCheck, MessageSquare, ShieldAlert, Timer, TrendingUp, Trophy, Zap } from "lucide-react";
+import { Activity, Bell, CheckCheck, MessageSquare, ShieldAlert, Timer, TrendingUp, Trophy } from "lucide-react";
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -22,7 +22,6 @@ const icons: Record<string, typeof Bell> = {
   CHAT: MessageSquare,
   PLAYER: Activity,
   INJURY: ShieldAlert,
-  TOUCHDOWN: Zap,
   PROJECTION: Bell,
 };
 

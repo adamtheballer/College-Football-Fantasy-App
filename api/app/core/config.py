@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import field_validator, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -26,6 +26,8 @@ TRUSTED_NATIVE_CORS_ORIGINS = frozenset({"capacitor://localhost"})
 
 
 class Settings(BaseSettings):
+    # Combined New Build release only. Never resets an account's consumed claim.
+    ios_app_review_enabled: bool = False
     environment: str = "development"
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5433/collegefootballfantasy"
     api_host: str = "0.0.0.0"
@@ -199,10 +201,12 @@ class Settings(BaseSettings):
     notification_worker_interval_seconds: int = 5
     notification_claim_lease_seconds: int = 120
     notification_max_attempts: int = 5
-    # Injury and other live player-update alerts remain explicitly disabled
-    # until the product has a verified, authoritative live-data source and an
-    # owner has approved the operational runbook. The notification pipeline
-    # can still process durable product events while this is false.
+    push_draft_ttl_seconds: int = Field(default=1800, ge=60, le=86400)
+    push_matchup_ttl_seconds: int = Field(default=3600, ge=60, le=86400)
+    push_injury_ttl_seconds: int = Field(default=21600, ge=60, le=86400)
+    push_news_ttl_seconds: int = Field(default=86400, ge=60, le=604800)
+    # Legacy injury-ingestion CLI default only. Play notifications are retired
+    # and cannot be enabled by this setting.
     live_player_notifications_enabled: bool = False
     resend_from: str | None = None
     smtp_host: str | None = None

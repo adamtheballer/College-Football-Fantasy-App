@@ -29,7 +29,7 @@ def test_onesignal_provider_sanitizes_non_success_responses(monkeypatch, status_
     )
 
     result = OneSignalPushProvider().send(
-        external_user_id="cfb_user:1",
+        external_user_id="cfb_user:1", subscription_id="subscription-1",
         title="Title",
         body="Body",
         data={},
@@ -41,7 +41,7 @@ def test_onesignal_provider_sanitizes_non_success_responses(monkeypatch, status_
     assert result.error == f"OneSignal rejected notification (HTTP {status_code})"
 
 
-def test_provider_timeout_is_retryable_and_success_without_json_still_accepts(monkeypatch):
+def test_provider_timeout_retries_but_missing_message_id_does_not_count_as_acceptance(monkeypatch):
     monkeypatch.setattr(settings, "onesignal_app_id", "app-id")
     monkeypatch.setattr(settings, "onesignal_app_api_key", "secret-key")
     monkeypatch.setattr(
@@ -50,15 +50,15 @@ def test_provider_timeout_is_retryable_and_success_without_json_still_accepts(mo
         lambda *_args, **_kwargs: (_ for _ in ()).throw(httpx.TimeoutException("timeout")),
     )
     timeout = OneSignalPushProvider().send(
-        external_user_id="cfb_user:1", title="Title", body="Body", data={}, idempotency_key="timeout-key"
+        external_user_id="cfb_user:1", subscription_id="subscription-1", title="Title", body="Body", data={}, idempotency_key="timeout-key"
     )
     assert timeout.accepted is False and timeout.retryable is True
 
     monkeypatch.setattr(notification_providers.httpx, "post", lambda *_args, **_kwargs: _Response(200, ValueError("bad json")))
     accepted = OneSignalPushProvider().send(
-        external_user_id="cfb_user:1", title="Title", body="Body", data={}, idempotency_key="accepted-key"
+        external_user_id="cfb_user:1", subscription_id="subscription-1", title="Title", body="Body", data={}, idempotency_key="accepted-key"
     )
-    assert accepted.accepted is True
+    assert accepted.accepted is False
     assert accepted.provider_message_id is None
 
 

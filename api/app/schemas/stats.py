@@ -63,3 +63,5 @@ class TeamInjuryRow(BaseModel):
 class TeamInjuriesList(BaseModel):
     data: list[TeamInjuryRow]
     total: int
+    season: int | None = None
+    week: int | None = None

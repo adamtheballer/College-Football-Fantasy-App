@@ -22,6 +22,8 @@ from collegefootballfantasy_api.app.schemas.stats import (
     TeamStatsSummaryList,
 )
 from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_fresh
+from collegefootballfantasy_api.app.services.league_weeks import calendar_cfb_week
+from collegefootballfantasy_api.app.api.routes.injuries import list_injuries
 from collegefootballfantasy_api.app.services.power4 import (
     canonical_school_name,
     conference_for_school,
@@ -641,12 +643,14 @@ def get_power4_standings(
 
 @router.get("/injuries", response_model=TeamInjuriesList)
 def list_power4_injuries(
-    season: int,
-    week: int,
+    season: int | None = None,
+    week: int | None = None,
     conference: str | None = None,
     team: str | None = None,
     db: Session = Depends(get_db),
 ) -> TeamInjuriesList:
+    season = season or datetime.utcnow().year
+    week = week or calendar_cfb_week(season)
     conference_key = _normalize_conference(conference)
     existing_rows = (
         db.query(Injury.id)
@@ -686,41 +690,8 @@ def list_power4_injuries(
                 except Exception:
                     db.rollback()
 
-    query = db.query(Injury, Player).join(Player, Injury.player_id == Player.id)
-    query = query.filter(Injury.season == season, Injury.week == week)
-    if team:
-        query = query.filter(Player.school.ilike(f"%{team}%"))
-    rows = query.order_by(Injury.updated_at.desc()).all()
-
-    impacts = {
-        impact.player_id: impact.delta_fpts
-        for impact in db.query(InjuryImpact)
-        .filter(InjuryImpact.season == season, InjuryImpact.week == week)
-        .all()
-    }
-
-    data: list[TeamInjuryRow] = []
-    for injury, player in rows:
-        canonical_team = resolve_power4_school(player.school or "")
-        conference_name = conference_for_school(canonical_team or player.school)
-        if not conference_name:
-            continue
-        if conference_key and conference_name != conference_key:
-            continue
-        data.append(
-            TeamInjuryRow(
-                player_id=player.id,
-                player_name=player.name,
-                team=canonical_team or player.school,
-                conference=conference_name,
-                position=player.position,
-                status=injury.status,
-                injury=injury.injury,
-                return_timeline=injury.return_timeline,
-                practice_level=injury.practice_level,
-                notes=injury.notes,
-                last_updated=injury.updated_at or datetime.utcnow(),
-                projection_delta=impacts.get(player.id),
-            )
-        )
-    return TeamInjuriesList(data=data, total=len(data))
+    injuries = list_injuries(season=season, week=week, conference=conference_key, team=team, db=db)
+    return TeamInjuriesList(
+        data=[TeamInjuryRow(**row.model_dump()) for row in injuries.data],
+        total=injuries.total, season=season, week=week,
+    )

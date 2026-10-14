@@ -16,7 +16,7 @@ type GateState =
 
 export type RuntimeCapabilities = Pick<
   RuntimeIdentity,
-  "email_enabled" | "password_reset_enabled" | "password_reset_email_configured" | "support_email" | "privacy_policy_url" | "terms_url" | "provider_disclosure_url"
+  "ios_app_review_enabled" | "email_enabled" | "password_reset_enabled" | "password_reset_email_configured" | "support_email" | "privacy_policy_url" | "terms_url" | "provider_disclosure_url"
 >;
 
 // Treat capabilities as disabled until the API explicitly supplies them. This
@@ -43,6 +43,7 @@ const RuntimeCompatibilityGate = ({ children }: { children: ReactNode }) => {
         if (!active) return;
         publishRuntimeDebugIdentity(runtime, deploymentSkew);
         setCapabilities({
+          ios_app_review_enabled: runtime.ios_app_review_enabled === true,
           email_enabled: runtime.email_enabled === true,
           password_reset_enabled: runtime.password_reset_enabled === true,
           password_reset_email_configured: runtime.password_reset_email_configured === true,

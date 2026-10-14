@@ -22,6 +22,7 @@ class PushToken(TimestampMixin, Base):
             sqlite_where=text("enabled = 1"),
         ),
         Index("ix_push_tokens_device_token", "device_token"),
+        Index("uq_push_tokens_active_installation", "installation_id", unique=True, postgresql_where=text("enabled = true AND installation_id IS NOT NULL"), sqlite_where=text("enabled = 1 AND installation_id IS NOT NULL")),
         Index("ix_push_tokens_external_user_id", "external_user_id"),
     )
 
@@ -34,6 +35,10 @@ class PushToken(TimestampMixin, Base):
     # it is never returned by the authenticated API or logged.
     provider: Mapped[str] = mapped_column(String(30), default="legacy_expo", nullable=False)
     external_user_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    installation_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    installation_secret_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    app_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    environment: Mapped[str] = mapped_column(String(20), default="web", server_default="web")
     platform: Mapped[str] = mapped_column(String(30), default="unknown")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
@@ -49,6 +54,10 @@ class NotificationPreference(TimestampMixin, Base):
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
     user_key: Mapped[str] = mapped_column(String(100))
     push_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    push_drafts: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
+    push_matchups: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
+    push_injuries: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
+    push_major_news: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
     email_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     draft_alerts: Mapped[bool] = mapped_column(Boolean, default=True)
     injury_alerts: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -67,6 +76,7 @@ class NotificationPreference(TimestampMixin, Base):
     # stored for backwards-compatible reads, but are not used for new events.
     matchup_start_alerts: Mapped[bool] = mapped_column(Boolean, default=True)
     matchup_result_alerts: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Inert legacy storage; omitted from settings/API and never used to dispatch.
     big_play_alerts: Mapped[bool] = mapped_column(Boolean, default=False)
     long_rush_alerts: Mapped[bool] = mapped_column(Boolean, default=False)
     long_reception_alerts: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -104,12 +114,9 @@ class NotificationLog(Base):
 class NotificationDeliveryAttempt(TimestampMixin, Base):
     __tablename__ = "notification_delivery_attempts"
     __table_args__ = (
-        UniqueConstraint(
-            "scheduled_notification_id",
-            "channel",
-            "attempt_number",
-            name="uq_notification_delivery_attempt_schedule_channel_number",
-        ),
+        Index("uq_notification_attempt_channel", "scheduled_notification_id", "channel", "attempt_number", unique=True,
+              postgresql_where=text("push_token_id IS NULL"), sqlite_where=text("push_token_id IS NULL")),
+        UniqueConstraint("scheduled_notification_id", "push_token_id", "attempt_number", name="uq_notification_attempt_device"),
         Index("ix_notification_delivery_attempts_scheduled_notification_id", "scheduled_notification_id"),
         Index("ix_notification_delivery_attempts_user_id", "user_id"),
         Index("ix_notification_delivery_attempts_status", "status"),
@@ -121,6 +128,7 @@ class NotificationDeliveryAttempt(TimestampMixin, Base):
         ForeignKey("scheduled_notifications.id", ondelete="CASCADE")
     )
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    push_token_id: Mapped[int | None] = mapped_column(ForeignKey("push_tokens.id", ondelete="RESTRICT"), nullable=True)
     channel: Mapped[str] = mapped_column(String(30))
     attempt_number: Mapped[int] = mapped_column(default=1)
     status: Mapped[str] = mapped_column(String(20), default="pending")
@@ -148,7 +156,8 @@ class NotificationLeaguePreference(TimestampMixin, Base):
     league_id: Mapped[int] = mapped_column(ForeignKey("leagues.id", ondelete="CASCADE"))
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     injury_alerts: Mapped[bool] = mapped_column(Boolean, default=True)
-    big_play_alerts: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Inert legacy storage; omitted from settings/API and never used to dispatch.
+    big_play_alerts: Mapped[bool] = mapped_column(Boolean, default=False)
     projection_alerts: Mapped[bool] = mapped_column(Boolean, default=True)
     draft_alerts: Mapped[bool] = mapped_column(Boolean, default=True)
     trade_alerts: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -160,3 +169,14 @@ class NotificationLeaguePreference(TimestampMixin, Base):
     long_rush_alerts: Mapped[bool] = mapped_column(Boolean, default=False)
     long_reception_alerts: Mapped[bool] = mapped_column(Boolean, default=False)
     long_pass_alerts: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class NewsAnnouncement(TimestampMixin, Base):
+    __tablename__ = "news_announcements"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_by: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    title: Mapped[str] = mapped_column(String(120))
+    body: Mapped[str] = mapped_column(String(400))
+    audience: Mapped[dict] = mapped_column(JSON, default=dict)
+    status: Mapped[str] = mapped_column(String(20), default="draft")
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

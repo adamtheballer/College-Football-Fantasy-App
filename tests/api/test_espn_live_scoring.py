@@ -39,7 +39,6 @@ from collegefootballfantasy_api.app.services.espn_live_scoring import (
     discover_relevant_espn_games,
     certify_espn_matchup_finality,
     espn_week_freshness,
-    queue_accepted_espn_long_play_notifications,
     prune_espn_snapshot_history,
     _canonical_hash,
     run_espn_scoring_cycle,
@@ -528,74 +527,6 @@ def test_recorded_replay_runs_through_worker_entrypoint_and_survives_restart(db_
         week=2,
         projection_version="MIDWEEK",
     ).count() == 1
-
-
-def test_accepted_snapshot_queues_only_new_verified_long_play_alerts(db_session, monkeypatch):
-    arch, wingo = _verified_players(db_session)
-    user = User(
-        email="long-play-owner@example.com",
-        first_name="Long Play",
-        password_hash="test-hash",
-        api_token="long-play-owner-token",
-    )
-    league = League(name="Long Play League", season_year=2026)
-    db_session.add_all([user, league])
-    db_session.flush()
-    team = Team(league_id=league.id, name="Owner Team", owner_user_id=user.id)
-    db_session.add(team)
-    db_session.flush()
-    db_session.add_all(
-        [
-            RosterEntry(league_id=league.id, team_id=team.id, player_id=arch.id, slot="QB", status="active"),
-            RosterEntry(league_id=league.id, team_id=team.id, player_id=wingo.id, slot="WR", status="active"),
-        ]
-    )
-    prior_payload = espn_summary_payload()
-    previous = ProviderGameSnapshot(
-        provider="espn",
-        provider_game_id="401",
-        season=2026,
-        week=1,
-        status="live",
-        captured_at=NOW,
-        snapshot_hash="prior-snapshot",
-        raw_payload=prior_payload,
-        normalized_rows=[],
-        accepted=True,
-    )
-    current_payload = deepcopy(prior_payload)
-    current_payload["drives"]["previous"].append(
-        {
-            "plays": [
-                {
-                    "id": "long-pass-1",
-                    "type": {"text": "Pass"},
-                    "text": "Arch Manning pass complete to Ryan Wingo for 48 yds",
-                    "statYardage": 48,
-                }
-            ]
-        }
-    )
-    db_session.add(previous)
-    db_session.commit()
-    monkeypatch.setattr(settings, "live_player_notifications_enabled", True)
-
-    queued = queue_accepted_espn_long_play_notifications(
-        db_session,
-        provider_game_id="401",
-        summary=current_payload,
-        previous_snapshot=previous,
-    )
-    db_session.commit()
-
-    assert queued == 2
-    assert {row.event_type for row in db_session.query(ScheduledNotification).all()} == {"LONG_PASS", "LONG_RECEPTION"}
-    assert queue_accepted_espn_long_play_notifications(
-        db_session,
-        provider_game_id="401",
-        summary=current_payload,
-        previous_snapshot=previous,
-    ) == 0
 
 
 def test_100_league_1000_roster_cache_is_per_game_not_per_roster_or_read(db_session):
@@ -1441,3 +1372,19 @@ def test_finality_accepts_verified_bye_starter_but_not_missing_schedule(db_sessi
     db_session.commit()
     assert certify_espn_matchup_finality(db_session, season=2026, week=1) == 1
     assert db_session.get(Matchup, matchup.id).status == "final"
+
+
+def test_live_scoring_accepts_long_plays_without_creating_play_notifications(db_session, monkeypatch):
+    _verified_players(db_session)
+    monkeypatch.setattr(settings, "live_player_notifications_enabled", True)
+    _make_public_promotion_ready(db_session, at=NOW)
+    first = run_espn_scoring_cycle(db_session, season=2026, week=1, mode="enabled",
+        client=FakeLiveESPN(), now=NOW, relevant_team_names={"texas"})
+    assert first.successful_games == 1
+    summary = _summary_at(period=2, clock="09:00", pass_yards=323)
+    summary["drives"]["previous"].append({"plays":[{"id":"retired-pass-1", "type":{"text":"Pass"},
+        "text":"Arch Manning pass complete to Ryan Wingo for 48 yds", "statYardage":48}]})
+    _make_public_promotion_ready(db_session, at=NOW+timedelta(minutes=4))
+    second = _run_summary(db_session, summary=summary, at=NOW+timedelta(minutes=4), mode="enabled")
+    assert second.successful_games == 1
+    assert db_session.query(ScheduledNotification).count() == 0

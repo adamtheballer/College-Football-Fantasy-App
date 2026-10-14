@@ -28,3 +28,5 @@ class PlayerTradeValue(TimestampMixin, Base):
     input_version: Mapped[str] = mapped_column(String(80), nullable=False)
     explanation_json: Mapped[list | None] = mapped_column(JSON, nullable=True)
     factor_breakdown_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    input_context_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)

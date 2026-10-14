@@ -20,3 +20,5 @@ class Matchup(TimestampMixin, Base):
     status: Mapped[str] = mapped_column(String(50), default="scheduled")
     home_score: Mapped[float] = mapped_column(Float, default=0.0)
     away_score: Mapped[float] = mapped_column(Float, default=0.0)
+    # Exact result/record receipt, written atomically by standings publication.
+    record_application_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)

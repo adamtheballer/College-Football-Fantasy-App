@@ -128,6 +128,12 @@ describe("api client", () => {
     });
   });
 
+  it("preserves the actual name-change cooldown contract without inventing timing for other failures", async () => {
+    const timing = { account_id: 7, current_name: "Manager", server_time: "2026-10-13T12:00:00Z", last_successful_change_at: "2026-10-06T12:00:01Z", next_eligible_at: "2026-10-13T12:00:01Z", remaining_wait_seconds: 1, can_change_name: false };
+    globalThis.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ detail: { ...timing, code: "NAME_CHANGE_COOLDOWN", field: "first_name", message: "Wait one second.", retry_at: timing.next_eligible_at } }), { status: 429, headers: { "Content-Type": "application/json" } }));
+    await expect(apiPatch("/auth/me", { first_name: "New Name" })).rejects.toMatchObject({ code: "NAME_CHANGE_COOLDOWN", nameChangeEligibility: timing });
+  });
+
   it("sends JSON PUT requests for APIs that update a single resource", async () => {
     globalThis.fetch = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ id: 14, selected_pick_player_id: 9 }), {

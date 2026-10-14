@@ -6,7 +6,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const platform = vi.hoisted(() => ({ native: false }));
 
-vi.mock("@capacitor/core", () => ({
+vi.mock("@capacitor/core", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@capacitor/core")>(),
   Capacitor: {
     isNativePlatform: () => platform.native,
   },

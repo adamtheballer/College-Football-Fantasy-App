@@ -11,6 +11,7 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 
+from collegefootballfantasy_api.app.domain.matchup_records import record_application_fingerprint
 from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.matchup import Matchup
@@ -227,6 +228,10 @@ def _update_standings(session, league_id: int, season: int, week: int, matchups:
                 points_for=round(record["points_for"], 2),
                 points_against=round(record["points_against"], 2),
             )
+        )
+    for matchup in matchups:
+        matchup.record_application_fingerprint = record_application_fingerprint(
+            matchup, records.get(matchup.home_team_id), records.get(matchup.away_team_id),
         )
     session.commit()
 

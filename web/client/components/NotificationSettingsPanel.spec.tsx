@@ -38,11 +38,11 @@ vi.mock("@/lib/push-notifications", () => ({
 import { NotificationSettingsPanel } from "./NotificationSettingsPanel";
 
 const preferences = {
+  push_drafts: true, push_matchups: true, push_injuries: true, push_major_news: false,
   push_enabled: false, email_enabled: false, draft_alerts: true, injury_alerts: false,
   usage_alerts: false, waiver_alerts: true, projection_alerts: false,
   lineup_reminders: true, trade_alerts: true, chat_alerts: true, matchup_results: true,
-  matchup_start_alerts: true, matchup_result_alerts: true, big_play_alerts: false,
-  long_rush_alerts: false, long_reception_alerts: false, long_pass_alerts: false,
+  matchup_start_alerts: true, matchup_result_alerts: true,
   quiet_hours_start: null, quiet_hours_end: null, timezone: "America/New_York",
 };
 
@@ -78,16 +78,23 @@ describe("NotificationSettingsPanel async lifecycle", () => {
     expect(screen.getByText("Push delivery")).toBeTruthy();
   });
 
-  it("groups long-play alerts beneath their Big Plays master control without a touchdown option", async () => {
-    api.get.mockResolvedValueOnce(preferences).mockResolvedValueOnce({ data: [] });
+  it("removes play controls from global and league settings and strips old API keys when saving", async () => {
+    const legacy = { ...preferences, big_play_alerts: true, touchdown_alerts: true, long_rush_alerts: true, long_reception_alerts: true, long_pass_alerts: true };
+    const league = { ...legacy, league_id: 42, league_name: "Test League", enabled: true };
+    api.get.mockResolvedValueOnce(legacy).mockResolvedValueOnce({ data: [league] });
+    api.post.mockImplementation(async (_url, payload) => payload.items ? { data: payload.items } : payload);
     render(<NotificationSettingsPanel />);
-
-    const group = await screen.findByTestId("big-play-alert-group");
-    expect(group.textContent).toContain("Master control for verified live long-play alerts");
-    expect(group.textContent).toContain("30+ yard rushing plays");
-    expect(group.textContent).toContain("40+ yard receptions");
-    expect(group.textContent).toContain("40+ yard completed passes");
-    expect(screen.queryByLabelText("Touchdowns notifications")).toBeNull();
+    await screen.findByLabelText("Drafts notifications");
+    expect(screen.queryByTestId("big-play-alert-group")).toBeNull();
+    expect(document.body.textContent).not.toMatch(/Big plays|Long rushes|Long receptions|Long passes|Touchdowns/i);
+    fireEvent.click(screen.getByLabelText("Drafts notifications"));
+    await act(async () => { await Promise.resolve(); });
+    const payload = api.post.mock.calls[0][1];
+    for (const key of ["big_play_alerts", "touchdown_alerts", "long_rush_alerts", "long_reception_alerts", "long_pass_alerts"]) expect(payload).not.toHaveProperty(key);
+    fireEvent.click(screen.getByLabelText("Test League Drafts"));
+    await act(async () => { await Promise.resolve(); });
+    const leaguePayload = api.post.mock.calls[1][1].items[0];
+    for (const key of ["big_play_alerts", "touchdown_alerts", "long_rush_alerts", "long_reception_alerts", "long_pass_alerts"]) expect(leaguePayload).not.toHaveProperty(key);
   });
 
   it("aborts a delayed preference update on unmount without reporting an async error", async () => {

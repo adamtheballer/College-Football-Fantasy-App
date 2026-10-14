@@ -1,10 +1,13 @@
-import React, { useMemo, useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
+import React, { useEffect, useMemo, useState } from "react";
 import { Search, ShieldAlert, AlertTriangle, TimerReset } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
-import { apiGet } from "@/lib/api";
+import { useInjuryUpdates } from "@/hooks/use-injury-updates";
+import { Button } from "@/components/ui/button";
+import { PlayerAvailabilityIndicator } from "@/lib/playerAvailability";
 import { usePlayerCard } from "@/hooks/use-players";
 import {
   Select,
@@ -23,8 +26,9 @@ export type InjuryItem = {
   status: string;
   injury: string;
   returnTimeline: string;
-  projectionDelta: number;
+  projectionDelta: number | null;
   lastUpdated: string;
+  sourceUrl?: string | null;
 };
 
 const statusStyles: Record<string, string> = {
@@ -36,9 +40,9 @@ const statusStyles: Record<string, string> = {
   INACTIVE: "bg-slate-500/10 text-slate-300 border-slate-500/30",
   IR: "bg-red-600/20 text-red-300 border-red-500/40",
   N_A: "bg-slate-500/10 text-slate-300 border-slate-500/30",
-  DOUBTFUL: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+  DOUBTFUL: "bg-red-500/15 text-red-300 border-red-500/30",
   QUESTIONABLE: "bg-yellow-500/15 text-yellow-300 border-yellow-500/30",
-  PROBABLE: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  PROBABLE: "bg-amber-500/15 text-amber-300 border-amber-500/30",
   FULL: "bg-slate-500/10 text-slate-300 border-slate-500/30",
 };
 
@@ -85,48 +89,27 @@ export const buildInjuryPlayerCard = (injury: InjuryItem) => ({
 export default function InjuryCenter() {
   const [searchQuery, setSearchQuery] = useState("");
   const [conferenceFilter, setConferenceFilter] = useState("ALL");
-  const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
-  const [injuries, setInjuries] = useState<InjuryItem[]>([]);
-  const playerCardQuery = usePlayerCard(selectedPlayerId, selectedPlayerId !== null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    const season = new Date().getFullYear();
-    const week = 1;
-    const conferenceParam =
-      conferenceFilter === "ALL"
-        ? undefined
-        : conferenceFilter.replace(" ", "");
-    apiGet<{ data: any[] }>(
-      "/injuries",
-      { season, week, conference: conferenceParam },
-      controller.signal
-    )
-      .then((payload) => {
-        const mapped = payload.data.map((row) => ({
-          id: row.player_id,
-          name: row.player_name,
-          team: row.team,
-          conference: row.conference || "UNKNOWN",
-          pos: row.position,
-          status: row.status,
-          injury: row.injury || "Injury designation",
-          returnTimeline: row.return_timeline || "TBD",
-          projectionDelta: row.projection_delta ?? 0,
-          lastUpdated: row.last_updated
-            ? new Date(row.last_updated).toLocaleString()
-            : "Updated recently",
-        }));
-        setInjuries(mapped);
-      })
-      .catch(() => {
-        setInjuries([]);
-      });
-    return () => controller.abort();
-  }, [conferenceFilter]);
+  const [searchParams] = useSearchParams();
+  const playerParam = Number(searchParams.get("playerId"));
+  const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(Number.isSafeInteger(playerParam) && playerParam > 0 ? playerParam : null);
+  useEffect(() => { setSelectedPlayerId(Number.isSafeInteger(playerParam) && playerParam > 0 ? playerParam : null); }, [playerParam]);
+  const leagueParam = Number(searchParams.get("leagueId"));
+  const leagueId = Number.isSafeInteger(leagueParam) && leagueParam > 0 ? leagueParam : undefined;
+  const injuryQuery = useInjuryUpdates();
+  const injuries: InjuryItem[] = useMemo(() => (injuryQuery.data?.data ?? []).map((row) => ({
+    id: row.player_id, name: row.player_name, team: row.team,
+    conference: row.conference || "UNKNOWN", pos: row.position, status: row.status,
+    injury: [row.injury, row.notes].filter(Boolean).join(" • ") || "Availability designation; no injury detail reported",
+    returnTimeline: row.return_timeline || "Return not confirmed",
+    projectionDelta: row.projection_delta,
+    lastUpdated: row.last_updated ? new Date(row.last_updated).toLocaleString() : "Report time unavailable",
+    sourceUrl: row.source_url,
+  })), [injuryQuery.data]);
+  const playerCardQuery = usePlayerCard(selectedPlayerId, selectedPlayerId !== null, leagueId);
 
   const filtered = useMemo(() => {
     return injuries
+      .filter((row) => conferenceFilter === "ALL" || row.conference === conferenceFilter.replace(" ", ""))
       .filter((row) =>
         row.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         row.team.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -159,7 +142,7 @@ export default function InjuryCenter() {
         }
         return a.name.localeCompare(b.name);
       });
-  }, [injuries, searchQuery]);
+  }, [injuries, searchQuery, conferenceFilter]);
 
   const openPlayer = (playerId: number) => {
     setSelectedPlayerId(playerId);
@@ -168,9 +151,10 @@ export default function InjuryCenter() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-10 animate-in fade-in duration-1000">
-      {selectedInjury ? (
+      {selectedPlayerId && (selectedInjury || playerCardQuery.data) ? (
         <PlayerCardModal
-          player={buildInjuryPlayerCard(selectedInjury)}
+          player={selectedInjury ? buildInjuryPlayerCard(selectedInjury) : playerCardQuery.data!.player}
+          leagueId={leagueId}
           card={playerCardQuery.data}
           error={playerCardQuery.isError}
           loading={playerCardQuery.isLoading}
@@ -214,6 +198,16 @@ export default function InjuryCenter() {
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-cfb-border-subtle bg-cfb-surface p-4">
+        <div className="space-y-1 text-sm text-cfb-text-secondary">
+          <p className="font-semibold text-cfb-text-primary">{injuryQuery.data ? `${injuryQuery.data.season} • Fantasy Week ${injuryQuery.data.week}` : "Current fantasy week"}</p>
+          <p>O = Out · D = Doubtful · Q = Questionable · P = Probable</p>
+          <p>Missing reports do not confirm a player is healthy. Check the report time before setting your lineup.</p>
+        </div>
+        <Button variant="outline" disabled={injuryQuery.isFetching} onClick={() => void injuryQuery.refetch()}>{injuryQuery.isFetching ? "Checking…" : "Refresh updates"}</Button>
+      </div>
+      {injuryQuery.isError ? <div role="alert" className="rounded-lg border border-red-400/40 bg-red-400/10 p-4 text-sm text-red-200">Injury updates could not be refreshed. {injuryQuery.data ? "Showing the last loaded reports." : "No current reports could be loaded."} Use Refresh updates to retry.</div> : null}
+
       <Card className="bg-card/40 backdrop-blur-md border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl">
         <CardHeader className="px-10 py-8 border-b border-white/5 bg-white/5">
           <div className="flex items-center justify-between">
@@ -223,7 +217,7 @@ export default function InjuryCenter() {
             <div className="flex items-center gap-3">
               <ShieldAlert className="w-4 h-4 text-primary" />
               <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">
-                Live Updates
+                Sourced Reports
               </span>
             </div>
           </div>
@@ -233,12 +227,11 @@ export default function InjuryCenter() {
             {filtered.map((row) => (
               <div
                 key={row.id}
-                onClick={() => openPlayer(row.id)}
-                className="grid grid-cols-1 md:grid-cols-[1.3fr_0.6fr_0.9fr_0.9fr_0.6fr] gap-6 items-center px-10 py-6 hover:bg-white/[0.04] transition-all cursor-pointer"
+                className="grid grid-cols-1 md:grid-cols-[1.3fr_0.6fr_0.9fr_0.9fr_0.6fr] gap-4 items-center px-4 py-5 sm:px-6 hover:bg-white/[0.04] transition-all"
               >
                 <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <h3 className="text-[14px] font-black italic uppercase text-foreground">{row.name}</h3>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button type="button" onClick={() => openPlayer(row.id)} className="text-left text-sm font-bold text-cfb-text-primary hover:text-cfb-brand"><PlayerAvailabilityIndicator status={row.status}>{row.name}</PlayerAvailabilityIndicator></button>
                     <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">
                       {row.team} • {row.conference} • {row.pos}
                     </span>
@@ -253,7 +246,7 @@ export default function InjuryCenter() {
                   <span
                     className={cn(
                       "px-4 py-1.5 rounded-xl border text-[9px] font-black uppercase tracking-widest",
-                      statusStyles[row.status]
+                      statusStyles[row.status] ?? statusStyles.TBD
                     )}
                   >
                     {statusLabel(row.status)}
@@ -265,20 +258,23 @@ export default function InjuryCenter() {
                 </div>
 
                 <div className="text-[12px] font-black text-foreground">
-                  {row.projectionDelta > 0 ? "+" : ""}
-                  {row.projectionDelta.toFixed(1)} pts
+                  {row.projectionDelta === null ? "Impact not reported" : `${row.projectionDelta > 0 ? "+" : ""}${row.projectionDelta.toFixed(1)} pts`}
                 </div>
 
-                <div className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40 flex items-center gap-2">
+                <div className="text-xs text-cfb-text-secondary space-y-2">
+                  <span className="flex items-center gap-2">
                   <TimerReset className="w-3 h-3" />
                   {row.lastUpdated}
+                  </span>
+                  {row.sourceUrl ? <a href={row.sourceUrl} target="_blank" rel="noopener noreferrer" className="font-semibold text-cfb-brand underline">View source</a> : null}
                 </div>
               </div>
             ))}
-            {filtered.length === 0 && (
+            {injuryQuery.isLoading ? <p role="status" className="p-6 text-sm text-cfb-text-secondary">Loading current injury reports…</p> : null}
+            {!injuryQuery.isLoading && !injuryQuery.isError && filtered.length === 0 && (
               <div className="px-10 py-10 text-center">
                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60">
-                  No Power 4 injury updates found for this filter.
+                  No current Power 4 injury reports are available for this filter. Reports may still be pending.
                 </p>
               </div>
             )}

@@ -1,3 +1,4 @@
+import pytest
 from datetime import datetime, timedelta, timezone
 
 from conftest import TestingSessionLocal
@@ -22,16 +23,13 @@ from collegefootballfantasy_api.app.services.notification_providers import (
     ProviderDeliveryResult,
 )
 from collegefootballfantasy_api.app.services.notification_service import (
-    _league_pref_allows,
-    _pref_allows_category,
     process_due_notifications_once,
-    intake_typed_big_play_notification,
     queue_certified_matchup_final_notifications,
     queue_notification_event,
     record_delivery_attempt,
     rebuild_matchup_start_notifications,
+    open_notification_event,
 )
-from collegefootballfantasy_api.app.services.notification_events import get_notification_event
 
 
 def auth_headers(token: str) -> dict[str, str]:
@@ -131,12 +129,7 @@ def test_notification_preferences_are_auth_scoped_without_user_key(client):
     body = update_response.json()
     assert "user_key" not in body
     assert body["push_enabled"] is False
-    # Touchdown alerts were retired. Big Plays is now the master switch, so
-    # clearing it also clears every long-play child preference.
-    assert body["touchdown_alerts"] is False
-    assert body["long_rush_alerts"] is False
-    assert body["long_reception_alerts"] is False
-    assert body["long_pass_alerts"] is False
+    assert not {"touchdown_alerts", "big_play_alerts", "long_rush_alerts", "long_reception_alerts", "long_pass_alerts"} & body.keys()
     assert body["quiet_hours_start"] == "22:00"
 
 
@@ -148,7 +141,7 @@ def test_push_tokens_and_league_preferences_resolve_identity_from_auth(client):
 
     token_response = client.post(
         "/notifications/tokens",
-        json={"device_token": "device-123", "platform": "ios"},
+        json={"device_token": "device-123", "platform": "ios", "account_id": user["id"], "installation_id": "a" * 32, "installation_secret": "b" * 64, "app_id": "test-app", "environment": "development"},
         headers=auth_headers(token),
     )
     assert token_response.status_code == 200
@@ -355,7 +348,7 @@ def test_direct_user_notification_is_visible_without_a_rostered_player(client, d
     assert response.status_code == 200
     assert response.json()["total"] == 1
     assert response.json()["unread_count"] == 1
-    assert response.json()["data"][0]["destination"] == {"type": "draft", "league_id": league["id"], "resource_id": None}
+    assert response.json()["data"][0]["destination"] == {"type": "draft", "league_id": league["id"], "resource_id": None, "week": None}
 
 
 def test_category_preference_suppresses_in_app_and_external_delivery(client, db_session):
@@ -366,15 +359,15 @@ def test_category_preference_suppresses_in_app_and_external_delivery(client, db_
         NotificationPreference(
             user_id=user_id,
             user_key=str(user_id),
-            draft_alerts=False,
+            draft_alerts=False, push_drafts=False,
         )
     )
+    from collegefootballfantasy_api.app.models.draft import Draft
+    draft = db_session.query(Draft).filter_by(league_id=league["id"]).one()
+    draft.status = "on_clock"
     queue_notification_event(
-        db_session,
-        league_id=league["id"],
-        user_id=user_id,
-        event_type="DRAFT_START",
-        event_key=f"draft:disabled:{user_id}",
+        db_session, league_id=league["id"], user_id=user_id,
+        event_type="DRAFT_START", event_key=f"draft:disabled:{user_id}", payload={"draft_id": draft.id},
     )
     db_session.commit()
 
@@ -508,7 +501,7 @@ def test_retryable_push_failure_creates_a_bounded_retry_attempt(client, db_sessi
     attempts = (
         db_session.query(NotificationDeliveryAttempt)
         .join(ScheduledNotification)
-        .filter(ScheduledNotification.event_key == f"trade:retry:{user_id}", NotificationDeliveryAttempt.channel == "push")
+        .filter(ScheduledNotification.event_key == f"trade:retry:{user_id}", NotificationDeliveryAttempt.channel == "push", NotificationDeliveryAttempt.push_token_id.isnot(None))
         .order_by(NotificationDeliveryAttempt.attempt_number)
         .all()
     )
@@ -580,7 +573,7 @@ def test_detach_allows_a_new_owner_without_deleting_subscription_history(client,
 
     protected = client.post("/notifications/tokens", json=payload, headers=auth_headers(second["access_token"]))
     assert protected.status_code == 404
-    detached = client.post("/notifications/tokens/detach", json={}, headers=auth_headers(first["access_token"]))
+    detached = client.post("/notifications/tokens/detach", json={"subscription_id": "subscription-123"}, headers=auth_headers(first["access_token"]))
     assert detached.status_code == 200
     assert detached.json() == {"disabled": 1}
 
@@ -674,7 +667,7 @@ def test_certified_matchup_final_persists_a_tied_notification_outcome(client, db
     assert queued.body == f"Your matchup with {team.name} ended 21–21."
 
 
-def test_stale_claim_is_recovered_once_and_big_play_intake_is_disabled_by_default(client, db_session, monkeypatch):
+def test_stale_claim_is_recovered_once(client, db_session, monkeypatch):
     identity = create_user(client, "stale-claim")
     league = create_league(client, identity["access_token"], "Lease League")
     user_id = identity["user"]["id"]
@@ -695,69 +688,6 @@ def test_stale_claim_is_recovered_once_and_big_play_intake_is_disabled_by_defaul
     result = process_due_notifications_once(db_session, worker_id="replacement-worker", now=datetime.now(timezone.utc))
     assert result["claimed"] == 1
     assert db_session.query(NotificationLog).filter_by(user_id=user_id, event_key=f"trade:stale:{user_id}:in_app").count() == 1
-
-    monkeypatch.setattr(settings, "live_player_notifications_enabled", False)
-    assert intake_typed_big_play_notification(
-        db_session,
-        league_id=league["id"],
-        user_id=user_id,
-        event_type="LONG_RUSH",
-        event_key=f"player:disabled:{user_id}",
-        player_id=1,
-    ) is None
-
-
-def test_long_play_alert_contract_uses_the_master_gate_and_approved_thresholds(client, db_session, monkeypatch):
-    identity = create_user(client, "long-play-contract")
-    league = create_league(client, identity["access_token"], "Long Play League")
-    user_id = identity["user"]["id"]
-
-    assert get_notification_event("LONG_RUSH").minimum_yards == 30
-    assert get_notification_event("LONG_RECEPTION").minimum_yards == 40
-    assert get_notification_event("LONG_PASS").minimum_yards == 40
-
-    global_pref = NotificationPreference(
-        user_id=user_id,
-        user_key=str(user_id),
-        big_play_alerts=False,
-        long_rush_alerts=True,
-    )
-    league_pref = NotificationLeaguePreference(
-        user_id=user_id,
-        user_key=str(user_id),
-        league_id=league["id"],
-        enabled=True,
-        big_play_alerts=False,
-        long_rush_alerts=True,
-    )
-    assert not _pref_allows_category("PLAYER", "LONG_RUSH", global_pref)
-    assert not _league_pref_allows("PLAYER", "LONG_RUSH", league_pref)
-    global_pref.big_play_alerts = True
-    league_pref.big_play_alerts = True
-    assert _pref_allows_category("PLAYER", "LONG_RUSH", global_pref)
-    assert _league_pref_allows("PLAYER", "LONG_RUSH", league_pref)
-
-    monkeypatch.setattr(settings, "live_player_notifications_enabled", True)
-    assert intake_typed_big_play_notification(
-        db_session,
-        league_id=league["id"],
-        user_id=user_id,
-        event_type="LONG_RUSH",
-        event_key=f"long-rush:below-threshold:{user_id}",
-        player_id=1,
-        play_yards=29,
-    ) is None
-    queued = intake_typed_big_play_notification(
-        db_session,
-        league_id=league["id"],
-        user_id=user_id,
-        event_type="LONG_RUSH",
-        event_key=f"long-rush:threshold:{user_id}",
-        player_id=1,
-        play_yards=30,
-    )
-    assert queued is not None
-    assert queued.event_type == "LONG_RUSH"
 
 
 def test_external_dead_letter_keeps_the_in_app_notification_and_sanitizes_error(client, db_session, monkeypatch):
@@ -802,6 +732,76 @@ def test_external_dead_letter_keeps_the_in_app_notification_and_sanitizes_error(
     attempt = (
         db_session.query(NotificationDeliveryAttempt)
         .filter_by(scheduled_notification_id=event.id, channel="push")
+        .filter(NotificationDeliveryAttempt.push_token_id.isnot(None))
         .one()
     )
     assert attempt.error_message == "provider error with details"
+
+
+@pytest.mark.parametrize("event_type", ["BIG_PLAY", "TOUCHDOWN", "LONG_RUSH", "LONG_RECEPTION", "LONG_PASS", " long_rush "])
+def test_retired_play_events_cannot_queue_or_dispatch_and_are_hidden(client, db_session, event_type):
+    identity = create_user(client, "retired-play")
+    token = identity["access_token"]
+    user_id = identity["user"]["id"]
+    league = create_league(client, token)
+    now = datetime.now(timezone.utc)
+    with pytest.raises(ValueError):
+        queue_notification_event(db_session, league_id=league["id"], user_id=user_id,
+            event_type=event_type, event_key="retired:new", payload={})
+    with pytest.raises(ValueError):
+        queue_notification_event(db_session, league_id=league["id"], user_id=user_id,
+            event_type="TRADE_RECEIVED", event_key="big_play:legacy", payload={})
+    # Seed a previously queued row with missing content: retirement must precede rendering.
+    row = ScheduledNotification(league_id=league["id"], user_id=user_id,
+        notification_type=event_type, event_type=None, event_key="legacy:retired", payload={},
+        scheduled_for=now-timedelta(seconds=1), status="retry")
+    db_session.add(row); db_session.flush()
+    attempts = [NotificationDeliveryAttempt(scheduled_notification_id=row.id, user_id=user_id,
+        channel=channel, attempt_number=1, status="pending") for channel in ("in_app", "push", "email")]
+    db_session.add_all(attempts)
+    for index in range(3):
+        db_session.add(NotificationLog(user_id=user_id, user_key=str(user_id), alert_type=event_type,
+            title="Retired play", body="Hidden", category="PLAYER", sent_at=now,
+            event_key=f"legacy-play:{index}", payload={}))
+    # Hide even a misclassified legacy row if its key identifies a play alert.
+    db_session.add(NotificationLog(user_id=user_id, user_key=str(user_id), alert_type="USAGE",
+        title="Retired prefix", body="Hidden", sent_at=now, event_key="big_play:old:in_app", payload={}))
+    db_session.add(NotificationLog(user_id=user_id, user_key=str(user_id), alert_type="INJURY",
+        title="Kept injury", body="Visible", sent_at=now-timedelta(seconds=2), event_key="injury:kept", payload={}))
+    db_session.commit()
+    assert open_notification_event(db_session, user_id, row.id)["allowed"] is False
+    response = client.get("/notifications/alerts", headers=auth_headers(token), params={"limit":1})
+    assert response.status_code == 200
+    assert [alert["title"] for alert in response.json()["data"]] == ["Kept injury"]
+    assert response.json()["unread_count"] == 1
+    push, email = FakePushProvider(), FakeEmailProvider()
+    result = process_due_notifications_once(db_session, now=now, push_provider=push, email_provider=email)
+    assert result["skipped"] == 1
+    db_session.refresh(row)
+    assert row.status == "canceled" and row.canceled_at is not None
+    assert all(attempt.status == "canceled" for attempt in attempts)
+    assert push.messages == [] and email.messages == []
+    assert process_due_notifications_once(db_session, now=now, push_provider=push, email_provider=email)["claimed"] == 0
+    assert db_session.query(NotificationLog).filter_by(title="Retired play").count() == 3
+
+
+def test_legacy_play_preferences_cannot_be_reenabled_globally_or_per_league(client, db_session):
+    identity = create_user(client, "retired-preferences")
+    user_id = identity["user"]["id"]
+    token = identity["access_token"]
+    league = create_league(client, token)
+    retired = {key: True for key in ("big_play_alerts", "touchdown_alerts", "long_rush_alerts", "long_reception_alerts", "long_pass_alerts")}
+    global_pref = NotificationPreference(user_id=user_id, user_key=str(user_id), push_injuries=False, **retired)
+    league_pref = NotificationLeaguePreference(user_id=user_id, user_key=str(user_id), league_id=league["id"], **retired)
+    db_session.add_all([global_pref, league_pref]); db_session.commit()
+    assert not retired.keys() & client.get("/notifications/preferences", headers=auth_headers(token)).json().keys()
+    assert not retired.keys() & client.get("/notifications/league-preferences", headers=auth_headers(token)).json()["data"][0].keys()
+    response = client.post("/notifications/preferences", json={**retired, "draft_alerts":False}, headers=auth_headers(token))
+    assert response.status_code == 200 and response.json()["draft_alerts"] is False
+    assert response.json()["push_injuries"] is False
+    assert not retired.keys() & response.json().keys()
+    response = client.post("/notifications/league-preferences", json={"items":[{"league_id":league["id"], **retired, "injury_alerts":False}]}, headers=auth_headers(token))
+    assert response.status_code == 200 and response.json()["data"][0]["injury_alerts"] is False
+    assert not retired.keys() & response.json()["data"][0].keys()
+    db_session.refresh(global_pref); db_session.refresh(league_pref)
+    assert all(getattr(pref,key) is False for pref in (global_pref,league_pref) for key in retired)

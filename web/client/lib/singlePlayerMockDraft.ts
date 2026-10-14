@@ -40,6 +40,7 @@ export type MockDraftPick = {
   position: string;
   school: string;
   projectedPoints: number;
+  projectionMissing?: boolean;
   draftRank: number;
   masterDraftRank: number;
   assignedSlot?: string;
@@ -562,6 +563,7 @@ const createPick = (
     position: player.pos,
     school: player.school,
     projectedPoints: player.projectedPoints,
+    projectionMissing: player.projectionMissing,
     draftRank: getPlayerBoardRank(player),
     masterDraftRank: getPlayerBoardRank(player),
     assignedSlot,

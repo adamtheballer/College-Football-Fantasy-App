@@ -1,6 +1,7 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, field_serializer
+import math
+from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
 
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.schemas.historical_stats import PlayerHistoricalStatsResponse
@@ -47,8 +48,28 @@ class PlayerRead(PlayerBase):
     rest_of_season_as_of_week: int | None = None
     rest_of_season_updated_at: datetime | None = None
     board_rank: int | None = None
+    master_draft_rank: int | None = None
+    draft_projected_points: float | None = None
+    draft_projection_missing: bool = False
+    draft_source_rank: float | None = None
+    draft_tier: int | None = None
+    draft_final_score: float | None = None
+    draft_talent_score: float | None = None
+    draft_ranking_version: str | None = None
+    draft_ranking_policy: str | None = None
     created_at: datetime
     updated_at: datetime
+
+    @field_validator("sheet_adp", "sheet_projected_season_points", "current_value_rating", "rest_of_season_projected_points", "draft_projected_points", mode="before")
+    @classmethod
+    def finite_optional_number(cls, value):
+        if value is None or value == "" or isinstance(value, bool):
+            return None
+        try:
+            parsed = float(value)
+            return parsed if math.isfinite(parsed) else None
+        except (ValueError, TypeError):
+            return None
 
     @field_serializer("image_url")
     def serialize_player_image_url(self, value: str | None) -> str | None:
@@ -62,6 +83,10 @@ class PlayerRead(PlayerBase):
 
 
 class PlayerList(BaseModel):
+    ranking_version: str | None = None
+    ranking_policy: str | None = None
+    ranking_season: int | None = None
+    ranking_week: int | None = None
     data: list[PlayerRead]
     total: int
     limit: int

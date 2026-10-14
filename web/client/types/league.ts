@@ -348,6 +348,7 @@ export interface LeagueMatchupTeam {
   manager_name?: string | null;
   owner_avatar_url?: string | null;
   record: string;
+  record_highlight?: "win" | "loss" | null;
   projected_points?: number | null;
   projected_total?: number | null;
   current_points?: number | null;
@@ -371,6 +372,8 @@ export interface LeagueMatchupTabResponse {
   season?: number;
   matchup_id: number | null;
   week: number;
+  current_matchup_week?: number | null;
+  matchup_week_rollover_at?: string | null;
   week_started?: boolean;
   status: string | null;
   my_team?: LeagueMatchupTeam | null;

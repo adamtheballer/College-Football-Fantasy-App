@@ -1,4 +1,5 @@
 from collections.abc import Collection
+from datetime import datetime
 
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
@@ -32,6 +33,7 @@ def current_published_projections_query(
     season: int,
     week: int,
     player_ids: Collection[int] | None = None,
+    published_before: datetime | None = None,
 ):
     """Return exactly one authoritative published projection per player.
 
@@ -60,6 +62,10 @@ def current_published_projections_query(
     )
     if player_ids is not None:
         ranked_query = ranked_query.where(WeeklyProjection.player_id.in_(player_ids))
+    if published_before is not None:
+        # Filter before ranking: a later correction must not hide an available
+        # pregame version or masquerade as the original forecast.
+        ranked_query = ranked_query.where(WeeklyProjection.updated_at <= published_before)
 
     ranked = ranked_query.subquery()
     return (

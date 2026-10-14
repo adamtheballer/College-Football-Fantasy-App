@@ -138,12 +138,15 @@ describe("normalizePlayer", () => {
     expect(player.hasWeeklyProjection).toBe(false);
   });
 
-  it("keeps an out-for-season injury as OUT for the real draft room badge", () => {
+  it("keeps the complete out-for-season designation for draft rows", () => {
     const player = normalizePlayer(
       { id: 3, name: "Ahmad Hardy", position: "RB", school: "Missouri" },
       { status: "OUT_FOR_SEASON" },
     );
 
-    expect(player.status).toBe("OUT");
+    expect(player.status).toBe("OUT_FOR_SEASON");
+  });
+  it.each(["PROBABLE", "DOUBTFUL", "QUESTIONABLE", "DAY_TO_DAY", "SUSPENDED", "INACTIVE", "TBD"])("preserves %s instead of reporting healthy", (status) => {
+    expect(normalizePlayer({ id: 4, name: "Status Player", position: "RB", school: "Texas" }, { status }).status).toBe(status);
   });
 });

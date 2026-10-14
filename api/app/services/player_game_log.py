@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.domain.scoring_engine import calculate_score
 from collegefootballfantasy_api.app.domain.stat_normalization import strip_unscored_return_stats
+from collegefootballfantasy_api.app.models.player_historical_game_stat import PlayerHistoricalGameStat
 from collegefootballfantasy_api.app.models.game import Game
 from collegefootballfantasy_api.app.models.historical_stats import PlayerHistoricalSeasonStat
 from collegefootballfantasy_api.app.models.league import League
@@ -328,7 +329,7 @@ def _canonical_player_schedules(
     return sorted(canonical.values(), key=lambda schedule: (schedule.week, schedule.id))
 
 
-def build_player_game_log(
+def _build_scheduled_player_game_log(
     db: Session,
     player: Player,
     *,
@@ -363,7 +364,7 @@ def build_player_game_log(
         .order_by(TeamSchedule.week.asc(), TeamSchedule.id.asc())
         .all()
     )
-    historical_teams = [row.team_name for row in selected_history if row.team_name]
+    historical_teams = list(dict.fromkeys([row.team_name for row in selected_history if row.team_name] + [row.team_name for row in db.query(PlayerHistoricalGameStat).filter_by(player_id=player.id,season=selected_season).all()]))
     # Historical records name the team the player actually represented. Use the
     # current school only for the newest schedule season, preventing transfer
     # seasons from silently adopting the player's current-team schedule.
@@ -451,3 +452,46 @@ def build_player_game_log(
         season_summary=season_summary,
         games=rows,
     )
+
+
+def build_player_game_log(db: Session, player: Player, *, season: int | None, league_id: int | None = None) -> PlayerGameLogRead:
+    from collegefootballfantasy_api.app.models.player_historical_game_stat import PlayerHistoricalGameStat
+    from collegefootballfantasy_api.app.services.player_game_history import historical_game_read
+    history=db.query(PlayerHistoricalGameStat).filter_by(player_id=player.id).order_by(PlayerHistoricalGameStat.kickoff_at,PlayerHistoricalGameStat.provider_event_id).all()
+    available={row.season for row in history}
+    selected=season
+    if selected is None and available and not _current_school_schedule_seasons(db,player):
+        selected=max(available)
+    response=_build_scheduled_player_game_log(db,player,season=selected,league_id=league_id)
+    # A newer team schedule does not mean this player has stats for that
+    # season. Default to the newest recorded games; explicit season selection
+    # still exposes the current schedule and its honest missing-stats state.
+    if season is None and available and not any(row.stats for row in response.games):
+        newest_recorded_season=max(available)
+        if newest_recorded_season != response.season:
+            response=_build_scheduled_player_game_log(db,player,season=newest_recorded_season,league_id=league_id)
+    response.available_seasons=sorted(set(response.available_seasons)|available,reverse=True)
+    if not any(row.season==response.season for row in history):
+        return response
+    games=db.query(Game).filter(Game.id.in_([row.game_id for row in response.games if row.game_id is not None])).all()
+    event_by_game={game.id:str(game.external_id) for game in games}
+    history_by_event={row.provider_event_id:row for row in history if row.season==response.season}
+    rules=_league_scoring_rules(db,league_id)
+    merged=[]
+    for existing in response.games:
+        event_id=event_by_game.get(existing.game_id)
+        source=history_by_event.pop(event_id,None)
+        # Canonical live accepted stats win. A verified history row fills a
+        # missing stat without importing it into fantasy week/team scores.
+        if source and existing.stats is None:
+            read=historical_game_read(source,scoring_rules=rules)
+            existing.stats=read.stats;existing.stat_status='final';existing.game_status='final'
+            existing.result=read.result;existing.provider_event_id=event_id
+            existing.source_url=source.source_url;existing.season_type=source.season_type
+        merged.append(existing)
+    merged.extend(historical_game_read(row,scoring_rules=rules) for row in history_by_event.values())
+    response.games=sorted(merged,key=lambda row:(row.kickoff_at.timestamp() if row.kickoff_at else float('inf'),row.week,row.provider_event_id or str(row.schedule_id)))
+    if history_by_event or any(row.provider_event_id for row in merged):
+        response.team_name=', '.join(dict.fromkeys(row.team_name for row in response.games if row.location!='bye'))
+        response.message=None
+    return response

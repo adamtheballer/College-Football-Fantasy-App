@@ -373,11 +373,11 @@ def test_profile_name_change_cooldown_is_server_enforced(client, db_session):
 
     assert blocked_change.status_code == 429
     detail = blocked_change.json()["detail"]
-    assert detail["code"] == "manager_name_cooldown"
+    assert detail["code"] == "NAME_CHANGE_COOLDOWN"
     assert detail["field"] == "first_name"
     assert detail["retry_at"] == first_change.json()["manager_name_change_available_at"]
     assert detail["message"] == "Your manager name is still in its seven-day change window. Unsuccessful attempts do not restart the wait."
-    assert detail["last_successful_change_at"] == first_changed_at
+    assert datetime.fromisoformat(detail["last_successful_change_at"]) == datetime.fromisoformat(first_changed_at)
     assert int(blocked_change.headers["retry-after"]) > 0
     assert db_session.get(User, user_id).first_name == "First Updated Manager"
 
@@ -387,7 +387,7 @@ def test_profile_name_change_cooldown_is_server_enforced(client, db_session):
     blocked_retry = client.patch("/auth/me", json={"first_name": "Third Updated Manager"}, headers=headers)
     assert blocked_retry.status_code == 429
     assert blocked_retry.json()["detail"]["retry_at"] == first_change.json()["manager_name_change_available_at"]
-    assert blocked_retry.json()["detail"]["last_successful_change_at"] == first_changed_at
+    assert datetime.fromisoformat(blocked_retry.json()["detail"]["last_successful_change_at"]) == datetime.fromisoformat(first_changed_at)
     assert db_session.get(User, user_id).manager_name_changed_at == persisted_change_at
 
     user = db_session.get(User, user_id)

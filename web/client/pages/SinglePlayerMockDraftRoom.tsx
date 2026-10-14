@@ -1,3 +1,4 @@
+import { DraftBoardSortControl, sortDraftBoardPlayers, type DraftBoardSort } from "@/components/draft/DraftBoardSortControl";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, ClipboardList, LocateFixed, Loader2, RefreshCcw, Search, Trophy } from "lucide-react";
@@ -106,6 +107,7 @@ const groupPicksByRound = (picks: MockDraftPick[]) => {
 export default function SinglePlayerMockDraftRoom() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [boardSort, setBoardSort] = useState<DraftBoardSort>("draft_rank");
   const [initialDraftResolution] = useState(() =>
     resolveInitialSinglePlayerMockDraftState({
       search: location.search,
@@ -129,12 +131,13 @@ export default function SinglePlayerMockDraftRoom() {
   const mobileCarouselRef = useRef<HTMLDivElement | null>(null);
   const mobilePickRefs = useRef<Map<number, HTMLDivElement | null>>(new Map());
   const [mobileCarouselInset, setMobileCarouselInset] = useState(0);
+  const mockSettings = getMockDraftSettings(draftState);
   const { data: playersPayload, isLoading, isError, error: playerPoolError } = useDraftPlayerPool({
     limit: 200,
     fetchAll: true,
     sort: "draft_rank",
+    draftConfig: {leagueSize:mockSettings.leagueSize,totalRosterSpots:mockSettings.rounds,rosterSlots:{QB:1,RB:2,WR:2,TE:1,K:1,BE:6,IR:0}},
   });
-  const mockSettings = getMockDraftSettings(draftState);
   const teamCount = getMockTeamCount(draftState);
   const totalPicks = getMockTotalPicks(draftState);
   const mockPlayerPool = useMemo(
@@ -153,7 +156,7 @@ export default function SinglePlayerMockDraftRoom() {
           WR: 2,
           TE: 1,
           K: 1,
-          BE: 5,
+          BE: 6,
           IR: 0,
         },
       }),
@@ -297,22 +300,8 @@ export default function SinglePlayerMockDraftRoom() {
       return matchesPosition && matchesSearch;
     });
 
-    if (position === "ALL") {
-      return filteredPlayers;
-    }
-
-    return [...filteredPlayers].sort((left, right) => {
-      if (left.projectedPoints !== right.projectedPoints) {
-        return right.projectedPoints - left.projectedPoints;
-      }
-      const leftRank = left.masterDraftRank ?? left.draftRank;
-      const rightRank = right.masterDraftRank ?? right.draftRank;
-      if (leftRank !== rightRank) {
-        return leftRank - rightRank;
-      }
-      return left.name.localeCompare(right.name);
-    });
-  }, [draftablePlayersForUserTeam, position, debouncedSearch]);
+    return sortDraftBoardPlayers(filteredPlayers, boardSort);
+  }, [draftablePlayersForUserTeam, position, debouncedSearch, boardSort]);
 
   const queuedPlayers = useMemo(() => {
     const byId = new Map(draftBoard.map((player) => [player.id, player]));
@@ -459,7 +448,8 @@ export default function SinglePlayerMockDraftRoom() {
             </div>
           </div>
           <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-3">
-            <div className="relative w-full lg:w-[480px]">
+            <DraftBoardSortControl value={boardSort} onChange={setBoardSort} />
+              <div className="relative w-full lg:w-[480px]">
               <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={search}
@@ -492,8 +482,8 @@ export default function SinglePlayerMockDraftRoom() {
       <div className="grid grid-cols-[28px_minmax(0,1fr)_54px_78px] items-center gap-x-2 border-b border-white/10 px-3 py-2 text-[8px] font-black uppercase tracking-[0.06em] text-muted-foreground sm:grid-cols-[56px_minmax(0,1fr)_72px_88px_120px] sm:gap-3 sm:px-5 sm:py-3 sm:text-[9px] sm:tracking-[0.06em]">
         <span>RK</span>
         <span>Player</span>
-        <span className="hidden text-right sm:block">ADP</span>
-        <span className="text-right">ROS</span>
+        <span className="hidden text-right sm:block">Source ADP</span>
+        <span className="text-right" title="Full season before verified games; remaining season after verified games">Season / ROS</span>
         <span className="text-right">Action</span>
       </div>
 
@@ -502,7 +492,7 @@ export default function SinglePlayerMockDraftRoom() {
           <div className="flex min-h-40 items-center justify-center gap-3 px-6 text-center text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" /> Loading draft board...
           </div>
-        ) : isError ? (
+        ) : isError && !playersPayload?.data.length ? (
           <div className="flex min-h-40 items-center justify-center px-6 text-center text-[10px] font-black uppercase tracking-[0.06em] text-red-300">
             {formatPlayerPoolError(playerPoolError)}
           </div>
@@ -558,8 +548,8 @@ export default function SinglePlayerMockDraftRoom() {
                     <span className={cn("shrink-0 rounded-md border px-1.5 py-0.5 text-[8px] font-black sm:rounded-full sm:px-2 sm:text-[9px]", positionClass)}>{player.pos}</span>
                   </div>
                 </div>
-                <p className="hidden text-right text-xs font-black tabular-nums text-muted-foreground sm:block">{player.adpEstimate ?? player.adpRank ?? "—"}</p>
-                <p className="text-right text-[10px] font-black tabular-nums text-foreground sm:text-sm">{formatDraftProjection({ restOfSeasonProjection: player.restOfSeasonProjectedPoints, seasonProjection: player.sheetProjectedSeasonPoints, fallbackSeasonProjection: player.sheetProjectionStats?.fpts })}</p>
+                <p className="hidden text-right text-xs font-black tabular-nums text-muted-foreground sm:block">{player.sheetAdp && player.sheetAdp > 0 ? player.sheetAdp : "—"}</p>
+                <p className="text-right text-[10px] font-black tabular-nums text-foreground sm:text-sm">{player.projectionMissing ? "—" : formatDraftProjection({ seasonProjection: player.draftProjectedPoints })}</p>
                   <Button
                     className={cn(
                       "h-10 min-h-[44px] w-[78px] rounded-lg px-1 text-[8px] font-black uppercase tracking-[0.04em] sm:h-10 sm:min-h-0 sm:w-[140px] sm:rounded-xl sm:px-3 sm:text-[10px] sm:tracking-[0.06em]",
@@ -606,7 +596,7 @@ export default function SinglePlayerMockDraftRoom() {
           school: selectedPlayer.school,
           position: selectedPlayer.pos,
           rankLabel: `Master Rank #${selectedPlayer.masterDraftRank ?? selectedPlayer.draftRank}`,
-          projectedPoints: selectedPlayer.projectedPoints,
+          projectedPoints: selectedPlayer.projectionMissing ? null : selectedPlayer.projectedPoints,
           playerClass: selectedPlayer.playerClass,
           status: selectedPlayer.status,
           projection: selectedPlayer.projection,
@@ -691,7 +681,7 @@ export default function SinglePlayerMockDraftRoom() {
             >
               <span className="block truncate text-sm font-bold text-foreground transition-colors hover:text-white sm:text-base">{slot.player.playerName}</span>
               <span className="block truncate text-[9px] font-semibold uppercase tracking-[0.08em] text-slate-400 sm:text-[10px]">
-                {slot.player.position} · {slot.player.school} · {slot.player.projectedPoints.toFixed(1)} proj
+                {slot.player.position} · {slot.player.school} · {slot.player.projectionMissing ? "—" : slot.player.projectedPoints.toFixed(1)} proj
               </span>
             </button>
           ) : (

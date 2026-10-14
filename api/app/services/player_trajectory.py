@@ -1,19 +1,26 @@
 """Build player-card trajectories from canonical published weekly snapshots."""
 from __future__ import annotations
 
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from collegefootballfantasy_api.app.domain.scoring_engine import calculate_player_fantasy_points
+from collegefootballfantasy_api.app.services.projection_scoring import points_for_projection as _points_for_projection
 from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.player import Player
-from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.player_trade_value import PlayerTradeValue
 from collegefootballfantasy_api.app.models.player_week_score import PlayerWeekScore
+from collegefootballfantasy_api.app.models.player_chart_week import PlayerChartWeek,PlayerChartForecast
+from collegefootballfantasy_api.app.services.fantasy_game_selection import fantasy_stat_weeks
+from collegefootballfantasy_api.app.services.player_chart_publication import points_from_verified_stats
+from collegefootballfantasy_api.app.services.player_chart_publication import verified_fantasy_week_stats
+from collegefootballfantasy_api.app.services.fantasy_week_finality import week_is_authoritatively_finalized, published_finalized_weeks
+from collegefootballfantasy_api.app.services.player_trade_value import PRESEASON_VALUE_POLICY_VERSION
+from collegefootballfantasy_api.app.services.player_trade_value import value_snapshot_is_finalized,active_value_policy_version,current_trade_value_snapshot
+from collegefootballfantasy_api.app.services.chart_forecasts import school_key, pregame_forecast, forecast_points
+from datetime import datetime
+from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
-from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
 from collegefootballfantasy_api.app.schemas.player_trajectory import (
     PlayerProjectionTrajectoryPointRead,
     PlayerTrajectoryRead,
@@ -23,67 +30,17 @@ from collegefootballfantasy_api.app.services.player_trade_value import MAX_TRADE
 
 WEEKS = tuple(range(1, 14))
 DISPLAY_WEEKS = tuple(range(0, 14))
-POSITION_SCARCITY = {"QB": 38.0, "RB": 58.0, "WR": 55.0, "TE": 62.0, "K": 25.0, "PK": 25.0}
+
 
 
 def _clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
 
 
-def _projection_stats(row: WeeklyProjection) -> dict[str, float]:
-    # Published projection sources provide 0--39, 40--49, and 50+ volume,
-    # rather than exact made-kick distances.  Split that expected volume into
-    # the fixed league scoring tiers so a league's field-goal settings still
-    # apply to projections; live ESPN box scores use exact distances.
-    short_field_goals = float(row.field_goals_made_0_to_39 or row.field_goals_made_0_to_49 or 0.0)
-    medium_field_goals = float(row.field_goals_made_40_to_49 or 0.0)
-    long_field_goals = float(row.field_goals_made_50_plus or 0.0)
-    return {
-        "pass_yards": float(row.pass_yards or 0.0),
-        "pass_tds": float(row.pass_tds or 0.0),
-        "interceptions": float(row.interceptions or 0.0),
-        "rush_yards": float(row.rush_yards or 0.0),
-        "rush_tds": float(row.rush_tds or 0.0),
-        "receptions": float(row.receptions or 0.0),
-        "rec_yards": float(row.rec_yards or 0.0),
-        "rec_tds": float(row.rec_tds or 0.0),
-        "fg_made_0_30": short_field_goals * 0.75,
-        "fg_made_31_40": short_field_goals * 0.25,
-        "fg_made_41_50": medium_field_goals,
-        "fg_made_51_60": long_field_goals,
-        "fg_made_61_plus": 0.0,
-        "xp_made": float(row.extra_points_made or 0.0),
-    }
-
-
-def _points_for_projection(player: Player, row: WeeklyProjection, scoring_rules: dict | None) -> float:
-    # A published weekly snapshot's fantasy-points field is already its
-    # authoritative scoring result. Recalculate only older rows that lack it.
-    if row.fantasy_points is not None:
-        return max(0.0, float(row.fantasy_points))
-    stats = _projection_stats(row)
-    if not scoring_rules or not any(stats.values()):
-        return max(0.0, float(row.fantasy_points or 0.0))
-    points, _ = calculate_player_fantasy_points(stats, scoring_rules, player.position)
-    return max(0.0, points)
-
-
-def _season_projection(db: Session, player: Player) -> float:
-    if player.sheet_projected_season_points is not None:
+def _season_projection(player: Player, *, season: int) -> float | None:
+    if season==settings.current_season_year and player.sheet_projected_season_points is not None:
         return max(0.0, float(player.sheet_projected_season_points))
-    fallback = (
-        db.query(Player.sheet_projected_season_points)
-        .filter(
-            Player.id != player.id,
-            func.lower(Player.name) == player.name.lower(),
-            func.lower(Player.school) == player.school.lower(),
-            func.upper(Player.position) == player.position.upper(),
-            Player.sheet_projected_season_points.isnot(None),
-        )
-        .order_by(Player.sheet_synced_at.desc().nullslast(), Player.updated_at.desc())
-        .first()
-    )
-    return max(0.0, float(fallback[0])) if fallback and fallback[0] is not None else 0.0
+    return None
 
 
 def _league_scoring_rules(db: Session, league_id: int | None) -> dict | None:
@@ -95,61 +52,28 @@ def _league_scoring_rules(db: Session, league_id: int | None) -> dict | None:
     return settings.scoring_json if settings and settings.scoring_json else None
 
 
-def _actual_points_by_week(
-    db: Session,
-    *,
-    player_id: int,
-    season: int,
-    league_id: int | None,
-) -> dict[int, float]:
-    """Read only canonical, already-calculated fantasy totals.
-
-    Actual points are league-scoring specific.  Without a league context, only
-    provider rows that already carry an explicit fantasy total can be shown;
-    the endpoint never guesses a scoring system for a standalone player card.
-    """
+def _actual_points_by_week(db: Session, *, player_id: int, season: int, league_id: int | None, scoring_rules: dict | None) -> dict[int, float]:
+    player = db.get(Player, player_id)
+    snapshots = db.query(PlayerChartWeek).filter_by(player_id=player_id, season=season).all()
+    points = {}
+    for row in snapshots:
+        value = row.standard_points if league_id is None else points_from_verified_stats(row.stats_json, position=row.stats_json.get("_chart_position", player.position), rules=scoring_rules or {})
+        if value is not None:
+            points[row.week] = round(float(value), 1)
+    # Existing finalized data can be read during rollout before staged backfill.
+    # A live/stale score never becomes a historical actual on a card read.
     if league_id is not None:
-        return {
-            row.week: round(float(row.fantasy_points), 1)
-            for row in db.query(PlayerWeekScore)
-            .filter(
-                PlayerWeekScore.player_id == player_id,
-                PlayerWeekScore.league_id == league_id,
-                PlayerWeekScore.season == season,
-                PlayerWeekScore.week.in_(WEEKS),
-            )
-            .all()
-        }
-    points: dict[int, float] = {}
-    for row in db.query(PlayerStat).filter(
-        PlayerStat.player_id == player_id,
-        PlayerStat.season == season,
-        PlayerStat.week.in_(WEEKS),
-    ):
-        stats = row.stats or {}
-        for key in ("fantasy_points", "fantasyPoints", "fpts"):
-            value = stats.get(key)
-            if isinstance(value, (int, float)) and not isinstance(value, bool):
-                points[row.week] = round(float(value), 1)
-                break
+        for row in db.query(PlayerWeekScore).filter_by(player_id=player_id, season=season, league_id=league_id).all():
+            if row.status in {"final", "stat_corrected"} and week_is_authoritatively_finalized(db, season=season, week=row.week):
+                points[row.week] = round(float(row.fantasy_points), 1)
+    else:
+        for week in WEEKS:
+            row = verified_fantasy_week_stats(db,season=season,week=week,players=[player]).get(player_id) if week not in points and week_is_authoritatively_finalized(db,season=season,week=week) else None
+            if row is not None:
+                value = points_from_verified_stats(row.stats, position=player.position)
+                if value is not None:
+                    points[week] = round(value, 1)
     return points
-
-
-def _estimated_value(db: Session, player: Player, season_projection: float) -> float:
-    pool = db.query(Player).filter(func.upper(Player.position) == player.position.upper()).all()
-    season_values = sorted(float(row.sheet_projected_season_points) for row in pool if row.sheet_projected_season_points is not None)
-    rating_values = sorted(float(row.cfb27_overall) for row in pool if row.cfb27_overall is not None)
-
-    def percentile(value: float | None, values: list[float], fallback: float) -> float:
-        if value is None or not values:
-            return fallback
-        return 100 * sum(candidate <= value for candidate in values) / len(values)
-
-    season_score = percentile(season_projection if season_projection > 0 else None, season_values, 35.0)
-    rating_score = percentile(float(player.cfb27_overall) if player.cfb27_overall is not None else None, rating_values, season_score)
-    scarcity = POSITION_SCARCITY.get(player.position.upper(), 45.0)
-    # Seasonal outlook is intentionally the dominant preseason input; CFB27 is a secondary quality signal.
-    return round(_clamp((0.60 * season_score) + (0.30 * rating_score) + (0.10 * scarcity), 0.0, 100.0), 1)
 
 
 def build_player_trajectory(
@@ -166,8 +90,12 @@ def build_player_trajectory(
     if league_id is not None and league is None:
         raise ValueError("league not found")
     scoring_rules = _league_scoring_rules(db, league_id)
-    schedules = db.query(TeamSchedule).filter(TeamSchedule.team_name == player.school, TeamSchedule.season == season, TeamSchedule.week.in_(WEEKS)).all()
+    schedules = [row for row in db.query(TeamSchedule).filter(TeamSchedule.season == season, TeamSchedule.week.in_(range(0,14))).all() if school_key(row.team_name) == school_key(player.school)]
     schedule_by_week = {row.week: row for row in schedules}
+    opening_source_week=fantasy_stat_weeks(db,season=season,week=1,player_ids={player.id})[player.id]
+    if opening_source_week==0:
+        schedule_by_week[1]=schedule_by_week.get(0)
+    frozen_forecasts = {r.week:r.snapshot_json for r in db.query(PlayerChartForecast).filter_by(player_id=player.id,season=season).all()}
     published_by_week = {
         week: db.scalar(
             current_published_projections_query(
@@ -184,47 +112,69 @@ def build_player_trajectory(
         player_id=player.id,
         season=season,
         league_id=league_id,
+        scoring_rules=scoring_rules,
     )
-    season_projection = _season_projection(db, player)
+    stored_by_week = {row.week: row for row in db.query(PlayerChartWeek).filter_by(player_id=player.id,season=season).all()}
+    season_projection = _season_projection(player,season=season)
     # A season total is metadata only. It is never divided, repeated, or
     # emitted as a weekly graph point; this series is canonical weekly data.
     projection: list[PlayerProjectionTrajectoryPointRead] = []
+    finalized_weeks = {week for week in WEEKS if week_is_authoritatively_finalized(db, season=season, week=week)} | set(actual_by_week) | published_finalized_weeks(db,season=season)
+    # Durable publication remains authoritative when another league is added
+    # later with projected historical matchups. Do not move the forecast back
+    # over already finalized player history.
+    last_finalized_week = max(finalized_weeks,default=0)
+    upcoming_week = last_finalized_week+1
     for week in WEEKS:
-        schedule = schedule_by_week.get(week)
-        if schedule and (schedule.is_bye or schedule.location == "bye"):
-            projection.append(PlayerProjectionTrajectoryPointRead(week=week, points=None, source="bye", projection_status="BYE"))
-        elif week in published_by_week or week in actual_by_week:
-            row = published_by_week.get(week)
-            projection.append(
-                PlayerProjectionTrajectoryPointRead(
-                    week=week,
-                    points=round(_points_for_projection(player, row, scoring_rules), 1) if row else None,
-                    actual_points=actual_by_week.get(week),
-                    source="published" if row else "actual",
-                    projection_status=row.projection_status if row else "ACTUAL_ONLY",
-                    projection_version=row.projection_version if row else None,
-                    published_at=row.updated_at if row else None,
-                )
-            )
+        if week>last_finalized_week and week != upcoming_week:
+            continue
+        schedule, row = schedule_by_week.get(week), published_by_week.get(week)
+        finalized = week in finalized_weeks
+        if not finalized and week!=upcoming_week:
+            # A delayed earlier week is a gap, not a second dotted current
+            # forecast or a calendar-inferred final result.
+            bye=bool(schedule and (schedule.is_bye or schedule.location=="bye"))
+            projection.append(PlayerProjectionTrajectoryPointRead(week=week,points=None,source="bye" if bye else "unavailable",is_finalized=False,projection_status="BYE" if bye else "AWAITING_WEEK_FINALITY"))
+            continue
+        original = frozen_forecasts.get(week)
+        if finalized:
+            stored = stored_by_week.get(week)
+            original = (stored.stats_json.get("_chart_forecast") or original) if stored and "_chart_forecast" in stored.stats_json else pregame_forecast(db,player=player,season=season,week=week,schedule=schedule)
+        projected_points = forecast_points(original,scoring_rules) if original else (_points_for_projection(player,row,scoring_rules) if row and not finalized else None)
+        if schedule and (schedule.is_bye or schedule.location == "bye") and week not in actual_by_week:
+            projection.append(PlayerProjectionTrajectoryPointRead(week=week, points=None, source="bye", projection_status="BYE", is_finalized=finalized))
+        elif row is not None or original is not None or finalized:
+            projection.append(PlayerProjectionTrajectoryPointRead(
+                week=week,
+                points=round(projected_points, 1) if projected_points is not None else None,
+                actual_points=actual_by_week.get(week),
+                source="unavailable" if finalized and week not in actual_by_week else ("published" if original or (row and not finalized) else "actual"),
+                is_finalized=finalized,
+                projection_status="MISSING_FINAL_STATS" if finalized and week not in actual_by_week else (original["projection_status"] if original else row.projection_status if row else "ACTUAL_ONLY"),
+                projection_version=original["projection_version"] if original else (row.projection_version if row and not finalized else None),
+                published_at=datetime.fromisoformat(original["published_at"]) if original else (row.updated_at if row and not finalized else None),
+            ))
 
     published_values = {
         row.week: row
         for row in db.query(PlayerTradeValue)
-        .filter(PlayerTradeValue.player_id == player.id, PlayerTradeValue.season == season, PlayerTradeValue.policy_version == VALUE_POLICY_VERSION, PlayerTradeValue.week.in_(DISPLAY_WEEKS))
+        .filter(PlayerTradeValue.player_id == player.id, PlayerTradeValue.season == season, PlayerTradeValue.policy_version==VALUE_POLICY_VERSION, PlayerTradeValue.week.in_(WEEKS))
         .all()
     }
-    preseason_value = published_values.get(0)
-    authoritative_preseason_value = preseason_rating_value(player)
-    value: list[PlayerValueTrajectoryPointRead] = [
-        PlayerValueTrajectoryPointRead(
-            week=0,
-            value=round(_clamp(authoritative_preseason_value if authoritative_preseason_value is not None else (float(preseason_value.value) if preseason_value else _estimated_value(db, player, season_projection)), 0.0, MAX_TRADE_VALUE), 1),
-            source="preseason",
-        )
-    ]
+    preseason_value = db.query(PlayerTradeValue).filter_by(player_id=player.id, season=season, week=0, policy_version=PRESEASON_VALUE_POLICY_VERSION).one_or_none()
+    authoritative_preseason_value = preseason_rating_value(player) if season==settings.current_season_year else None
+    if season==settings.current_season_year and active_value_policy_version(db,season=season)==PRESEASON_VALUE_POLICY_VERSION:
+        # Before Week 1 closes, share the card's existing availability-adjusted
+        # policy instead of displaying a stale stored or unadjusted baseline.
+        current=current_trade_value_snapshot(db,player_id=player.id,season=season)
+        authoritative_preseason_value=current["value"] if current else None
+        preseason_value=None
+    value: list[PlayerValueTrajectoryPointRead] = []
+    if preseason_value is not None or authoritative_preseason_value is not None:
+        value.append(PlayerValueTrajectoryPointRead(week=0, value=round(_clamp(float(preseason_value.value) if preseason_value else authoritative_preseason_value, 0.0, MAX_TRADE_VALUE), 1), source="preseason"))
     for week in WEEKS:
         existing = published_values.get(week)
-        if existing is not None:
+        if existing is not None and value_snapshot_is_finalized(db,existing):
             value.append(PlayerValueTrajectoryPointRead(week=week, value=round(_clamp(float(existing.value), 0.0, MAX_TRADE_VALUE), 1), source="published"))
 
-    return PlayerTrajectoryRead(player_id=player.id, season=season, league_id=league_id, projection=projection, value=value, preseason_projection_points=round(season_projection, 1) if season_projection > 0 else None)
+    return PlayerTrajectoryRead(player_id=player.id, season=season, league_id=league_id, projection=projection, value=value, preseason_projection_points=round(season_projection, 1) if season_projection is not None else None)

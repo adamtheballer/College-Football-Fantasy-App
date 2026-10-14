@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -14,7 +15,7 @@ import {
   ApiError,
   apiDelete,
   apiGet,
-  apiPatch,
+  apiUserProfilePatch,
   apiPost,
   clearAccessTokenSession,
   getStoredAccessToken,
@@ -90,7 +91,7 @@ type AuthContextValue = {
   user: User | null;
   login: (email: string, password: string, betaAccessReservation?: string) => Promise<User>;
   signup: (firstName: string, email: string, password: string, betaAccessReservation?: string) => Promise<User>;
-  updateProfile: (input: UpdateProfileInput) => Promise<User>;
+  updateProfile: (input: UpdateProfileInput, signal?: AbortSignal) => Promise<User>;
   logout: () => void;
   resetPasswordWithCurrentPassword: (
     email: string,
@@ -230,8 +231,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
   const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const profileSequence = useRef(0);
 
   useEffect(() => {
+    const initialProfileSequence = profileSequence.current;
     const storedUser = loadStoredUser();
     const storedToken = getStoredAccessToken();
     setUser(storedUser);
@@ -280,7 +283,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (accessTokenNeedsRefresh && !shouldAttemptRestore) return;
 
       const payload = await apiGet<UserReadPayload>("/auth/me", undefined, controller.signal);
-      if (!cancelled) {
+      if (!cancelled && profileSequence.current === initialProfileSequence) {
         const nextUser = mapUserPayload(payload);
         safeStorageSet(USER_STORAGE_KEY, JSON.stringify(nextUser));
         setUser(nextUser);
@@ -310,13 +313,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (user) {
+    if (user && !isBootstrapping) {
       void syncBrowserPushIdentity(user.id);
     }
-  }, [user?.id]);
+  }, [user?.id, isBootstrapping]);
 
   useEffect(() => {
-    const syncAuth = () => setUser(loadStoredUser());
+    let lastAccountId = loadStoredUser()?.id;
+    const syncAuth = () => {
+      const stored = loadStoredUser();
+      if (stored?.id !== lastAccountId) profileSequence.current++;
+      lastAccountId = stored?.id;
+      setUser(stored);
+    };
     window.addEventListener("storage", syncAuth);
     window.addEventListener(AUTH_CHANGED_EVENT, syncAuth);
     return () => {
@@ -326,6 +335,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, password: string, betaAccessReservation?: string) => {
+    profileSequence.current++;
     const payload = await apiPost<AuthPayload>("/auth/login", {
       email,
       password,
@@ -341,6 +351,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   const signup = useCallback(async (firstName: string, email: string, password: string, betaAccessReservation?: string) => {
+    profileSequence.current++;
     const payload = await apiPost<AuthPayload>("/auth/signup", {
       first_name: firstName,
       email,
@@ -356,11 +367,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return nextUser;
   }, [queryClient]);
 
-  const updateProfile = useCallback(async (input: UpdateProfileInput) => {
+  const updateProfile = useCallback(async (input: UpdateProfileInput, signal?: AbortSignal) => {
+    const accountId = loadStoredUser()?.id;
+    if (accountId === undefined) throw new ApiError(401, "Sign in again before changing your profile.");
+    const sequence = ++profileSequence.current;
     const request: Record<string, string | null> = {};
     if (input.firstName !== undefined) request.first_name = input.firstName;
     if (input.avatarUrl !== undefined) request.avatar_url = input.avatarUrl;
-    const payload = await apiPatch<AuthUserPayload>("/auth/me", request);
+    const payload = await apiUserProfilePatch<AuthUserPayload>(accountId, request, signal);
+    if (signal?.aborted || loadStoredUser()?.id !== accountId || payload.id !== accountId || sequence !== profileSequence.current) {
+      throw new ApiError(409, "The profile or signed-in account changed. Reopen Settings and try again.");
+    }
     const nextUser = mapUserPayload(payload);
     safeStorageSet(USER_STORAGE_KEY, JSON.stringify(nextUser));
     setUser(nextUser);
@@ -368,7 +385,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Manager identity appears in cached league, draft, matchup, and chat
     // responses. Mark every related view stale so the newly saved photo is
     // fetched immediately instead of waiting for its normal refresh window.
-    await Promise.all([
+    // Persistence is already confirmed. Cache refresh failures must not turn
+    // a saved name into a reported storage failure.
+    void Promise.allSettled([
       queryClient.invalidateQueries({ queryKey: ["leagues"] }),
       queryClient.invalidateQueries({ queryKey: ["league"] }),
       queryClient.invalidateQueries({ queryKey: ["draft-room"] }),
@@ -379,6 +398,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   const logout = useCallback(() => {
+    profileSequence.current++;
     void (async () => {
       let refreshToken: string | null = null;
       try {
@@ -393,7 +413,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Ignore network failures; local logout must still complete.
       }
     })();
-    clearBrowserPushIdentity();
+    void clearBrowserPushIdentity();
     clearStoredAuth();
     queryClient.clear();
     setUser(null);
@@ -402,7 +422,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const clearPasswordChangeAuth = useCallback(() => {
     void clearNativeRefreshToken().catch(() => {});
-    clearBrowserPushIdentity();
+    void clearBrowserPushIdentity();
     clearStoredAuth();
     queryClient.clear();
     setUser(null);
@@ -471,7 +491,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logoutAll = useCallback(async () => {
     await apiPost("/auth/logout-all", {});
     await clearNativeRefreshToken().catch(() => {});
-    clearBrowserPushIdentity();
+    void clearBrowserPushIdentity();
     clearStoredAuth();
     queryClient.clear();
     setUser(null);
@@ -484,7 +504,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       confirmation,
     });
     await clearNativeRefreshToken().catch(() => {});
-    clearBrowserPushIdentity();
+    void clearBrowserPushIdentity();
     clearStoredAuth();
     queryClient.clear();
     setUser(null);

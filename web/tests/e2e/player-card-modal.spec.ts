@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { canonicalDraftPool } from "./fixtures/draft-pool";
 
 const mockAuthPayload = {
   access_token: "mock-access-token",
@@ -161,7 +162,7 @@ test.describe("player card modal", () => {
       } else if (path.endsWith("/players/1")) {
         await route.fulfill({ json: player });
       } else {
-        await route.fulfill({ json: { data: board, total: board.length, limit: 200, offset: 0 } });
+        await route.fulfill({ json: canonicalDraftPool(board, { limit: 200, ranking_week: 1 }) });
       }
     });
     await page.goto("/draft/mock/single-player?new=1&teams=4&timer=60");
@@ -389,10 +390,10 @@ test.describe("player card modal", () => {
             season: 2026,
             preseason_projection_points: 315.5,
             projection: [
-              { week: 1, points: 18.4, actual_points: 21.6, source: "published", projection_status: "final" },
-              { week: 2, points: 19.8, actual_points: 24.1, source: "published", projection_status: "final" },
-              { week: 3, points: 20.3, source: "published", projection_status: "published" },
-              { week: 4, points: 19.1, source: "published", projection_status: "published" },
+              { week: 1, points: 18.4, actual_points: 21.6, source: "actual", is_finalized: true, projection_status: "final" },
+              { week: 2, points: 19.8, actual_points: 24.1, source: "actual", is_finalized: true, projection_status: "final" },
+              { week: 3, points: 20.3, source: "published", is_finalized: false, projection_status: "published" },
+              { week: 4, points: 19.1, source: "published", is_finalized: false, projection_status: "published" },
             ],
             value: [],
           }),
@@ -410,7 +411,7 @@ test.describe("player card modal", () => {
       await route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ data: [mockPlayer], total: 1, limit: 200, offset: 0 }),
+        body: JSON.stringify(canonicalDraftPool([mockPlayer], { limit: 200, ranking_week: 1 })),
       });
     });
     await page.route("**/projections/1**", async (route) => {

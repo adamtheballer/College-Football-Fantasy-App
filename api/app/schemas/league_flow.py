@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
@@ -705,6 +706,7 @@ class MatchupTeamRead(BaseModel):
     id: int
     name: str
     record: str | None = None
+    record_highlight: Literal["win", "loss"] | None = None
     projected_points: float | None = None
     win_probability: float | None = None
     fantasy_team_id: int
@@ -745,6 +747,8 @@ class LeagueMatchupTabRead(BaseModel):
     league_id: int
     season: int
     week: int
+    current_matchup_week: int | None = None
+    matchup_week_rollover_at: datetime | None = None
     week_started: bool = False
     matchup_id: int | None = None
     status: str | None = None

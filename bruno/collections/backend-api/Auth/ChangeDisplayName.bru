@@ -1,0 +1,22 @@
+meta {
+  name: Change Account Display Name
+  type: http
+  seq: 21
+}
+patch {
+  url: {{base_url}}/auth/me
+  body: json
+}
+headers {
+  Authorization: Bearer {{access_token}}
+  X-CFFB-Profile-Account: {{profile_account_id}}
+}
+body:json {
+  { "first_name": "Local Test Manager" }
+}
+docs {
+  Local test account only. profile_account_id must match the verified JWT user.
+  Send only changed fields. An unchanged legacy avatar must not block this save.
+  Success returns persisted profile. HTTP 429 NAME_CHANGE_COOLDOWN includes
+  authoritative timing and Retry-After. Same already-saved name is a safe no-op.
+}
