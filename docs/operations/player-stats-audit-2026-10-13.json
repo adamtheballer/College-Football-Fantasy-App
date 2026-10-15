@@ -1,0 +1,204 @@
+{
+  "captured_at": "2026-10-13T22:05:14.818622+00:00",
+  "public_catalog_players": 815,
+  "production_writes": 0,
+  "local_replay_counts": {
+    "available": 786,
+    "no_stats": 14,
+    "unmatched": 15
+  },
+  "local_verified_game_records": 9394,
+  "unresolved": [
+    {
+      "id": 1444,
+      "name": "Bryan Wilder",
+      "school": "Syracuse",
+      "position": "WR",
+      "seasons": {},
+      "identity_status": "no_candidate"
+    },
+    {
+      "id": 1865,
+      "name": "Cameron Ball",
+      "school": "West Virginia",
+      "position": "TE",
+      "seasons": {},
+      "candidate_provider_id": "4890881",
+      "identity_status": "mismatch",
+      "source_name": "Cam Ball",
+      "source_school": "West Virginia",
+      "source_position": "TE"
+    },
+    {
+      "id": 1296,
+      "name": "Carter Vegas",
+      "school": "California",
+      "position": "RB",
+      "seasons": {},
+      "candidate_provider_id": "5148905",
+      "identity_status": "mismatch",
+      "source_name": "Carter Vargas",
+      "source_school": "California",
+      "source_position": "RB"
+    },
+    {
+      "id": 1415,
+      "name": "Derrick McFall",
+      "school": "SMU",
+      "position": "RB",
+      "seasons": {},
+      "candidate_provider_id": "5079523",
+      "identity_status": "mismatch",
+      "source_name": "Derrick McFall",
+      "source_school": "SMU",
+      "source_position": "WR"
+    },
+    {
+      "id": 1114,
+      "name": "Devin Kargman",
+      "school": "Maryland",
+      "position": "QB",
+      "seasons": {},
+      "candidate_provider_id": "4685693",
+      "identity_status": "mismatch",
+      "source_name": "Devin Kargman",
+      "source_school": "Concord",
+      "source_position": "QB"
+    },
+    {
+      "id": 1552,
+      "name": "Hardley Gilmore IV",
+      "school": "Kentucky",
+      "position": "WR",
+      "seasons": {},
+      "candidate_provider_id": "5141471",
+      "identity_status": "mismatch",
+      "source_name": "Hardley Gilmore IV",
+      "source_school": "American Int'l",
+      "source_position": "WR"
+    },
+    {
+      "id": 1791,
+      "name": "Jaden Nickens",
+      "school": "Kansas",
+      "position": "WR",
+      "seasons": {},
+      "identity_status": "no_candidate"
+    },
+    {
+      "id": 1775,
+      "name": "Jayden Jackson",
+      "school": "Iowa State",
+      "position": "RB",
+      "seasons": {},
+      "identity_status": "no_candidate"
+    },
+    {
+      "id": 1358,
+      "name": "Jaylen Mbakwe",
+      "school": "Georgia Tech",
+      "position": "WR",
+      "seasons": {},
+      "candidate_provider_id": "5079515",
+      "identity_status": "mismatch",
+      "source_name": "Jaylen Mbakwe",
+      "source_school": "Georgia Tech",
+      "source_position": "CB"
+    },
+    {
+      "id": 1758,
+      "name": "Josh McCormick",
+      "school": "Colorado",
+      "position": "K",
+      "seasons": {},
+      "candidate_provider_id": "4879569",
+      "identity_status": "mismatch",
+      "source_name": "Josh McCormick",
+      "source_school": "Grambling",
+      "source_position": "PK"
+    },
+    {
+      "id": 1241,
+      "name": "Joshua Phifer",
+      "school": "UCLA",
+      "position": "TE",
+      "seasons": {},
+      "candidate_provider_id": "5084910",
+      "identity_status": "mismatch",
+      "source_name": "Josh Phifer",
+      "source_school": "UCLA",
+      "source_position": "TE"
+    },
+    {
+      "id": 1230,
+      "name": "Kameron Anthony",
+      "school": "Rutgers",
+      "position": "TE",
+      "seasons": {},
+      "candidate_provider_id": "5193264",
+      "identity_status": "mismatch",
+      "source_name": "Kam Anthony",
+      "source_school": "Rutgers",
+      "source_position": "TE"
+    },
+    {
+      "id": 1108,
+      "name": "Lendon Phillips Jr",
+      "school": "Iowa",
+      "position": "RB",
+      "seasons": {},
+      "candidate_provider_id": "5155048",
+      "identity_status": "mismatch",
+      "source_name": "L.J. Phillips Jr.",
+      "source_school": "Iowa",
+      "source_position": "RB"
+    },
+    {
+      "id": 1255,
+      "name": "Ryon Sayeri",
+      "school": "USC",
+      "position": "K",
+      "seasons": {},
+      "candidate_provider_id": "5221037",
+      "identity_status": "mismatch",
+      "source_name": "Ryon Sayeri",
+      "source_school": "USC",
+      "source_position": "P"
+    },
+    {
+      "id": 1734,
+      "name": "Will Stone",
+      "school": "UCF",
+      "position": "K",
+      "seasons": {},
+      "candidate_provider_id": "4868929",
+      "identity_status": "mismatch",
+      "source_name": "Will Stone",
+      "source_school": "UCF",
+      "source_position": "P"
+    }
+  ],
+  "no_stats": [
+    1868,
+    1578,
+    1290,
+    1429,
+    1425,
+    1770,
+    1281,
+    1132,
+    1623,
+    1088,
+    1545,
+    1311,
+    1817,
+    1336
+  ],
+  "notes": [
+    "All catalog rows were reviewed; no current roster or visible-card sampling.",
+    "Only exact profile identity matches were replayed locally.",
+    "2025 facts are retained with historical teams, including transfer players.",
+    "Per-game stats are independent of live league score/finality writes.",
+    "No-stat provider responses are unknown production, not zero/DNP."
+  ]
+}

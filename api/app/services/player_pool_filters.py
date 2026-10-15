@@ -1,3 +1,5 @@
+import math
+
 from sqlalchemy import and_, exists, func, or_, select
 
 from collegefootballfantasy_api.app.models.injury import Injury
@@ -172,7 +174,8 @@ def active_canonical_preseason_player_filter(season: int):
         canonical_preseason_player_filter(season),
         Player.position.in_(ELIGIBLE_FANTASY_POSITIONS),
         Player.sheet_projected_season_points.isnot(None),
-        Player.sheet_projected_season_points > 0,
+        Player.sheet_projected_season_points >= 0,
+        Player.sheet_projected_season_points <= 1.7976931348623157e308,
     )
 
 
@@ -219,7 +222,7 @@ def is_canonical_fantasy_player(player: Player, season: int) -> bool:
     try:
         projected_points = float(player.sheet_projected_season_points)
     except (TypeError, ValueError):
-        projected_points = 0.0
+        return False
     return bool(
         (
             source_marker.startswith(f"{CANONICAL_PRESEASON_SOURCE_PREFIX}{int(season)}:")
@@ -227,5 +230,8 @@ def is_canonical_fantasy_player(player: Player, season: int) -> bool:
         )
         and is_approved_fantasy_school(player.school)
         and (player.position or "").strip().upper() in ELIGIBLE_FANTASY_POSITIONS
-        and projected_points > 0
+        and player.sheet_projected_season_points is not None
+        and not isinstance(player.sheet_projected_season_points, bool)
+        and math.isfinite(projected_points)
+        and projected_points >= 0
     )

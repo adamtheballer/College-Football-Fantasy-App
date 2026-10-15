@@ -18,6 +18,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 kSecAttrAccount as String: "cffb_native_refresh_token"
             ]
             SecItemDelete(staleSession as CFDictionary)
+            UserDefaults(suiteName: "group.org.collegefantasyfootball.app.onesignal")?.removeObject(forKey: "cffbPushAccountId")
             UserDefaults.standard.set(true, forKey: installMarker)
         }
         return true

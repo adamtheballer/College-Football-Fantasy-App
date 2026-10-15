@@ -29,8 +29,14 @@ class ESPNHistoricalStatsClient:
         if not provider_player_id:
             raise ESPNHistoricalStatsClientError("provider_player_id is required")
 
-        url = self.athlete_stats_url(provider_player_id)
-        params = {"region": "gb", "lang": "en", "contentorigin": "espn"}
+        return self._get_json(self.athlete_stats_url(provider_player_id), {"region": "gb", "lang": "en", "contentorigin": "espn"})
+
+    def get_athlete_game_log(self, provider_player_id: str, *, season: int) -> dict[str, Any]:
+        if not str(provider_player_id).isdecimal():
+            raise ESPNHistoricalStatsClientError("A numeric trusted provider player ID is required")
+        return self._get_json(f"{self.base_url}/athletes/{provider_player_id}/gamelog", {"season": season, "lang": "en"})
+
+    def _get_json(self, url: str, params: dict) -> dict[str, Any]:
         timeout = settings.espn_historical_stats_timeout_seconds
         max_retries = max(1, settings.espn_historical_stats_max_retries)
         last_error: Exception | None = None

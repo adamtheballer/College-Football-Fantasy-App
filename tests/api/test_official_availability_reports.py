@@ -385,3 +385,25 @@ def test_player_card_exposes_official_availability_news(client, db_session):
     assert datetime.fromisoformat(recent_news[0]["published_at"].replace("Z", "+00:00")) == datetime(
         2026, 8, 24, 16, 58, tzinfo=timezone.utc
     )
+
+
+def test_dated_archive_chooses_final_status_and_never_guesses_dates():
+    import pytest
+    from collegefootballfantasy_api.app.integrations.conference_availability_reports import parse_archive_document
+    html = '''<table><tr><th>Date</th><th>Team</th><th>Player</th><th>Initial Status</th><th>Update 2 Status</th><th>Game Day Status</th></tr>
+        <tr><td>10/10/26</td><td>Auburn</td><td>Final Receiver</td><td>Questionable</td><td>Doubtful</td><td>Out</td></tr>
+        <tr><td>Sat, Oct 10, 2026</td><td>Texas</td><td>Updated Receiver</td><td>Questionable</td><td>Available</td><td></td></tr>
+        <tr><td>bad date</td><td>Texas</td><td>Undated Receiver</td><td>Out</td><td></td><td>Out</td></tr>
+        <tr><td>10/10/26</td><td>Texas</td><td>Exempt Receiver</td><td>Out</td><td></td><td>Exempt</td></tr></table>'''
+    rows = parse_archive_document(html, conference="SEC", source_url="https://www.secsports.com/fbreports-archive")
+    assert [(row["player_name"], row["status"], row["game_date"]) for row in rows] == [("Final Receiver", "Out", "2026-10-10"), ("Updated Receiver", "Available", "2026-10-10")]
+    with pytest.raises(ConferenceReportUnavailable):
+        parse_archive_document("<p>Report pending</p>", conference="SEC", source_url="https://www.secsports.com/fbreports")
+
+
+def test_ambiguous_same_school_identity_never_assigns_an_injury(db_session):
+    db_session.add_all([Player(name="Same Receiver", school="USC", position="WR"), Player(name="Same Receiver", school="USC", position="WR")]); db_session.commit()
+    result = _upsert_official_availability_rows(db_session, season=2026, week=6, rows=[{"player_name": "Same Receiver", "team_name": "USC", "position": "WR", "conference": "BIG10", "status": "Out"}])
+    assert result["skipped"] == 1
+    assert db_session.query(Injury).count() == 0
+    assert db_session.query(PlayerAvailabilityEvent).count() == 0

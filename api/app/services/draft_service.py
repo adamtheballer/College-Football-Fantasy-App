@@ -389,31 +389,10 @@ def _select_auto_pick_player(
         .join(Team, Team.id == RosterEntry.team_id)
         .where(Team.league_id == league.id)
     )
-    rank_bucket = case(
-        (Player.sheet_adp.isnot(None), 0),
-        (Player.cfb27_rank.isnot(None), 1),
-        else_=2,
-    )
-    candidates = (
-        db.query(Player)
-        .filter(
-            Player.id.not_in(drafted_player_ids),
-            Player.id.not_in(rostered_player_ids),
-            canonical_fantasy_player_filter(league.season_year),
-            season_eligible_player_filter(league.season_year),
-            league_conference_player_filter(settings_row.conference_codes),
-        )
-        .order_by(
-            rank_bucket.asc(),
-            Player.sheet_adp.asc().nullslast(),
-            Player.cfb27_rank.asc().nullslast(),
-            Player.sheet_projected_season_points.desc().nullslast(),
-            func.lower(Player.name).asc(),
-            Player.id.asc(),
-        )
-        .limit(500)
-        .all()
-    )
+    from collegefootballfantasy_api.app.services.draft_rankings import build_draft_ranking_snapshot
+    snapshot = build_draft_ranking_snapshot(db, season=league.season_year, league_id=league.id)
+    unavailable = set(db.scalars(drafted_player_ids).all()) | set(db.scalars(rostered_player_ids).all())
+    candidates = [snapshot["players"][row["id"]] for row in sorted(snapshot["board"].values(), key=lambda row: (row["masterDraftRank"], row["id"])) if row["id"] not in unavailable]
     for candidate in candidates:
         if assign_best_roster_slot_for_team(
             db,

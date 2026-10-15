@@ -67,12 +67,14 @@ from collegefootballfantasy_api.app.schemas.league_flow import (
 from collegefootballfantasy_api.app.schemas.waiver import WaiverDropCandidateRead
 from collegefootballfantasy_api.app.services.league_weeks import (
     calendar_cfb_week,
+    next_matchup_display_rollover_at,
     resolve_current_week,
     resolve_matchup_display_week,
 )
+from collegefootballfantasy_api.app.domain.matchup_records import FINAL_MATCHUP_STATUSES, finalized_matchup_records, record_application_fingerprint
 from collegefootballfantasy_api.app.services.fantasy_game_selection import fantasy_games_by_school, fantasy_stat_weeks
 from collegefootballfantasy_api.app.services.espn_live_scoring import espn_week_freshness
-from collegefootballfantasy_api.app.services.injury_status import is_current_injury_designation, normalize_injury_status
+from collegefootballfantasy_api.app.services.injury_status import is_current_injury_designation, normalize_injury_status, reviewed_injuries_for_week
 from collegefootballfantasy_api.app.services.league_workspace import build_standings_summary
 from collegefootballfantasy_api.app.services.matchup_probability import (
     calculate_matchup_win_probability,
@@ -385,6 +387,51 @@ def _team_records(db: Session, league: League, team_ids: set[int]) -> dict[int, 
     return records
 
 
+def _applied_matchup_records(db: Session, league: League, matchup: Matchup, current_week: int | None, records: dict[int, str], *, postseason: bool) -> tuple[dict[int, str], dict[int, str]]:
+    """Read-only proof that the finalized result is in these exact record rows.
+
+    Status alone and generic timestamps cannot certify application. Compare
+    persisted counts AND score totals with the scoring engine's shared result
+    calculation; a pending/failed correction therefore stays neutral.
+    """
+    if postseason or len(records) != 2 or matchup.week != current_week or (matchup.status or "").lower() not in FINAL_MATCHUP_STATUSES:
+        return records, {}
+    home_score, away_score = float(matchup.home_score or 0), float(matchup.away_score or 0)
+    if matchup.home_team_id == matchup.away_team_id or not all(math.isfinite(score) for score in (home_score, away_score)):
+        return records, {}
+    standings = db.query(Standing).filter(
+        Standing.league_id == league.id, Standing.season == league.season_year,
+        Standing.week == matchup.week, Standing.team_id.in_(records),
+    ).all()
+    if not standings:
+        return records, {}
+    results = db.query(Matchup).filter(
+        Matchup.league_id == league.id, Matchup.season == league.season_year,
+        Matchup.week <= matchup.week,
+    ).all()
+    expected = finalized_matchup_records(results, records)
+    updated = dict(records)
+    updated.update({standing.team_id: f"{standing.wins}-{standing.losses}-{standing.ties}" for standing in standings})
+    receipt = record_application_fingerprint(matchup, expected.get(matchup.home_team_id), expected.get(matchup.away_team_id))
+    if receipt is None or matchup.record_application_fingerprint != receipt:
+        return updated, {}
+    verified_ids: set[int] = set()
+    winner = matchup.home_team_id if home_score > away_score else matchup.away_team_id if away_score > home_score else None
+    for standing in standings:
+        # Persisted pending/corrected counts remain visible, but neutral.
+        updated[standing.team_id] = f"{standing.wins}-{standing.losses}-{standing.ties}"
+        record = expected.get(standing.team_id)
+        if record is None or any(getattr(standing, key) != record[key] for key in ("wins", "losses", "ties")):
+            continue
+        if any(not math.isfinite(float(getattr(standing, key))) or float(getattr(standing, key)) != round(float(record[key]), 2) for key in ("points_for", "points_against")):
+            continue
+        verified_ids.add(standing.team_id)
+    highlights = {
+        team_id: "win" if team_id == winner else "loss" for team_id in records
+    } if winner is not None and verified_ids == set(records) else {}
+    return updated, highlights
+
+
 def _owner_avatar_urls(db: Session, teams: list[Team], viewer: User) -> dict[int, str | None]:
     """Fetch visible matchup manager avatars in one bounded query when needed."""
     owner_ids = {team.owner_user_id for team in teams if team.owner_user_id is not None}
@@ -641,20 +688,8 @@ def _injury_status_by_player(
 ) -> dict[int, str]:
     if not player_ids:
         return {}
-    rows = (
-        db.query(Injury)
-        .filter(Injury.season == season, Injury.player_id.in_(player_ids))
-        .order_by(Injury.updated_at.desc(), Injury.id.desc())
-        .all()
-    )
-    statuses: dict[int, str] = {}
-    for row in rows:
-        normalized = normalize_injury_status(row.status)
-        if normalized == "OUT_FOR_SEASON":
-            statuses[row.player_id] = normalized
-        elif row.week == week and row.player_id not in statuses and is_current_injury_designation(normalized):
-            statuses[row.player_id] = normalized
-    return statuses
+    rows = reviewed_injuries_for_week(db, season=season, week=week, player_ids=player_ids)
+    return {key: normalize_injury_status(row.status) for key, row in rows.items() if is_current_injury_designation(row.status)}
 
 
 def _serialize_roster_entry(
@@ -1170,7 +1205,12 @@ def build_matchup_tab_view(
     # Hold the completed matchup through Tuesday while standings and scoring
     # have already rolled over. Roster and waiver flows still use the active
     # operational week; this is deliberately presentation-only.
-    week = resolve_matchup_display_week(db, league, selected_week)
+    presentation_now = datetime.now(timezone.utc)
+    # Explicit nonfinal/historical navigation needs no eligibility queries.
+    # Resolve current context lazily only when a final result could highlight.
+    current_matchup_week = None if selected_week is not None and selected_week > 0 else resolve_matchup_display_week(db, league, now=presentation_now)
+    week = selected_week if selected_week is not None and selected_week > 0 else current_matchup_week
+    rollover_at = None
     week_started = _week_has_started(db, season=league.season_year, week=week)
     freshness_read = LiveScoringFreshnessRead(
         state="unavailable",
@@ -1306,7 +1346,11 @@ def build_matchup_tab_view(
     opponent_current, opponent_live_total, opponent_pregame_total, _ = _starter_live_totals(opponent_roster)
     my_total = my_live_total
     opponent_total = opponent_live_total
-    matchup_final = (matchup.status or "").lower() in {"final", "stat_corrected"}
+    matchup_final = (matchup.status or "").lower() in FINAL_MATCHUP_STATUSES
+    if matchup_final:
+        if current_matchup_week is None:
+            current_matchup_week = resolve_matchup_display_week(db, league, now=presentation_now)
+        rollover_at = next_matchup_display_rollover_at(db, league, current_matchup_week, presentation_now)
     if matchup_final and matchup.home_score is not None and matchup.away_score is not None:
         my_current = float(matchup.home_score if primary_team.id == matchup.home_team_id else matchup.away_score)
         opponent_current = float(matchup.away_score if primary_team.id == matchup.home_team_id else matchup.home_score)
@@ -1324,6 +1368,9 @@ def build_matchup_tab_view(
     if opponent:
         record_team_ids.add(opponent.id)
     records = _team_records(db, league, record_team_ids)
+    records, record_highlights = _applied_matchup_records(
+        db, league, matchup, current_matchup_week, records, postseason=postseason_node is not None,
+    )
     avatars_by_owner_id = _owner_avatar_urls(
         db,
         [team for team in (primary_team, opponent) if team is not None],
@@ -1333,6 +1380,7 @@ def build_matchup_tab_view(
         id=primary_team.id,
         name=primary_team.display_name,
         record=records[primary_team.id],
+        record_highlight=record_highlights.get(primary_team.id),
         projected_points=my_total,
         win_probability=my_probability,
         fantasy_team_id=primary_team.id,
@@ -1350,6 +1398,7 @@ def build_matchup_tab_view(
             id=opponent.id,
             name=opponent.display_name,
             record=records[opponent.id],
+            record_highlight=record_highlights.get(opponent.id),
             projected_points=opponent_total,
             win_probability=opponent_probability,
             fantasy_team_id=opponent.id,
@@ -1378,6 +1427,8 @@ def build_matchup_tab_view(
         league_id=league.id,
         season=league.season_year,
         week=week,
+        current_matchup_week=current_matchup_week,
+        matchup_week_rollover_at=rollover_at,
         week_started=week_started,
         matchup_id=matchup.id,
         status=effective_status,

@@ -121,7 +121,7 @@ describe("PlayerCardModal helpers", () => {
       },
     ], "QB");
 
-    expect(totals.gamesPlayed).toBe(1);
+    expect(totals.gamesWithStats).toBe(1);
     expect(totals.totals).toContainEqual(["FPTS", 25.4]);
     expect(totals.totals).toContainEqual(["PASS YDS", 280]);
     expect(totals.totals).toContainEqual(["PASS TD", 3]);
@@ -143,7 +143,7 @@ describe("PlayerCardModal helpers", () => {
       },
     ], "RB");
 
-    expect(totals.gamesPlayed).toBe(1);
+    expect(totals.gamesWithStats).toBe(1);
     expect(totals.totals).toContainEqual(["RUSH ATT", 17]);
     expect(totals.totals).toContainEqual(["RUSH YDS", 98]);
   });

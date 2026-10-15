@@ -20,7 +20,7 @@ const roadmap = [
   },
   {
     title: "Sponsored Deals",
-    description: "In-app partner offers and discount-code rewards, including Saturday Pick 6 promotions on the Home dashboard.",
+    description: "In-app partner offers and discount-code rewards.",
     icon: Handshake,
   },
 ];
@@ -34,7 +34,7 @@ export default function ComingSoon() {
           <p className="cfb-micro-label text-cfb-brand">College Football Fantasy</p>
           <h1 className="mt-3 cfb-display-title text-4xl sm:text-5xl">Coming Soon</h1>
           <p className="mt-4 text-base font-semibold leading-7 text-cfb-text-secondary sm:text-lg">
-            A look at what we are building next. Saturday Pick 6 is available from the Home dashboard.
+            A look at what we are building next.
           </p>
         </div>
       </section>

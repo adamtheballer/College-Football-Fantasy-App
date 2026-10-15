@@ -198,7 +198,7 @@ describe("league matchup scoreboard", () => {
   it("asks the server for its current display week when the tab URL has no historical week", () => {
     render(createElement(LeagueMatchup));
 
-    expect(hookMocks.useLeagueMatchupTab).toHaveBeenCalledWith(42, undefined, undefined, true);
+    expect(hookMocks.useLeagueMatchupTab).toHaveBeenCalledWith(42, undefined, undefined, true, undefined);
   });
 
   it("shows actual zero-point totals from the first kickoff while retaining projections and win chances", () => {

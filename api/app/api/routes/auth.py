@@ -25,6 +25,8 @@ from collegefootballfantasy_api.app.models.beta_access import BetaAccessCode
 from collegefootballfantasy_api.app.models.refresh_session import RefreshSession
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
+from collegefootballfantasy_api.app.schemas.name_change import NameChangeEligibility
+from collegefootballfantasy_api.app.services import profile_names
 from collegefootballfantasy_api.app.schemas.auth import (
     AccountDeletionRequest,
     AuthMessageResponse,
@@ -267,73 +269,26 @@ def current_user_profile(current_user: User = Depends(get_current_user)) -> User
     return UserRead.model_validate(current_user)
 
 
+@router.get("/me/name-change-eligibility", response_model=NameChangeEligibility)
+def current_name_change_eligibility(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> NameChangeEligibility:
+    return profile_names.name_change_eligibility(current_user, profile_names.server_now(db))
+
+
 @router.patch("/me", response_model=UserRead)
 def update_current_user_profile(
     payload: UserProfileUpdate,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> UserRead:
-    """Update only the signed-in manager's beta profile fields."""
-
-    fields_set = payload.model_fields_set
-    if "first_name" in fields_set:
-        next_name = moderate_user_text(
-            db,
-            actor_user_id=current_user.id,
-            field_name="manager_name",
-            value=payload.first_name,
-            required=True,
-        ) or current_user.first_name
-        if next_name != current_user.first_name:
-            now = utcnow()
-            available_at = current_user.manager_name_change_available_at
-            if available_at is not None and ensure_aware(available_at) > now:
-                last_successful_change_at = ensure_aware(current_user.manager_name_changed_at)
-                seconds_remaining = max(1, int((ensure_aware(available_at) - now).total_seconds()))
-                raise HTTPException(
-                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    # Keep this machine-readable so every client can show a
-                    # precise, localized message beside the name field rather
-                    # than degrading it into a generic server error.
-                    detail={
-                        "code": "manager_name_cooldown",
-                        "message": "Your manager name is still in its seven-day change window. Unsuccessful attempts do not restart the wait.",
-                        "field": "first_name",
-                        # This is intentionally the durable, successful
-                        # change timestamp rather than this failed request's
-                        # timestamp. A client can make the cooldown behavior
-                        # transparent instead of looking like it has reset.
-                        "last_successful_change_at": last_successful_change_at.isoformat() if last_successful_change_at else None,
-                        # Preserve the same serialization the profile
-                        # response uses, so clients can persist this value
-                        # verbatim and compare it without timezone churn.
-                        "retry_at": ensure_aware(available_at).isoformat(),
-                    },
-                    headers={"Retry-After": str(seconds_remaining)},
-                )
-            current_user.first_name = next_name
-            current_user.manager_name_changed_at = now
-            # League, roster, matchup, draft, and chat reads all
-            # resolve the manager's current team through this record. Keep the
-            # denormalized owner name in sync and refresh generated ``Name's
-            # Team`` labels, including labels made stale by earlier releases.
-            # A non-standard team name is a deliberate custom team name and is
-            # therefore preserved.
-            owned_teams = (
-                db.query(Team)
-                .filter(Team.owner_user_id == current_user.id)
-                .all()
-            )
-            for team in owned_teams:
-                team.owner_name = next_name
-                if team.name.endswith("'s Team"):
-                    team.name = f"{next_name}'s Team"
-    if "avatar_url" in fields_set:
-        current_user.avatar_url = payload.avatar_url
-    db.add(current_user)
-    db.commit()
-    db.refresh(current_user)
-    return UserRead.model_validate(current_user)
+    """Update only the verified session's account, atomically with its cooldown."""
+    expected_account = request.headers.get("x-cffb-profile-account")
+    if expected_account is not None and expected_account != str(current_user.id):
+        raise HTTPException(status_code=409, detail="The signed-in account changed. Reopen Settings and try again.")
+    return UserRead.model_validate(profile_names.update_profile(db, current_user, payload))
 
 
 @router.delete("/me", response_model=AuthMessageResponse)

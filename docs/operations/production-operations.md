@@ -25,7 +25,7 @@ In-app history is always produced by the durable outbox. Push and email are opt-
 - OneSignal push: set `PUSH_NOTIFICATIONS_ENABLED=true`, `PUSH_PROVIDER=onesignal`, `ONESIGNAL_APP_ID`, and `ONESIGNAL_APP_API_KEY` in the notification-worker secret store. The server key must not be present in API browser configuration or Vite variables.
 - Web push: pass only `VITE_ONESIGNAL_APP_ID` at web build time. The site must use HTTPS, serve `OneSignalSDKWorker.js` from the same origin, and prompt only after the user presses **Enable push notifications** in Settings.
 - Resend email: set `EMAIL_ENABLED=true`, `EMAIL_DELIVERY_MODE=resend`, `RESEND_API_KEY`, and `RESEND_FROM` in the notification-worker secret store. SMTP remains reserved for the existing auth-email path.
-- Live player-update fanout remains disabled with `LIVE_PLAYER_NOTIFICATIONS_ENABLED=false` until an authoritative data provider and runbook are approved. This setting does not affect draft, trade, waiver, or in-app notification processing.
+- Play notifications are retired and cannot be enabled. `LIVE_PLAYER_NOTIFICATIONS_ENABLED` remains only a legacy injury-ingestion CLI default; it does not control ESPN play alerts, draft, trade or waiver notifications.
 
 The worker writes the provider result, retry schedule, and provider message ID to `notification_delivery_attempts`. It uses deterministic provider idempotency keys; a retry after a worker crash may repeat a provider request only with that same idempotency key. Never mark a notification sent merely because it was queued.
 

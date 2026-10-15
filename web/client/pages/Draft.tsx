@@ -1,3 +1,4 @@
+import { DraftBoardSortControl, sortDraftBoardPlayers, type DraftBoardSort } from "@/components/draft/DraftBoardSortControl";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router-dom";
@@ -234,6 +235,7 @@ export default function Draft() {
   const { leagueId } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [boardSort, setBoardSort] = useState<DraftBoardSort>("draft_rank");
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 150);
   const [position, setPosition] = useState("ALL");
@@ -523,18 +525,8 @@ export default function Draft() {
       return matchesPosition && matchesSearch;
     });
 
-    if (position === "ALL") return filteredPlayers;
-
-    return [...filteredPlayers].sort((left, right) => {
-      if (left.projectedPoints !== right.projectedPoints) {
-        return right.projectedPoints - left.projectedPoints;
-      }
-      const leftRank = left.masterDraftRank ?? left.draftRank;
-      const rightRank = right.masterDraftRank ?? right.draftRank;
-      if (leftRank !== rightRank) return leftRank - rightRank;
-      return left.name.localeCompare(right.name);
-    });
-  }, [draftablePlayers, position, debouncedSearch]);
+    return sortDraftBoardPlayers(filteredPlayers, boardSort);
+  }, [draftablePlayers, position, debouncedSearch, boardSort]);
 
   const queuedPlayers = useMemo(() => {
     const byId = new Map(draftBoard.map((player) => [player.id, player]));
@@ -1356,7 +1348,8 @@ export default function Draft() {
                 </div>
               </div>
               <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-3">
-                <div className="relative w-full lg:w-[480px]">
+                <DraftBoardSortControl value={boardSort} onChange={setBoardSort} />
+              <div className="relative w-full lg:w-[480px]">
                   <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     value={search}
@@ -1389,8 +1382,8 @@ export default function Draft() {
           <div className="grid grid-cols-[28px_minmax(0,1fr)_54px_78px] items-center gap-x-2 border-b border-white/10 px-3 py-2 text-[8px] font-black uppercase tracking-[0.06em] text-muted-foreground sm:grid-cols-[56px_minmax(0,1fr)_72px_88px_120px] sm:gap-3 sm:px-5 sm:py-3 sm:text-[9px] sm:tracking-[0.06em]">
             <span>RK</span>
             <span>Player</span>
-            <span className="hidden text-right sm:block">ADP</span>
-            <span className="text-right">ROS</span>
+            <span className="hidden text-right sm:block">Source ADP</span>
+            <span className="text-right" title="Full season before verified games; remaining season after verified games">Season / ROS</span>
             <span className="text-right">Action</span>
           </div>
 
@@ -1399,7 +1392,7 @@ export default function Draft() {
               <div className="flex min-h-40 items-center justify-center gap-3 px-6 text-center text-[10px] font-black uppercase tracking-[0.06em] text-muted-foreground">
                 <Loader2 className="h-5 w-5 animate-spin" /> Loading real player board...
               </div>
-            ) : playersError ? (
+            ) : playersError && !playersPayload?.data.length ? (
               <div className="flex min-h-40 items-center justify-center px-6 text-center text-[10px] font-black uppercase tracking-[0.06em] text-red-300">
                 {formatApiError(playersErrorObject, "Unable to load players right now. Please try again in a moment.")}
               </div>
@@ -1456,8 +1449,8 @@ export default function Draft() {
                         <span className={cn("shrink-0 rounded-md border px-1.5 py-0.5 text-[8px] font-black sm:rounded-full sm:px-2 sm:text-[9px]", positionClass)}>{player.pos}</span>
                       </div>
                     </div>
-                    <p className="hidden text-right text-xs font-black tabular-nums text-muted-foreground sm:block">{player.adpEstimate ?? player.adpRank ?? "—"}</p>
-                    <p className="text-right text-[10px] font-black tabular-nums text-foreground sm:text-sm">{formatDraftProjection({ restOfSeasonProjection: player.restOfSeasonProjectedPoints, seasonProjection: player.sheetProjectedSeasonPoints, fallbackSeasonProjection: player.sheetProjectionStats?.fpts })}</p>
+                    <p className="hidden text-right text-xs font-black tabular-nums text-muted-foreground sm:block">{player.sheetAdp && player.sheetAdp > 0 ? player.sheetAdp : "—"}</p>
+                    <p className="text-right text-[10px] font-black tabular-nums text-foreground sm:text-sm">{player.projectionMissing ? "—" : formatDraftProjection({ seasonProjection: player.draftProjectedPoints })}</p>
                       <Button
                         className={cn(
                           "h-10 min-h-[44px] w-[78px] rounded-lg px-1 text-[8px] font-black uppercase tracking-[0.04em] sm:h-10 sm:min-h-0 sm:w-[140px] sm:rounded-xl sm:px-3 sm:text-[10px] sm:tracking-[0.06em]",
@@ -1528,7 +1521,7 @@ export default function Draft() {
             school: selectedPlayer.school,
             position: selectedPlayer.pos,
             rankLabel: `Master Rank #${selectedPlayer.masterDraftRank ?? selectedPlayer.draftRank}`,
-            projectedPoints: selectedPlayer.projectedPoints,
+            projectedPoints: selectedPlayer.projectionMissing ? null : selectedPlayer.projectedPoints,
             playerClass: selectedPlayer.playerClass,
             status: selectedPlayer.status,
             projection: selectedPlayer.projection,

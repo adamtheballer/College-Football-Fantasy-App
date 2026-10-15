@@ -23,7 +23,7 @@ def _finalized_week_one_fixture(db_session):
     matchup.status = "final"
     db_session.add(
         TeamSchedule(
-            team_name="Test",
+            team_name="Texas",
             season=2026,
             week=2,
             opponent_name="Next Opponent",
@@ -35,6 +35,7 @@ def _finalized_week_one_fixture(db_session):
         )
     )
     for player in players.values():
+        player.school = "Texas"
         player.raw_cfb27_rating = 82
         player.cfb27_overall = 82
     db_session.commit()

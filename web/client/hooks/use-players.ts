@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { apiGet, getLeaguePlayerHistory } from "@/lib/api";
 import type { Player } from "@/types/player";
+import { useInjuryUpdates } from "./use-injury-updates";
 
 export const PLAYER_API_MAX_LIMIT = 100;
 
@@ -28,6 +29,14 @@ type BackendPlayerRead = {
   value_calculated_at?: string | null;
   value_source_batch_id?: string | null;
   board_rank?: number | null;
+  master_draft_rank?: number | null;
+  draft_projected_points?: number | null;
+  draft_projection_missing?: boolean;
+  draft_source_rank?: number | null;
+  draft_tier?: number | null;
+  draft_final_score?: number | null;
+  draft_talent_score?: number | null;
+  draft_ranking_version?: string | null;
   rest_of_season_projected_points?: number | null;
   rest_of_season_rank?: number | null;
   rest_of_season_as_of_week?: number | null;
@@ -35,6 +44,10 @@ type BackendPlayerRead = {
 };
 
 type BackendPlayerListResponse = {
+  ranking_version?: string | null;
+  ranking_policy?: string | null;
+  ranking_season?: number | null;
+  ranking_week?: number | null;
   data: BackendPlayerRead[];
   total: number;
   limit: number;
@@ -75,15 +88,6 @@ type BackendTeamSummaryResponse = {
   data: BackendTeamSummary[];
 };
 
-type BackendInjuryRow = {
-  player_id: number;
-  status: string;
-};
-
-type BackendInjuryResponse = {
-  data: BackendInjuryRow[];
-};
-
 export type PlayerSeasonStatsResponse = {
   player_id: number;
   season: number;
@@ -111,7 +115,10 @@ export type PlayerGameLogResponse = {
   } | null;
   message?: string | null;
   games: Array<{
-    schedule_id: number;
+    schedule_id: number | null;
+    provider_event_id?: string | null;
+    season_type?: string | null;
+    source_url?: string | null;
     game_id?: number | null;
     team_name?: string | null;
     week: number;
@@ -190,7 +197,7 @@ export type PlayerTrajectoryResponse = {
   player_id: number;
   season: number;
   league_id?: number | null;
-  projection: Array<{ week: number; points: number | null; actual_points?: number | null; source: "published" | "actual" | "bye"; projection_status: string; projection_version?: string | null; published_at?: string | null }>;
+  projection: Array<{ week: number; points: number | null; actual_points?: number | null; source: "published" | "actual" | "bye" | "unavailable"; is_finalized: boolean; projection_status: string; projection_version?: string | null; published_at?: string | null }>;
   value: Array<{ week: number; value: number; source: "preseason" | "published" }>;
   preseason_projection_points?: number | null;
 };
@@ -208,7 +215,7 @@ export function useLeaguePlayerHistory(
   });
 }
 
-export function usePlayerTradeValues(playerId?: number | null, season = 2026, enabled = true) {
+export function usePlayerTradeValues(playerId?: number | null, season?: number, enabled = true) {
   return useQuery({
     queryKey: ["player-trade-values", playerId, season],
     enabled: enabled && typeof playerId === "number" && Number.isFinite(playerId),
@@ -216,9 +223,10 @@ export function usePlayerTradeValues(playerId?: number | null, season = 2026, en
     // is opened, including after a preseason value reconciliation.
     staleTime: 0,
     refetchOnMount: "always",
+    refetchInterval: 30_000,
     retry: false,
-    queryFn: async () => {
-      const payload = await apiGet<PlayerTradeValueResponse>(`/players/${playerId}/trade-values`, { season });
+    queryFn: async ({signal}) => {
+      const payload = await apiGet<PlayerTradeValueResponse>(`/players/${playerId}/trade-values`, { season },signal);
       return payload.current ? { ...payload, current: { ...payload.current, history: payload.history } } : payload;
     },
   });
@@ -226,19 +234,30 @@ export function usePlayerTradeValues(playerId?: number | null, season = 2026, en
 
 export function usePlayerTrajectory(
   playerId?: number | null,
-  season = 2026,
+  season?: number,
   leagueId?: number | null,
   enabled = true,
 ) {
   return useQuery({
     queryKey: ["player-trajectory", playerId, season, leagueId ?? null],
     enabled: enabled && typeof playerId === "number" && Number.isFinite(playerId),
-    staleTime: 60_000,
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
     retry: false,
-    queryFn: () => apiGet<PlayerTrajectoryResponse>(`/players/${playerId}/trajectory`, {
+    queryFn: async ({signal}) => {
+      const payload = await apiGet<PlayerTrajectoryResponse>(`/players/${playerId}/trajectory`, {
       season,
       ...(typeof leagueId === "number" && Number.isFinite(leagueId) ? { league_id: leagueId } : {}),
-    }),
+      }, signal);
+      if (payload.player_id !== playerId || (season !== undefined && payload.season !== season) || (payload.league_id ?? null) !== (leagueId ?? null)) {
+        throw new Error("Player chart response does not match the requested player, season or league.");
+      }
+      if (payload.projection.some(point=>typeof point.is_finalized!=="boolean" || ((point.actual_points!=null || point.source==="actual") && !point.is_finalized))) {
+        throw new Error("Player chart response lacks authoritative weekly finality.");
+      }
+      return payload;
+    },
   });
 }
 
@@ -364,13 +383,19 @@ const normalizeStatus = (value?: string | null): Player["status"] => {
     .replace(/_/g, " ")
     .replace(/-/g, " ")
     .replace(/\s+/g, " ");
-  if (["HEALTHY", "ACTIVE", "AVAILABLE", "FULL", "PROBABLE"].includes(normalized)) return "HEALTHY";
+  if (["HEALTHY", "ACTIVE", "AVAILABLE", "FULL"].includes(normalized)) return "HEALTHY";
+  if (["OUT FOR SEASON", "SEASON ENDING"].includes(normalized)) return "OUT_FOR_SEASON";
+  if (normalized === "PROBABLE") return "PROBABLE";
+  if (normalized === "DAY TO DAY") return "DAY_TO_DAY";
+  if (normalized === "SUSPENDED") return "SUSPENDED";
+  if (normalized === "INACTIVE") return "INACTIVE";
+  if (normalized === "TBD") return "TBD";
   if (normalized === "IR" || normalized.includes("INJURED RESERVE")) return "IR";
   if (/\b(OUT|INACTIVE|SUSPEND)/.test(normalized)) return "OUT";
   if (/\bDOUBTFUL\b/.test(normalized)) return "DOUBTFUL";
-  if (/\b(QUESTION|DAY TO DAY|GTD|GAME TIME|TBD)\b/.test(normalized)) return "QUESTIONABLE";
-  if (["N/A", "NA", "NONE", "UNREPORTED"].includes(normalized)) return "UNREPORTED";
-  return "UNREPORTED";
+  if (/\b(QUESTION|GTD|GAME TIME)/.test(normalized)) return "QUESTIONABLE";
+  if (["N/A", "N A", "NA", "NONE", "UNREPORTED"].includes(normalized)) return "UNREPORTED";
+  return "TBD";
 };
 
 const mapProjection = (
@@ -416,6 +441,14 @@ export const normalizePlayer = (
   conf: context?.conference ?? "N/A",
   rank: context?.rank ?? player.board_rank ?? player.sheet_adp ?? player.cfb27_rank ?? 0,
   boardRank: player.board_rank ?? player.sheet_adp ?? null,
+  masterDraftRank: player.master_draft_rank,
+  draftProjectedPoints: player.draft_projected_points,
+  draftProjectionMissing: player.draft_projection_missing,
+  draftSourceRank: player.draft_source_rank,
+  draftTier: player.draft_tier,
+  draftFinalScore: player.draft_final_score,
+  draftTalentScore: player.draft_talent_score,
+  draftRankingVersion: player.draft_ranking_version,
   adp: context?.adp ?? player.sheet_adp ?? 0,
   posRank: context?.posRank ?? player.cfb27_position_rank ?? null,
   rostered: 0,
@@ -466,6 +499,8 @@ export function usePlayers(
     offset = 0,
   } = params;
 
+  const injuries = useInjuryUpdates({ season: params.season, week: params.week, enabled: true });
+
   return useQuery({
     queryKey: [
       "players",
@@ -483,8 +518,12 @@ export function usePlayers(
       },
     ],
     staleTime: 30_000,
+    select: (payload) => {
+      const statuses = new Map(injuries.data?.data.map((row) => [row.player_id, row.status]));
+      return { ...payload, data: payload.data.map((player) => ({ ...player, status: normalizeStatus(statuses.get(player.id)) })) };
+    },
     queryFn: async () => {
-      const [payload, projections, teams, injuries] = await Promise.all([
+      const [payload, projections, teams] = await Promise.all([
         apiGet<BackendPlayerListResponse>("/players", {
           search: search || undefined,
           position: position || undefined,
@@ -513,15 +552,6 @@ export function usePlayers(
             data: [],
           })
         ),
-        apiGet<BackendInjuryResponse>("/stats/injuries", {
-          season,
-          week,
-          conference: "ALL",
-        }).catch(
-          (): BackendInjuryResponse => ({
-            data: [],
-          })
-        ),
       ]);
 
       const overallRankByPlayer = new Map<number, number>();
@@ -537,11 +567,7 @@ export function usePlayers(
       const conferenceEntries: Array<[string, string]> = teams.data.map(
         (row): [string, string] => [row.team.toUpperCase(), row.conference]
       );
-      const injuryEntries: Array<[number, string]> = injuries.data.map(
-        (row): [number, string] => [row.player_id, row.status]
-      );
       const conferenceBySchool = new Map<string, string>(conferenceEntries);
-      const injuryByPlayerId = new Map<number, string>(injuryEntries);
 
       return {
         ...payload,
@@ -551,7 +577,6 @@ export function usePlayers(
             rank: player.rest_of_season_rank ?? player.board_rank ?? player.sheet_adp ?? player.cfb27_rank ?? overallRankByPlayer.get(player.id) ?? 0,
             adp: player.sheet_adp ?? player.board_rank ?? overallRankByPlayer.get(player.id) ?? 0,
             posRank: player.cfb27_position_rank ?? null,
-            status: injuryByPlayerId.get(player.id),
             projection: projectionByPlayerId.get(player.id),
           })
         ),
@@ -576,6 +601,7 @@ export function useDraftPlayerPool(
     fetchAll?: boolean;
     maxPages?: number;
     enabled?: boolean;
+    draftConfig?: import("@/lib/draftRankings").DraftConfig;
   } = {}
 ) {
   const {
@@ -586,18 +612,21 @@ export function useDraftPlayerPool(
     available_only,
     sort,
     season = new Date().getFullYear(),
-    week = 1,
+    week,
     limit = 100,
     offset = 0,
     pages = 1,
     fetchAll = false,
     maxPages = 50,
     enabled = true,
+    draftConfig,
   } = params;
 
   const backendLimit = getDraftPlayerPoolBackendLimit(limit);
 
-  return useQuery({
+  const injuries = useInjuryUpdates({ season: params.season, week: params.week, enabled: enabled });
+
+  return useQuery<Omit<BackendPlayerListResponse, "data"> & { data: Player[] }>({
     queryKey: [
       "draft-player-pool",
       {
@@ -616,11 +645,19 @@ export function useDraftPlayerPool(
         fetchAll: fetchAll ? "true" : "false",
         maxPages,
         enabled: enabled ? "true" : "false",
+        draftConfig: draftConfig ?? null,
       },
     ],
     enabled,
     staleTime: 15_000,
-    queryFn: async () => {
+    refetchOnWindowFocus: true,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
+    select: (payload) => {
+      const statuses = new Map(injuries.data?.data.map((row) => [row.player_id, row.status]));
+      return { ...payload, data: payload.data.map((player) => ({ ...player, status: normalizeStatus(statuses.get(player.id)) })) };
+    },
+    queryFn: async ({ signal }) => {
       const fetchPage = (pageOffset: number) =>
         apiGet<BackendPlayerListResponse>("/players", {
           search: search || undefined,
@@ -629,41 +666,33 @@ export function useDraftPlayerPool(
           league_id,
           available_only,
           draft_eligible: true,
-          sort,
+          season,
+          draft_config: draftConfig ? JSON.stringify(draftConfig) : undefined,
+          sort: sort || "draft_rank",
           limit: backendLimit,
           offset: pageOffset,
-        });
+        }, signal);
 
-      const [firstPayload, projections, teams, injuries] = await Promise.all([
+      const [firstPayload, teams] = await Promise.all([
         fetchPage(offset),
-        apiGet<BackendProjectionListResponse>("/projections", {
-          season,
-          week,
-          limit: 2000,
-          offset: 0,
-        }).catch(
-          (): BackendProjectionListResponse => ({
-            data: [],
-          })
-        ),
         apiGet<BackendTeamSummaryResponse>("/stats/teams", {
           season,
           conference: "ALL",
-        }).catch(
+        }, signal).catch(
           (): BackendTeamSummaryResponse => ({
             data: [],
           })
         ),
-        apiGet<BackendInjuryResponse>("/stats/injuries", {
-          season,
-          week,
-          conference: "ALL",
-        }).catch(
-          (): BackendInjuryResponse => ({
-            data: [],
-          })
-        ),
       ]);
+      if (!firstPayload.ranking_version) throw new Error("Draft rankings are unavailable. Refresh after the backend update.");
+      if (!Number.isInteger(firstPayload.ranking_week) || !firstPayload.ranking_season) throw new Error("Draft ranking context is unavailable.");
+      if (!league_id && firstPayload.ranking_season !== season) throw new Error("Draft ranking season does not match this board.");
+      const projections = await apiGet<BackendProjectionListResponse>("/projections", {
+        season: firstPayload.ranking_season,
+        week: firstPayload.ranking_week,
+        limit: 2000,
+        offset: 0,
+      }, signal).catch((): BackendProjectionListResponse => ({ data: [] }));
       const pageOffsets = getDraftPlayerPoolPageOffsets({
         fetchAll,
         limit: backendLimit,
@@ -677,16 +706,21 @@ export function useDraftPlayerPool(
       const remainingPayloads = remainingOffsets.length
         ? await fetchDraftPlayerPoolPagesSequentially(remainingOffsets, fetchPage)
         : [];
+      if (remainingPayloads.some(payload => payload.ranking_version !== firstPayload.ranking_version || payload.ranking_season !== firstPayload.ranking_season || payload.ranking_week !== firstPayload.ranking_week || payload.total !== firstPayload.total)) {
+        throw new Error("Draft rankings changed while loading. Refresh the board.");
+      }
       const rows = [firstPayload, ...remainingPayloads].flatMap((payload) => payload.data);
+      if (new Set(rows.map(row => row.id)).size !== rows.length || rows.some(row =>
+        row.draft_ranking_version !== firstPayload.ranking_version || !Number.isInteger(row.master_draft_rank) || (row.master_draft_rank ?? 0) < 1
+      )) throw new Error("Draft ranking rows are inconsistent. Refresh the board.");
+      if (fetchAll && rows.length + offset < firstPayload.total) throw new Error("The full draft pool could not be loaded. Refresh the board.");
       const conferenceBySchool = new Map(
         teams.data.map((row): [string, string] => [row.team.toUpperCase(), row.conference])
       );
       const projectionByPlayerId = new Map<number, BackendProjectionRead>(
         projections.data.map((row) => [row.player_id, row])
       );
-      const injuryByPlayerId = new Map<number, string>(
-        injuries.data.map((row) => [row.player_id, row.status])
-      );
+
 
       return {
         ...firstPayload,
@@ -694,10 +728,9 @@ export function useDraftPlayerPool(
         data: rows.map((player) =>
           normalizePlayer(player, {
             conference: conferenceBySchool.get(player.school.toUpperCase()) ?? "N/A",
-            rank: player.rest_of_season_rank ?? player.board_rank ?? player.sheet_adp ?? player.cfb27_rank ?? 0,
-            adp: player.sheet_adp ?? player.board_rank ?? 0,
+            rank: player.master_draft_rank ?? player.board_rank ?? player.sheet_adp ?? player.cfb27_rank ?? 0,
+            adp: player.sheet_adp ?? 0,
             posRank: player.cfb27_position_rank ?? null,
-            status: injuryByPlayerId.get(player.id),
             projection: projectionByPlayerId.get(player.id),
           })
         ),
@@ -762,12 +795,15 @@ export function getDraftPlayerPoolPageOffsets({
 export function usePlayerDetail(playerId?: number | null, enabled = true) {
   const season = new Date().getFullYear();
   const week = 1;
+  const injuries = useInjuryUpdates({ enabled: enabled && typeof playerId === "number" });
+
   return useQuery({
     queryKey: ["player", playerId, season, week],
     enabled: enabled && typeof playerId === "number" && !Number.isNaN(playerId),
     staleTime: 30_000,
+    select: (payload) => ({ ...payload, status: normalizeStatus(injuries.data?.data.find((row) => row.player_id === payload.id)?.status) }),
     queryFn: async () => {
-      const [payload, projection, teams, injuries] = await Promise.all([
+      const [payload, projection, teams] = await Promise.all([
         apiGet<BackendPlayerRead>(`/players/${playerId}`),
         apiGet<BackendProjectionRead>(`/projections/${playerId}`, { season, week }).catch(() => undefined),
         apiGet<BackendTeamSummaryResponse>("/stats/teams", {
@@ -778,32 +814,18 @@ export function usePlayerDetail(playerId?: number | null, enabled = true) {
             data: [],
           })
         ),
-        apiGet<BackendInjuryResponse>("/stats/injuries", {
-          season,
-          week,
-          conference: "ALL",
-        }).catch(
-          (): BackendInjuryResponse => ({
-            data: [],
-          })
-        ),
       ]);
 
       const conferenceEntries: Array<[string, string]> = teams.data.map(
         (row): [string, string] => [row.team.toUpperCase(), row.conference]
       );
-      const injuryEntries: Array<[number, string]> = injuries.data.map(
-        (row): [number, string] => [row.player_id, row.status]
-      );
       const conferenceBySchool = new Map<string, string>(conferenceEntries);
-      const injuryByPlayerId = new Map<number, string>(injuryEntries);
 
       return normalizePlayer(payload, {
         conference: conferenceBySchool.get(payload.school.toUpperCase()) ?? "N/A",
         rank: 0,
         adp: 0,
         posRank: null,
-        status: injuryByPlayerId.get(payload.id),
         projection,
       });
     },
@@ -847,10 +869,10 @@ export function usePlayerGameLog(
     refetchOnMount: "always",
     refetchInterval: 30_000,
     refetchIntervalInBackground: true,
-    queryFn: () => apiGet<PlayerGameLogResponse>(`/players/${playerId}/game-log`, {
+    queryFn: ({signal}) => apiGet<PlayerGameLogResponse>(`/players/${playerId}/game-log`, {
       ...(typeof season === "number" && Number.isFinite(season) ? { season } : {}),
       ...(typeof leagueId === "number" && Number.isFinite(leagueId) ? { league_id: leagueId } : {}),
-    }),
+    }, signal),
   });
 }
 

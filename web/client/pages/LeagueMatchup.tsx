@@ -1,7 +1,9 @@
 import { Bell, ChevronLeft, ChevronRight, Clock3, MessageCircle, ShieldAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { focusManager } from "@tanstack/react-query";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
+import { MatchupRecord, currentRecordHighlight } from "@/components/league/MatchupRecord";
 import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { SideBySideMatchup } from "@/components/league/SideBySideMatchup";
 import { WinChanceBar, validProbability } from "@/components/league/WinChanceMeter";
@@ -139,12 +141,14 @@ function MatchupTeamSummary({
   align,
   status,
   weekStarted,
+  recordHighlight,
 }: {
   team: LeagueMatchupTeam | null;
   accent: "brand" | "crimson";
   align: "left" | "right";
   status: string;
   weekStarted?: boolean;
+  recordHighlight?: "win" | "loss" | null;
 }) {
   const isBrand = accent === "brand";
   // Kickoff moves the display to real scoring immediately. A provider may not
@@ -172,7 +176,7 @@ function MatchupTeamSummary({
       <p className="mt-0.5 truncate text-[11px] font-black text-cfb-text-primary sm:mt-1 sm:text-sm">
         {teamLabel}
       </p>
-      <p className="text-[9px] font-bold text-cfb-text-muted sm:text-[10px]">{team?.record ?? "0-0-0"}</p>
+      <p className="text-[9px] font-bold text-cfb-text-muted sm:text-[10px]"><MatchupRecord record={team?.record ?? "0-0-0"} highlight={recordHighlight ?? null} /></p>
       <p className="cfb-score-value mt-0.5 text-2xl text-cfb-text-primary sm:mt-1 sm:text-4xl">
         {showActual ? formatMatchupPoints(team?.current_points ?? 0) : formatMatchupPoints(projected)}
       </p>
@@ -191,6 +195,9 @@ function CompactMatchupScoreboard({
   matchupIndex,
   matchupCount,
   status,
+  leagueId,
+  season,
+  now,
 }: {
   data: LeagueMatchupTabResponse;
   myTeam: LeagueMatchupTeam | null;
@@ -199,6 +206,9 @@ function CompactMatchupScoreboard({
   matchupIndex: number;
   matchupCount: number;
   status: string;
+  leagueId: number;
+  season: number | undefined;
+  now: number;
 }) {
   const winChance = probabilityPair(myTeam?.win_probability, opponentTeam?.win_probability);
   const displayedWinChance = winChance ? displayedProbabilityPair(winChance.my, winChance.opponent) : null;
@@ -231,6 +241,7 @@ function CompactMatchupScoreboard({
       <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 sm:gap-5">
         <MatchupTeamSummary
           team={myTeam}
+          recordHighlight={currentRecordHighlight(data, myTeam, leagueId, season, now)}
           accent="brand"
           align="left"
           status={status}
@@ -251,6 +262,7 @@ function CompactMatchupScoreboard({
 
         <MatchupTeamSummary
           team={opponentTeam}
+          recordHighlight={currentRecordHighlight(data, opponentTeam, leagueId, season, now)}
           accent="crimson"
           align="right"
           status={status}
@@ -287,12 +299,15 @@ export default function LeagueMatchup() {
     draftStatus: leagueQuery.data?.draft?.status,
     leagueStatus: leagueQuery.data?.status,
   });
-  const matchupQuery = useLeagueMatchupTab(parsedLeagueId, selectedWeek, selectedMatchupId, postDraft);
+  const matchupQuery = useLeagueMatchupTab(parsedLeagueId, selectedWeek, selectedMatchupId, postDraft, leagueQuery.data?.season_year);
   const data = matchupQuery.data;
   const myTeam = data?.my_team ?? data?.user_team ?? null;
   const opponentTeam = data?.opponent_team ?? null;
   const displayWeek = data?.week ?? selectedWeek ?? 1;
   const [refreshClock, setRefreshClock] = useState(() => Date.now());
+  useEffect(() => focusManager.subscribe((focused) => {
+    if (focused) setRefreshClock(Date.now());
+  }), []);
   useEffect(() => {
     if (Number.isInteger(parsedLeagueId) && parsedLeagueId > 0) setActiveLeagueId(parsedLeagueId);
   }, [parsedLeagueId, setActiveLeagueId]);
@@ -322,11 +337,20 @@ export default function LeagueMatchup() {
     refreshClock,
   );
   useEffect(() => {
-    if (refreshCountdownSeconds === null && !hasUpcomingKickoff) return;
+    if (refreshCountdownSeconds === null && !hasUpcomingKickoff && !myTeam?.record_highlight && !opponentTeam?.record_highlight) return;
     setRefreshClock(Date.now());
     const interval = window.setInterval(() => setRefreshClock(Date.now()), 1_000);
     return () => window.clearInterval(interval);
   }, [rosteredPlayerIsLive, hasUpcomingKickoff, data?.status, matchupQuery.dataUpdatedAt]);
+  useEffect(() => {
+    const boundary = data?.matchup_week_rollover_at ? Date.parse(data.matchup_week_rollover_at) : NaN;
+    if (!Number.isFinite(boundary)) return;
+    const remaining = boundary - Date.now();
+    const advance = () => { setRefreshClock(Date.now()); void matchupQuery.refetch(); };
+    if (remaining <= 0) { setRefreshClock(Date.now()); return; }
+    const timer = window.setTimeout(advance, Math.min(remaining, 2_147_483_647));
+    return () => window.clearTimeout(timer);
+  }, [data?.matchup_week_rollover_at, parsedLeagueId, selectedWeek, selectedMatchupId, matchupQuery.refetch]);
   const wasLiveRef = useRef(false);
   useEffect(() => {
     if (isLocalKickoffTransition && localKickoffRefreshAt === null) {
@@ -514,6 +538,9 @@ export default function LeagueMatchup() {
             ) : null}
             <CompactMatchupScoreboard
               data={data}
+              leagueId={parsedLeagueId}
+              season={leagueQuery.data?.season_year}
+              now={refreshClock}
               myTeam={myTeam}
               opponentTeam={opponentTeam}
               displayWeek={displayWeek}

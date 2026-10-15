@@ -20,8 +20,11 @@ class InjuryRead(BaseModel):
     notes: str | None = None
     last_updated: datetime
     projection_delta: float | None = None
+    source_url: str | None = None
 
 
 class InjuryList(BaseModel):
     data: list[InjuryRead]
     total: int
+    season: int | None = None
+    week: int | None = None

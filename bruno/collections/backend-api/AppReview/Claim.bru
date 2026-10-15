@@ -1,0 +1,23 @@
+meta {
+  name: Claim iOS Automatic Review Once
+  type: http
+  seq: 2
+}
+post {
+  url: {{base_url}}/app-review/claim
+  body: json
+}
+headers {
+  Authorization: Bearer {{access_token}}
+  Origin: capacitor://localhost
+  X-CFFB-Native-Session: ios
+  X-CFFB-Review-Account: {{review_account_id}}
+}
+body:json {
+  { "app_version": "1.0", "app_build": "local-test" }
+}
+docs {
+  Local test accounts only. Enable IOS_APP_REVIEW_ENABLED in the local API.
+  First POST grants authorization; every subsequent POST returns already_claimed.
+  This consumes lifetime eligibility. Never run against a production user's account.
+}

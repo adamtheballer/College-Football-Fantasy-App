@@ -1,0 +1,601 @@
+{
+  "filters": [
+    {
+      "displayName": "League",
+      "name": "league",
+      "value": "college-football",
+      "options": [
+        {
+          "value": "college-football",
+          "displayValue": "NCAA - Football",
+          "shortDisplayName": "NCAAF"
+        }
+      ]
+    },
+    {
+      "displayName": "Season",
+      "name": "season",
+      "value": "2025",
+      "options": [
+        {
+          "value": "2025",
+          "displayValue": "2025"
+        },
+        {
+          "value": "2024",
+          "displayValue": "2024"
+        },
+        {
+          "value": "2023",
+          "displayValue": "2023"
+        },
+        {
+          "value": "2022",
+          "displayValue": "2022"
+        }
+      ]
+    }
+  ],
+  "names": [
+    "receptions",
+    "receivingYards",
+    "yardsPerReception",
+    "longReception",
+    "receivingTouchdowns",
+    "rushingAttempts",
+    "rushingYards",
+    "yardsPerRushAttempt",
+    "rushingTouchdowns",
+    "longRushing"
+  ],
+  "events": {
+    "401778315": {
+      "id": "401778315",
+      "week": 1,
+      "atVs": "vs",
+      "gameDate": "2025-12-27T01:00:00.000+00:00",
+      "homeTeamId": "2636",
+      "awayTeamId": "2229",
+      "homeTeamScore": "57",
+      "awayTeamScore": "20",
+      "gameResult": "L",
+      "opponent": {
+        "id": "2636",
+        "displayName": "UTSA Roadrunners",
+        "abbreviation": "UTSA"
+      },
+      "team": {
+        "id": "2229",
+        "abbreviation": "FIU"
+      }
+    },
+    "401757311": {
+      "id": "401757311",
+      "week": 14,
+      "atVs": "@",
+      "gameDate": "2025-11-29T18:00:00.000+00:00",
+      "homeTeamId": "2534",
+      "awayTeamId": "2229",
+      "homeTeamScore": "16",
+      "awayTeamScore": "56",
+      "gameResult": "W",
+      "opponent": {
+        "id": "2534",
+        "displayName": "Sam Houston Bearkats",
+        "abbreviation": "SHSU"
+      },
+      "team": {
+        "id": "2229",
+        "abbreviation": "FIU"
+      }
+    },
+    "401757305": {
+      "id": "401757305",
+      "week": 13,
+      "atVs": "vs",
+      "gameDate": "2025-11-22T20:30:00.000+00:00",
+      "homeTeamId": "2229",
+      "awayTeamId": "55",
+      "homeTeamScore": "27",
+      "awayTeamScore": "21",
+      "gameResult": "W",
+      "opponent": {
+        "id": "55",
+        "displayName": "Jacksonville State Gamecocks",
+        "abbreviation": "JVST"
+      },
+      "team": {
+        "id": "2229",
+        "abbreviation": "FIU"
+      }
+    },
+    "401757301": {
+      "id": "401757301",
+      "week": 12,
+      "atVs": "vs",
+      "gameDate": "2025-11-15T22:00:00.000+00:00",
+      "homeTeamId": "2229",
+      "awayTeamId": "2335",
+      "homeTeamScore": "34",
+      "awayTeamScore": "27",
+      "gameResult": "W",
+      "opponent": {
+        "id": "2335",
+        "displayName": "Liberty Flames",
+        "abbreviation": "LIB"
+      },
+      "team": {
+        "id": "2229",
+        "abbreviation": "FIU"
+      }
+    },
+    "401757296": {
+      "id": "401757296",
+      "week": 11,
+      "atVs": "@",
+      "gameDate": "2025-11-08T20:00:00.000+00:00",
+      "homeTeamId": "2393",
+      "awayTeamId": "2229",
+      "homeTeamScore": "30",
+      "awayTeamScore": "56",
+      "gameResult": "W",
+      "opponent": {
+        "id": "2393",
+        "displayName": "Middle Tennessee Blue Raiders",
+        "abbreviation": "MTSU"
+      },
+      "team": {
+        "id": "2229",
+        "abbreviation": "FIU"
+      }
+    },
+    "401757291": {
+      "id": "401757291",
+      "week": 10,
+      "atVs": "@",
+      "gameDate": "2025-10-30T00:00:00.000+00:00",
+      "homeTeamId": "2623",
+      "awayTeamId": "2229",
+      "homeTeamScore": "28",
+      "awayTeamScore": "21",
+      "gameResult": "L",
+      "opponent": {
+        "id": "2623",
+        "displayName": "Missouri State Bears",
+        "abbreviation": "MOST"
+      },
+      "team": {
+        "id": "2229",
+        "abbreviation": "FIU"
+      }
+    },
+    "401757285": {
+      "id": "401757285",
+      "week": 9,
+      "atVs": "vs",
+      "gameDate": "2025-10-21T23:00:00.000+00:00",
+      "homeTeamId": "2229",
+      "awayTeamId": "338",
+      "homeTeamScore": "26",
+      "awayTeamScore": "45",
+      "gameResult": "L",
+      "opponent": {
+        "id": "338",
+        "displayName": "Kennesaw State Owls",
+        "abbreviation": "KENN"
+      },
+      "team": {
+        "id": "2229",
+        "abbreviation": "FIU"
+      }
+    },
+    "401757281": {
+      "id": "401757281",
+      "week": 8,
+      "atVs": "@",
+      "gameDate": "2025-10-15T00:00:00.000+00:00",
+      "homeTeamId": "98",
+      "awayTeamId": "2229",
+      "homeTeamScore": "6",
+      "awayTeamScore": "25",
+      "gameResult": "W",
+      "opponent": {
+        "id": "98",
+        "displayName": "Western Kentucky Hilltoppers",
+        "abbreviation": "WKU"
+      },
+      "team": {
+        "id": "2229",
+        "abbreviation": "FIU"
+      }
+    },
+    "401757171": {
+      "id": "401757171",
+      "week": 6,
+      "atVs": "@",
+      "gameDate": "2025-10-04T19:30:00.000+00:00",
+      "homeTeamId": "41",
+      "awayTeamId": "2229",
+      "homeTeamScore": "51",
+      "awayTeamScore": "10",
+      "gameResult": "L",
+      "opponent": {
+        "id": "41",
+        "displayName": "UConn Huskies",
+        "abbreviation": "CONN"
+      },
+      "team": {
+        "id": "2229",
+        "abbreviation": "FIU"
+      }
+    },
+    "401757259": {
+      "id": "401757259",
+      "week": 4,
+      "atVs": "vs",
+      "gameDate": "2025-09-20T22:00:00.000+00:00",
+      "homeTeamId": "2229",
+      "awayTeamId": "48",
+      "homeTeamScore": "16",
+      "awayTeamScore": "38",
+      "gameResult": "L",
+      "opponent": {
+        "id": "48",
+        "displayName": "Delaware Blue Hens",
+        "abbreviation": "DEL"
+      },
+      "team": {
+        "id": "2229",
+        "abbreviation": "FIU"
+      }
+    },
+    "401757233": {
+      "id": "401757233",
+      "week": 3,
+      "atVs": "vs",
+      "gameDate": "2025-09-14T00:30:00.000+00:00",
+      "homeTeamId": "2229",
+      "awayTeamId": "2226",
+      "homeTeamScore": "38",
+      "awayTeamScore": "28",
+      "gameResult": "W",
+      "opponent": {
+        "id": "2226",
+        "displayName": "Florida Atlantic Owls",
+        "abbreviation": "FAU"
+      },
+      "team": {
+        "id": "2229",
+        "abbreviation": "FIU"
+      }
+    },
+    "401752811": {
+      "id": "401752811",
+      "week": 2,
+      "atVs": "@",
+      "gameDate": "2025-09-06T16:00:00.000+00:00",
+      "homeTeamId": "213",
+      "awayTeamId": "2229",
+      "homeTeamScore": "34",
+      "awayTeamScore": "0",
+      "gameResult": "L",
+      "opponent": {
+        "id": "213",
+        "displayName": "Penn State Nittany Lions",
+        "abbreviation": "PSU"
+      },
+      "team": {
+        "id": "2229",
+        "abbreviation": "FIU"
+      }
+    },
+    "401766898": {
+      "id": "401766898",
+      "week": 1,
+      "atVs": "vs",
+      "gameDate": "2025-08-30T00:15:00.000+00:00",
+      "homeTeamId": "2229",
+      "awayTeamId": "2065",
+      "homeTeamScore": "42",
+      "awayTeamScore": "9",
+      "gameResult": "W",
+      "opponent": {
+        "id": "2065",
+        "displayName": "Bethune-Cookman Wildcats",
+        "abbreviation": "BCU"
+      },
+      "team": {
+        "id": "2229",
+        "abbreviation": "FIU"
+      }
+    }
+  },
+  "seasonTypes": [
+    {
+      "displayName": "2025 Postseason",
+      "displayTeam": "FIU",
+      "categories": [
+        {
+          "displayName": "Postseason",
+          "type": "event",
+          "splitType": "3",
+          "events": [
+            {
+              "eventId": "401778315",
+              "stats": [
+                "3",
+                "24",
+                "8.0",
+                "14",
+                "0",
+                "0",
+                "0",
+                "0.0",
+                "0",
+                "0"
+              ]
+            }
+          ],
+          "totals": [
+            "56",
+            "840",
+            "15.0",
+            "64",
+            "9",
+            "0",
+            "0",
+            "0.0",
+            "0",
+            "0"
+          ]
+        }
+      ],
+      "summary": {
+        "displayName": "Postseason",
+        "stats": [
+          {
+            "displayName": "Totals",
+            "stats": [
+              "56",
+              "840",
+              "15.0",
+              "64",
+              "9",
+              "0",
+              "0",
+              "0.0",
+              "0",
+              "0"
+            ],
+            "type": "total"
+          }
+        ]
+      }
+    },
+    {
+      "displayName": "2025 Regular Season",
+      "categories": [
+        {
+          "displayName": "Regular Season Stats",
+          "type": "event",
+          "splitType": "2",
+          "events": [
+            {
+              "eventId": "401757311",
+              "stats": [
+                "7",
+                "140",
+                "20.0",
+                "35",
+                "2",
+                "0",
+                "0",
+                "0.0",
+                "0",
+                "0"
+              ]
+            },
+            {
+              "eventId": "401757305",
+              "stats": [
+                "4",
+                "109",
+                "27.3",
+                "64",
+                "1",
+                "0",
+                "0",
+                "0.0",
+                "0",
+                "0"
+              ]
+            },
+            {
+              "eventId": "401757301",
+              "stats": [
+                "8",
+                "88",
+                "11.0",
+                "36",
+                "1",
+                "0",
+                "0",
+                "0.0",
+                "0",
+                "0"
+              ]
+            },
+            {
+              "eventId": "401757296",
+              "stats": [
+                "5",
+                "71",
+                "14.2",
+                "20",
+                "2",
+                "0",
+                "0",
+                "0.0",
+                "0",
+                "0"
+              ]
+            },
+            {
+              "eventId": "401757291",
+              "stats": [
+                "3",
+                "53",
+                "17.7",
+                "25",
+                "1",
+                "0",
+                "0",
+                "0.0",
+                "0",
+                "0"
+              ]
+            },
+            {
+              "eventId": "401757285",
+              "stats": [
+                "7",
+                "75",
+                "10.7",
+                "35",
+                "0",
+                "0",
+                "0",
+                "0.0",
+                "0",
+                "0"
+              ]
+            },
+            {
+              "eventId": "401757281",
+              "stats": [
+                "3",
+                "86",
+                "28.7",
+                "36",
+                "0",
+                "0",
+                "0",
+                "0.0",
+                "0",
+                "0"
+              ]
+            },
+            {
+              "eventId": "401757171",
+              "stats": [
+                "4",
+                "32",
+                "8.0",
+                "11",
+                "0",
+                "0",
+                "0",
+                "0.0",
+                "0",
+                "0"
+              ]
+            },
+            {
+              "eventId": "401757259",
+              "stats": [
+                "5",
+                "84",
+                "16.8",
+                "47",
+                "1",
+                "0",
+                "0",
+                "0.0",
+                "0",
+                "0"
+              ]
+            },
+            {
+              "eventId": "401757233",
+              "stats": [
+                "2",
+                "46",
+                "23.0",
+                "26",
+                "1",
+                "0",
+                "0",
+                "0.0",
+                "0",
+                "0"
+              ]
+            },
+            {
+              "eventId": "401752811",
+              "stats": [
+                "2",
+                "15",
+                "7.5",
+                "13",
+                "0",
+                "0",
+                "0",
+                "0.0",
+                "0",
+                "0"
+              ]
+            },
+            {
+              "eventId": "401766898",
+              "stats": [
+                "3",
+                "17",
+                "5.7",
+                "11",
+                "0",
+                "0",
+                "0",
+                "0.0",
+                "0",
+                "0"
+              ]
+            }
+          ],
+          "totals": [
+            "53",
+            "816",
+            "15.4",
+            "64",
+            "9",
+            "0",
+            "0",
+            "0.0",
+            "0",
+            "0"
+          ]
+        }
+      ],
+      "summary": {
+        "displayName": "Regular Season Stats",
+        "stats": [
+          {
+            "displayName": "Totals",
+            "stats": [
+              "53",
+              "816",
+              "15.4",
+              "64",
+              "9",
+              "0",
+              "0",
+              "0.0",
+              "0",
+              "0"
+            ],
+            "type": "total"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from datetime import datetime, time, timedelta, timezone
 from hashlib import sha256
-from typing import Literal
 from uuid import NAMESPACE_URL, uuid5
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -31,6 +30,7 @@ from collegefootballfantasy_api.app.models.notification import (
     NotificationLog,
     NotificationPreference,
     PushToken,
+    NewsAnnouncement,
 )
 from collegefootballfantasy_api.app.models.scheduled_notification import ScheduledNotification
 from collegefootballfantasy_api.app.models.team import Team
@@ -51,9 +51,13 @@ from collegefootballfantasy_api.app.services.notification_providers import (
     PushNotificationProvider,
     get_email_provider,
     get_push_provider,
+    verify_subscription_identity,
 )
 from collegefootballfantasy_api.app.services.notification_events import (
     NotificationScope,
+    RETIRED_PLAY_EVENTS,
+    RETIRED_PLAY_PREFERENCES,
+    is_retired_play_event,
     canonical_event_type,
     destination_for_event,
     get_notification_event,
@@ -127,14 +131,40 @@ def _serialize_log(row: NotificationLog) -> NotificationRead:
 
 
 def _notification_log_user_filter(user_id: int):
-    return or_(
-        NotificationLog.user_id == user_id,
-        and_(NotificationLog.user_id.is_(None), NotificationLog.user_key == legacy_user_key(user_id)),
+    return and_(
+        or_(NotificationLog.user_id == user_id,
+            and_(NotificationLog.user_id.is_(None), NotificationLog.user_key == legacy_user_key(user_id))),
+        func.upper(func.trim(NotificationLog.alert_type)).notin_(RETIRED_PLAY_EVENTS),
+        ~func.lower(func.trim(func.coalesce(NotificationLog.event_key, ""))).startswith("big_play:", autoescape=True),
     )
 
 
 def register_push_token(db: Session, current_user_id: int, payload: PushTokenCreate) -> PushTokenRead:
-    """Race-safe upsert of a provider subscription without returning its ID."""
+    """Only the authenticated account and verified installation may bind a device."""
+    if payload.account_id is not None and payload.account_id != current_user_id:
+        raise PermissionError("account changed")
+    secret_hash = sha256(payload.installation_secret.encode()).hexdigest() if payload.installation_secret else None
+    if payload.platform == "ios" and not all((payload.installation_id, secret_hash, payload.app_id, payload.account_id)):
+        raise PermissionError("native installation metadata is required")
+    if bool(payload.installation_id) != bool(secret_hash):
+        raise PermissionError("installation metadata is incomplete")
+    if settings.is_production and settings.push_provider != "onesignal":
+        raise RuntimeError("Phone registration is not configured on this server.")
+    if (settings.push_notifications_enabled or settings.is_production) and settings.push_provider == "onesignal":
+        if not settings.onesignal_app_id or not settings.onesignal_app_api_key:
+            raise RuntimeError("Phone registration is not configured on this server.")
+        if payload.app_id and payload.app_id != settings.onesignal_app_id:
+            raise PermissionError("push app does not match")
+        verify_subscription_identity(payload.subscription_id, external_user_identity(current_user_id))
+    if payload.installation_id:
+        prior = db.query(PushToken).filter(PushToken.installation_id == payload.installation_id).with_for_update().all()
+        if any(row.installation_secret_hash != secret_hash for row in prior):
+            raise PermissionError("installation does not match")
+        for row in prior:
+            if row.device_token != payload.subscription_id or row.user_id != current_user_id:
+                row.enabled = False
+        db.flush()
+
     active = (
         db.query(PushToken)
         .filter(PushToken.device_token == payload.subscription_id, PushToken.enabled.is_(True))
@@ -188,6 +218,10 @@ def register_push_token(db: Session, current_user_id: int, payload: PushTokenCre
     existing.provider = payload.provider
     existing.external_user_id = external_user_identity(current_user_id)
     existing.enabled = True
+    existing.installation_id = payload.installation_id
+    existing.installation_secret_hash = secret_hash
+    existing.app_id = payload.app_id
+    existing.environment = payload.environment
     db.add(existing)
     db.commit()
     db.refresh(existing)
@@ -197,6 +231,7 @@ def register_push_token(db: Session, current_user_id: int, payload: PushTokenCre
         provider=existing.provider,
         platform=existing.platform,
         enabled=existing.enabled,
+        delivery_configured=settings.push_notifications_enabled,
     )
 
 
@@ -213,19 +248,23 @@ def disable_push_subscription(db: Session, *, current_user_id: int, subscription
     db.commit()
 
 
-def detach_push_subscriptions(db: Session, *, current_user_id: int) -> int:
-    """Disable this account's active browser subscriptions before OneSignal logout.
-
-    This intentionally leaves the rows and their previous owner intact.  A
-    later account can claim the subscription only after this explicit detach.
-    """
-    disabled = (
-        db.query(PushToken)
-        .filter(PushToken.user_id == current_user_id, PushToken.enabled.is_(True))
-        .update({PushToken.enabled: False}, synchronize_session=False)
-    )
+def detach_push_subscriptions(db: Session, *, current_user_id: int, payload=None) -> int:
+    # Empty legacy requests must not detach the user's other phones.
+    if payload is None or not (payload.subscription_id or payload.installation_id):
+        return 0
+    if payload.account_id is not None and payload.account_id != current_user_id:
+        raise PermissionError("account changed")
+    query = db.query(PushToken).filter(PushToken.user_id == current_user_id, PushToken.enabled.is_(True))
+    if payload.installation_id:
+        digest = sha256((payload.installation_secret or "").encode()).hexdigest()
+        query = query.filter(PushToken.installation_id == payload.installation_id, PushToken.installation_secret_hash == digest)
+    else:
+        query = query.filter(PushToken.device_token == payload.subscription_id)
+    rows = query.with_for_update().all()
+    for row in rows:
+        row.enabled = False
     db.commit()
-    return int(disabled)
+    return len(rows)
 
 
 def get_notification_preferences(db: Session, current_user_id: int) -> NotificationPreferences:
@@ -234,13 +273,12 @@ def get_notification_preferences(db: Session, current_user_id: int) -> Notificat
         return NotificationPreferences()
     return NotificationPreferences(
         push_enabled=prefs.push_enabled,
+        push_drafts=prefs.push_drafts, push_matchups=prefs.push_matchups,
+        push_injuries=prefs.push_injuries, push_major_news=prefs.push_major_news,
         email_enabled=prefs.email_enabled,
         draft_alerts=prefs.draft_alerts,
         injury_alerts=prefs.injury_alerts,
         injury_alert_scope=(prefs.injury_alert_scope or "ALL").upper(),
-        # Retain this legacy API property for already-installed clients, but
-        # never reactivate a standalone touchdown alert.
-        touchdown_alerts=False,
         usage_alerts=prefs.usage_alerts,
         waiver_alerts=prefs.waiver_alerts,
         projection_alerts=prefs.projection_alerts,
@@ -250,10 +288,6 @@ def get_notification_preferences(db: Session, current_user_id: int) -> Notificat
         matchup_results=prefs.matchup_results,
         matchup_start_alerts=prefs.matchup_start_alerts,
         matchup_result_alerts=prefs.matchup_result_alerts,
-        big_play_alerts=prefs.big_play_alerts,
-        long_rush_alerts=prefs.long_rush_alerts,
-        long_reception_alerts=prefs.long_reception_alerts,
-        long_pass_alerts=prefs.long_pass_alerts,
         quiet_hours_start=prefs.quiet_hours_start,
         quiet_hours_end=prefs.quiet_hours_end,
         timezone=prefs.timezone,
@@ -266,18 +300,13 @@ def update_notification_preferences(
     prefs = db.query(NotificationPreference).filter(NotificationPreference.user_id == current_user_id).first()
     if not prefs:
         prefs = NotificationPreference(user_id=current_user_id, user_key=legacy_user_key(current_user_id))
-    # Big Plays is the master switch.  Turning it off also clears every
-    # long-play child control, so a later re-enable always requires an
-    # explicit choice of the desired sub-alerts. Touchdowns are no longer a
-    # product notification type; retain the storage field only for clients
-    # built before this release.
-    payload.touchdown_alerts = False
+    # Old clients can send retired keys, but cannot restore their storage flags.
+    for field in RETIRED_PLAY_PREFERENCES:
+        setattr(prefs, field, False)
     payload.injury_alert_scope = payload.injury_alert_scope.upper()
-    if not payload.big_play_alerts:
-        payload.long_rush_alerts = False
-        payload.long_reception_alerts = False
-        payload.long_pass_alerts = False
     for field in NotificationPreferences.model_fields:
+        if field.startswith("push_") and field not in payload.model_fields_set:
+            continue
         setattr(prefs, field, getattr(payload, field))
     prefs.user_id = current_user_id
     prefs.user_key = legacy_user_key(current_user_id)
@@ -306,63 +335,35 @@ def list_user_alerts(db: Session, current_user_id: int, limit: int = 50) -> Noti
 
 
 def log_official_injury_update(
-    db: Session,
-    *,
-    player: Player,
-    season: int,
-    week: int,
-    status: str,
-    content_hash: str,
-    source_url: str | None,
-    detail: str | None,
+    db: Session, *, player: Player, season: int, week: int, status: str,
+    content_hash: str, source_url: str | None, detail: str | None,
+    previous_status: str | None = None, availability_event_id: int | None = None,
 ) -> int:
-    """Write one deduplicated alert for each rostered, opted-in manager."""
-    roster_rows = (
-        db.query(Team.owner_user_id, Team.league_id)
-        .join(RosterEntry, RosterEntry.team_id == Team.id)
-        .filter(RosterEntry.player_id == player.id, Team.owner_user_id.is_not(None))
-        .distinct()
-        .all()
-    )
-    created = 0
+    """First snapshots and notes-only changes never create injury alerts."""
+    from collegefootballfantasy_api.app.services.injury_status import normalize_injury_status
+    severity = {"QUESTIONABLE": 1, "DOUBTFUL": 2, "OUT": 3, "IR": 3, "OUT_FOR_SEASON": 3}
+    before = normalize_injury_status(previous_status) if previous_status is not None else None
+    after = normalize_injury_status(status)
+    if before is None or severity.get(after, 0) <= severity.get(before, 0):
+        return 0
+    if availability_event_id is None:
+        return 0  # a verified persisted change is required, not an arbitrary caller payload
+    roster_rows = db.query(Team.owner_user_id, Team.league_id).join(RosterEntry, RosterEntry.team_id == Team.id).filter(
+        RosterEntry.player_id == player.id, Team.owner_user_id.is_not(None), func.lower(RosterEntry.status) == "active"
+    ).distinct().all()
+    leagues_by_user: dict[int, list[int]] = {}
     for user_id, league_id in roster_rows:
-        if user_id is None or league_id is None:
-            continue
-        global_prefs = db.query(NotificationPreference).filter(NotificationPreference.user_id == user_id).one_or_none()
-        if global_prefs is not None and not global_prefs.injury_alerts:
-            continue
-        if global_prefs is not None and (global_prefs.injury_alert_scope or "ALL").upper() == "SELECTED":
-            league_pref = (
-                db.query(NotificationLeaguePreference)
-                .filter(NotificationLeaguePreference.user_id == user_id, NotificationLeaguePreference.league_id == league_id)
-                .one_or_none()
-            )
-            if not _league_pref_allows("INJURY", "INJURY", league_pref):
-                continue
-        event_key = f"official-injury:{user_id}:{league_id}:{player.id}:{content_hash}"
-        if db.query(NotificationLog.id).filter(NotificationLog.event_key == event_key).first():
-            continue
-        status_label = "IR" if status == "IR" else ("Out" if status == "OUT" else "Questionable" if status == "QUESTIONABLE" else "Available")
-        db.add(
-            NotificationLog(
-                user_id=user_id,
-                user_key=legacy_user_key(user_id),
-                league_id=league_id,
-                category="INJURY",
-                scope="direct_user",
-                event_key=event_key,
-                alert_type="INJURY",
-                title=f"{player.name}: {status_label}",
-                body=detail or f"Official availability report lists {player.name} as {status_label}.",
-                payload={
-                    "player_id": player.id, "league_id": league_id, "season": season, "week": week,
-                    "status": status, "content_hash": content_hash, "source_url": source_url,
-                },
-                sent_at=utcnow(),
-            )
+        if league_id is not None:
+            leagues_by_user.setdefault(user_id, []).append(league_id)
+    for user_id, leagues in leagues_by_user.items():
+        queue_notification_event(
+            db, league_id=min(leagues), user_id=user_id, event_type="INJURY",
+            event_key=f"injury:{availability_event_id}:{user_id}", channels=("in_app", "push"),
+            title=f"Injury update: {player.name}", body=f"{player.name} is now {after.replace('_', ' ').title()}. Check your lineup.",
+            payload={"player_id": player.id, "season": season, "week": week, "status": after,
+                     "availability_event_id": availability_event_id, "source_url": source_url, "league_ids": sorted(leagues)},
         )
-        created += 1
-    return created
+    return len(leagues_by_user)
 
 
 def mark_notification_read(db: Session, *, current_user_id: int, notification_id: int, read: bool = True) -> NotificationRead | None:
@@ -408,7 +409,6 @@ def get_league_preferences(db: Session, current_user_id: int) -> LeagueNotificat
                 league_name=league.name,
                 enabled=pref.enabled if (pref := pref_by_league.get(league.id)) else True,
                 injury_alerts=pref.injury_alerts if pref else True,
-                big_play_alerts=pref.big_play_alerts if pref else True,
                 projection_alerts=pref.projection_alerts if pref else True,
                 draft_alerts=pref.draft_alerts if pref else True,
                 trade_alerts=pref.trade_alerts if pref else True,
@@ -416,10 +416,6 @@ def get_league_preferences(db: Session, current_user_id: int) -> LeagueNotificat
                 matchup_start_alerts=pref.matchup_start_alerts if pref else True,
                 matchup_result_alerts=pref.matchup_result_alerts if pref else True,
                 lineup_reminders=pref.lineup_reminders if pref else True,
-                touchdown_alerts=False,
-                long_rush_alerts=pref.long_rush_alerts if pref else False,
-                long_reception_alerts=pref.long_reception_alerts if pref else False,
-                long_pass_alerts=pref.long_pass_alerts if pref else False,
             )
             for _membership, league in memberships
         ]
@@ -445,14 +441,10 @@ def update_league_preferences(
             pref = NotificationLeaguePreference(
                 user_id=current_user_id, user_key=legacy_user_key(current_user_id), league_id=item.league_id
             )
-        item.touchdown_alerts = False
-        if not item.big_play_alerts:
-            item.long_rush_alerts = False
-            item.long_reception_alerts = False
-            item.long_pass_alerts = False
+        for field in RETIRED_PLAY_PREFERENCES:
+            setattr(pref, field, False)
         pref.enabled = item.enabled
         pref.injury_alerts = item.injury_alerts
-        pref.big_play_alerts = item.big_play_alerts
         pref.projection_alerts = item.projection_alerts
         pref.draft_alerts = item.draft_alerts
         pref.trade_alerts = item.trade_alerts
@@ -460,10 +452,6 @@ def update_league_preferences(
         pref.matchup_start_alerts = item.matchup_start_alerts
         pref.matchup_result_alerts = item.matchup_result_alerts
         pref.lineup_reminders = item.lineup_reminders
-        pref.touchdown_alerts = False
-        pref.long_rush_alerts = item.long_rush_alerts
-        pref.long_reception_alerts = item.long_reception_alerts
-        pref.long_pass_alerts = item.long_pass_alerts
         db.add(pref)
     db.commit()
     return get_league_preferences(db, current_user_id)
@@ -472,7 +460,7 @@ def update_league_preferences(
 def queue_notification_event(
     db: Session,
     *,
-    league_id: int,
+    league_id: int | None,
     user_id: int,
     event_type: str,
     event_key: str,
@@ -485,6 +473,8 @@ def queue_notification_event(
 ) -> ScheduledNotification:
     """Create the durable per-recipient event exactly once in the caller transaction."""
     normalized_event_type = canonical_event_type(event_type)
+    if is_retired_play_event(normalized_event_type, event_key=event_key):
+        raise ValueError("play notifications have been retired")
     definition = get_notification_event(normalized_event_type)
     scope = scope or definition.privacy_scope.value
     if scope not in NOTIFICATION_SCOPES:
@@ -523,8 +513,8 @@ def queue_notification_event(
                     )
                 )
         return existing
-    league = db.get(League, league_id)
-    if league is None:
+    league = db.get(League, league_id) if league_id is not None else None
+    if league is None and normalized_event_type != "MAJOR_NEWS":
         raise ValueError("notification league does not exist")
     payload_data = dict(payload or {})
     payload_data["league_id"] = league_id
@@ -532,7 +522,7 @@ def queue_notification_event(
     if destination is not None:
         payload_data["destination"] = destination
     payload_data["scope"] = scope
-    category, default_title, default_body = _event_metadata(normalized_event_type, payload_data, league.name)
+    category, default_title, default_body = _event_metadata(normalized_event_type, payload_data, league.name if league else "College football")
     try:
         with db.begin_nested():
             scheduled = ScheduledNotification(
@@ -545,6 +535,7 @@ def queue_notification_event(
                 event_key=event_key,
                 scope=scope,
                 scheduled_for=_as_utc(scheduled_for or utcnow()),
+                expires_at=_as_utc(scheduled_for or utcnow()) + timedelta(seconds=_event_ttl(normalized_event_type)),
                 title=title or default_title,
                 body=body or default_body,
                 payload=payload_data,
@@ -749,6 +740,7 @@ def rebuild_matchup_start_notifications(db: Session, *, league_id: int, season: 
                 schedule_changed = _as_utc(existing.scheduled_for) != kickoff
                 revision_changed = (existing.payload or {}).get("kickoff_revision") != revision
                 existing.scheduled_for = kickoff
+                existing.expires_at = kickoff + timedelta(seconds=_event_ttl("MATCHUP_START"))
                 existing.payload = {
                     **payload,
                     "league_id": league_id,
@@ -931,33 +923,6 @@ def queue_certified_matchup_final_notifications(db: Session, matchup: Matchup) -
     return queued
 
 
-def intake_typed_big_play_notification(
-    db: Session,
-    *,
-    league_id: int,
-    user_id: int,
-    event_type: Literal["LONG_RUSH", "LONG_RECEPTION", "LONG_PASS"],
-    event_key: str,
-    player_id: int,
-    play_yards: int | None = None,
-) -> ScheduledNotification | None:
-    """Typed intake only; live data polling/inference remains intentionally absent."""
-    if not settings.live_player_notifications_enabled:
-        return None
-    definition = get_notification_event(event_type)
-    if definition.minimum_yards is None or play_yards is None or play_yards < definition.minimum_yards:
-        return None
-    return queue_notification_event(
-        db,
-        league_id=league_id,
-        user_id=user_id,
-        event_type=event_type,
-        event_key=event_key,
-        payload={"player_id": player_id},
-        scope=NotificationScope.LEAGUE_MEMBER.value,
-    )
-
-
 def cancel_scheduled_notifications(
     db: Session,
     league_id: int,
@@ -999,8 +964,6 @@ def _pref_allows_category(category: str, alert_type: str, prefs: NotificationPre
     if prefs is None:
         return True
     preference = get_notification_event(alert_type).global_preference
-    if alert_type in {"LONG_RUSH", "LONG_RECEPTION", "LONG_PASS"} and not prefs.big_play_alerts:
-        return False
     return bool(getattr(prefs, preference, True)) if preference else True
 
 
@@ -1010,8 +973,6 @@ def _league_pref_allows(category: str, alert_type: str, pref: NotificationLeague
     if not pref.enabled:
         return False
     preference = get_notification_event(alert_type).league_preference
-    if alert_type in {"LONG_RUSH", "LONG_RECEPTION", "LONG_PASS"} and not pref.big_play_alerts:
-        return False
     return bool(getattr(pref, preference, True)) if preference else True
 
 
@@ -1081,7 +1042,8 @@ def _latest_attempts(db: Session, row: ScheduledNotification) -> dict[str, Notif
     )
     latest: dict[str, NotificationDeliveryAttempt] = {}
     for attempt in attempts:
-        latest.setdefault(attempt.channel, attempt)
+        key = f"push:{attempt.push_token_id}" if attempt.push_token_id is not None else attempt.channel
+        latest.setdefault(key, attempt)
     return latest
 
 
@@ -1128,6 +1090,7 @@ def _schedule_retry(db: Session, attempt: NotificationDeliveryAttempt, *, now: d
             scheduled_notification_id=attempt.scheduled_notification_id,
             user_id=attempt.user_id,
             channel=attempt.channel,
+            push_token_id=attempt.push_token_id,
             attempt_number=attempt.attempt_number + 1,
             status="pending",
             next_retry_at=next_retry_at,
@@ -1155,12 +1118,15 @@ def _process_attempt(
     if attempt.status != "pending" or (attempt.next_retry_at and _as_utc(attempt.next_retry_at) > now):
         return
     _heartbeat_claim(db, row, now=now, worker_id=worker_id)
+    if attempt.channel == "push" and row.expires_at and _as_utc(row.expires_at) <= now:
+        _mark_attempt(db, attempt, status="expired", now=now, error_message="event expired before device dispatch")
+        return
     event_type = (row.event_type or row.notification_type).upper()
     # Category and league controls govern every notification surface,
     # including the in-app center. Delivery-channel controls below govern
     # only their corresponding external channel, so turning off push/email
     # does not erase an otherwise-enabled in-app notification.
-    if not _pref_allows_category(row.category, event_type, prefs) or not _league_pref_allows(row.category, event_type, league_pref):
+    if attempt.channel != "push" and (not _pref_allows_category(row.category, event_type, prefs) or not _league_pref_allows(row.category, event_type, league_pref)):
         _mark_attempt(db, attempt, status="skipped", now=now, error_message="disabled by notification preference")
         return
     if attempt.channel == "in_app":
@@ -1189,17 +1155,15 @@ def _process_attempt(
         if not settings.push_notifications_enabled or not (prefs is None or prefs.push_enabled):
             _mark_attempt(db, attempt, status="skipped", now=now, error_message="push delivery is disabled")
             return
-        # The provider targets the stable external user identity rather than a
-        # raw browser token. Still require an enabled local subscription so an
-        # old OneSignal alias cannot receive a notification after a user has
-        # removed every registered device from this application.
-        if (
-            db.query(PushToken.id)
-            .filter(PushToken.user_id == user.id, PushToken.provider == "onesignal", PushToken.enabled.is_(True))
-            .first()
-            is None
-        ):
-            _mark_attempt(db, attempt, status="skipped", now=now, error_message="no active push subscription")
+        if not _phone_category_allowed(event_type, prefs) or not _league_pref_allows(row.category, event_type, league_pref):
+            _mark_attempt(db, attempt, status="skipped", now=now, error_message="phone category is disabled")
+            return
+        token = db.query(PushToken).filter(PushToken.id == attempt.push_token_id).populate_existing().with_for_update().one_or_none()
+        if token is None or not token.enabled or token.user_id != user.id or token.provider != "onesignal":
+            _mark_attempt(db, attempt, status="skipped", now=now, error_message="device is no longer bound")
+            return
+        if settings.onesignal_app_id and token.app_id and token.app_id != settings.onesignal_app_id:
+            _mark_attempt(db, attempt, status="skipped", now=now, error_message="device app does not match")
             return
         definition = get_notification_event(event_type)
         if definition.quiet_hours_apply and prefs:
@@ -1215,8 +1179,13 @@ def _process_attempt(
                 external_user_id=external_user_identity(user.id),
                 title=row.title or "",
                 body=row.body or "",
-                data={"destination": (row.payload or {}).get("destination"), "event_type": event_type},
-                idempotency_key=_provider_idempotency_key("push", row.event_key or f"legacy-scheduled:{row.id}"),
+                data={"destination": (row.payload or {}).get("destination"), "event_type": event_type,
+                      "recipient_user_id": user.id, "event_id": row.id, "expires_at": int(_as_utc(row.expires_at).timestamp())},
+                subscription_id=token.device_token,
+                private_alert=token.platform == "ios",
+                ttl=max(1, int((_as_utc(row.expires_at) - now).total_seconds())),
+                badge_count=int(db.query(func.count(NotificationLog.id)).filter(_notification_log_user_filter(user.id), NotificationLog.read_at.is_(None)).scalar() or 0),
+                idempotency_key=_provider_idempotency_key(f"push:{token.id}", row.event_key or f"legacy-scheduled:{row.id}"),
             )
         except Exception:
             if attempt.attempt_number < settings.notification_max_attempts:
@@ -1265,7 +1234,7 @@ def _process_attempt(
                 )
                 .update({PushToken.enabled: False}, synchronize_session=False)
             )
-        _mark_attempt(db, attempt, status="failed", now=now, error_message=result.error or "provider delivery failed")
+        _mark_attempt(db, attempt, status="invalid_token" if result.invalid_subscription_id else "failed", now=now, error_message=result.error or "provider delivery failed")
 
 
 def _refresh_event_state(db: Session, row: ScheduledNotification, now: datetime) -> None:
@@ -1277,7 +1246,11 @@ def _refresh_event_state(db: Session, row: ScheduledNotification, now: datetime)
         row.claimed_at = None
         row.claim_heartbeat_at = None
         row.claimed_by = None
-    elif any(attempt.status == "failed" for attempt in latest.values()):
+    elif any(attempt.status == "expired" for attempt in latest.values()):
+        row.status = "expired"
+        row.completed_at = now
+        row.claimed_at = row.claim_heartbeat_at = row.claimed_by = None
+    elif any(attempt.status in {"failed", "invalid_token"} for attempt in latest.values()):
         row.status = "dead_letter"
         row.completed_at = now
         row.claimed_at = None
@@ -1344,6 +1317,8 @@ def process_due_notifications_once(
     claimed_ids = _claim_due_events(db, now=current, worker_id=worker_id, limit=max(1, min(limit, 500)))
     summary = {"claimed": len(claimed_ids), "delivered": 0, "provider_accepted": 0, "retried": 0, "failed": 0, "skipped": 0}
     for event_id in claimed_ids:
+        if now is None:
+            current = utcnow()
         row = (
             db.query(ScheduledNotification)
             .filter(ScheduledNotification.id == event_id, ScheduledNotification.status == "claimed", ScheduledNotification.claimed_by == worker_id)
@@ -1353,16 +1328,29 @@ def process_due_notifications_once(
         if row is None:
             continue
         try:
+            # Cancel retired rows before content rendering, fanout or provider calls.
+            if is_retired_play_event(row.event_type, row.notification_type, event_key=row.event_key):
+                row.canceled_at = current
+                _finish_ineligible(db, row, current, "canceled", "play alerts retired")
+                summary["skipped"] += 1
+                continue
             _ensure_legacy_content(db, row)
             _ensure_in_app_attempt(db, row)
-            user = db.get(User, row.user_id)
+            row.expires_at = row.expires_at or _as_utc(row.scheduled_for) + timedelta(seconds=_event_ttl(row.event_type or row.notification_type))
+            if _as_utc(row.expires_at) <= current:
+                _finish_ineligible(db, row, current, "expired", "event expired")
+                summary["skipped"] += 1
+                continue
+            user = db.query(User).filter(User.id == row.user_id).with_for_update().one_or_none()
             membership_exists = user is not None and (
                 db.query(LeagueMember.id)
                 .filter(LeagueMember.league_id == row.league_id, LeagueMember.user_id == user.id)
                 .first()
                 is not None
             )
-            if user is None or not user.is_active or not membership_exists:
+            if row.league_id is None and row.event_type == "MAJOR_NEWS":
+                membership_exists = True
+            if user is None or not user.is_active or not _event_still_eligible(db, row, user) or (not membership_exists and row.event_type != "INJURY"):
                 row.status = "canceled"
                 row.completed_at = current
                 row.canceled_at = current
@@ -1376,12 +1364,13 @@ def process_due_notifications_once(
                 db.commit()
                 summary["skipped"] += 1
                 continue
-            prefs = db.query(NotificationPreference).filter(NotificationPreference.user_id == user.id).one_or_none()
+            prefs = db.query(NotificationPreference).filter(NotificationPreference.user_id == user.id).with_for_update().one_or_none()
             league_pref = (
                 db.query(NotificationLeaguePreference)
                 .filter(NotificationLeaguePreference.user_id == user.id, NotificationLeaguePreference.league_id == row.league_id)
                 .one_or_none()
             )
+            _ensure_device_attempts(db, row, user, current)
             for attempt in _latest_attempts(db, row).values():
                 _process_attempt(
                     db,
@@ -1390,7 +1379,7 @@ def process_due_notifications_once(
                     user=user,
                     prefs=prefs,
                     league_pref=league_pref,
-                    now=current,
+                    now=current if now is not None else utcnow(),
                     push_provider=push,
                     email_provider=email,
                     worker_id=worker_id,
@@ -1489,3 +1478,180 @@ def create_test_alert(db: Session, current_user_id: int) -> NotificationRead:
         scope=event.scope if event.scope in NOTIFICATION_SCOPES else "direct_user",
         destination=_validated_destination(event.payload),
     )
+
+
+def _event_ttl(event_type: str) -> int:
+    event_type = event_type.upper()
+    if event_type.startswith("DRAFT"):
+        return settings.push_draft_ttl_seconds
+    if event_type.startswith("MATCHUP"):
+        return settings.push_matchup_ttl_seconds
+    if event_type == "INJURY":
+        return settings.push_injury_ttl_seconds
+    return settings.push_news_ttl_seconds
+
+
+def _phone_category_allowed(event_type: str, prefs: NotificationPreference | None) -> bool:
+    if event_type == "MAJOR_NEWS":
+        return bool(prefs and prefs.push_major_news)
+    field = "push_drafts" if event_type.startswith("DRAFT") else "push_matchups" if event_type.startswith("MATCHUP") else "push_injuries" if event_type == "INJURY" else None
+    return (prefs is None or bool(getattr(prefs, field))) if field else _pref_allows_category(get_notification_event(event_type).category, event_type, prefs)
+
+
+def _ensure_device_attempts(db: Session, row: ScheduledNotification, user: User, now: datetime) -> None:
+    seed = _latest_attempts(db, row).get("push")
+    if seed is None or seed.status != "pending":
+        return
+    # Freeze the recipient devices once; a newly installed phone never replays old events.
+    for token in db.query(PushToken).filter(PushToken.user_id == user.id, PushToken.provider == "onesignal", PushToken.enabled.is_(True)).all():
+        db.add(NotificationDeliveryAttempt(scheduled_notification_id=row.id, user_id=user.id,
+            channel="push", push_token_id=token.id, attempt_number=1, status="pending"))
+    _mark_attempt(db, seed, status="skipped", now=now, error_message="expanded to device deliveries")
+    db.flush()
+
+
+def _finish_ineligible(db: Session, row: ScheduledNotification, now: datetime, status: str, reason: str) -> None:
+    row.status = status
+    row.completed_at = now
+    row.claimed_at = row.claim_heartbeat_at = row.claimed_by = None
+    for attempt in _latest_attempts(db, row).values():
+        if attempt.status == "pending":
+            _mark_attempt(db, attempt, status=status, now=now, error_message=reason)
+    db.add(row)
+    db.commit()
+
+
+def _event_still_eligible(db: Session, row: ScheduledNotification, user: User) -> bool:
+    if is_retired_play_event(row.event_type, row.notification_type, event_key=row.event_key):
+        return False
+    payload = row.payload or {}
+    if row.event_type == "DRAFT_START":
+        draft = db.get(Draft, payload["draft_id"]) if payload.get("draft_id") else None
+        return bool(draft and draft.league_id == row.league_id and draft.status in {"on_clock", "transition", "paused", "live", "in_progress"})
+    if row.event_type == "MATCHUP_START":
+        matchup = db.get(Matchup, payload.get("matchup_id")) if payload.get("matchup_id") else None
+        if not matchup or matchup.league_id != row.league_id or matchup.week != payload.get("week") or matchup.season != payload.get("season"):
+            return False
+        if (matchup.status or "").lower() in {"canceled", "cancelled", "postponed", "final", "completed", "certified", "corrected", "stat_corrected"}:
+            return False
+        return db.query(Team.id).filter(Team.id.in_((matchup.home_team_id, matchup.away_team_id)), Team.owner_user_id == user.id).first() is not None
+    if row.event_type == "INJURY":
+        from collegefootballfantasy_api.app.models.player_availability_event import PlayerAvailabilityEvent
+        event = db.get(PlayerAvailabilityEvent, payload.get("availability_event_id"))
+        if event is None or event.status != payload.get("status"):
+            return False
+        latest = db.query(PlayerAvailabilityEvent).filter(PlayerAvailabilityEvent.player_id == event.player_id, PlayerAvailabilityEvent.season == event.season).order_by(PlayerAvailabilityEvent.id.desc()).first()
+        if latest is None or latest.status != event.status:
+            return False
+        owned = db.query(Team.league_id).join(RosterEntry, RosterEntry.team_id == Team.id).join(LeagueMember, and_(LeagueMember.league_id == Team.league_id, LeagueMember.user_id == user.id)).filter(
+            Team.owner_user_id == user.id, RosterEntry.player_id == payload.get("player_id"), func.lower(RosterEntry.status) == "active"
+        ).order_by(Team.league_id).with_for_update(of=(RosterEntry, Team, LeagueMember)).all()
+        if not owned:
+            return False
+        prefs = db.query(NotificationPreference).filter(NotificationPreference.user_id == user.id).first()
+        leagues = [league_id for (league_id,) in owned]
+        if prefs and prefs.injury_alert_scope == "SELECTED":
+            leagues = [league_id for league_id in leagues if _league_pref_allows("INJURY", "INJURY", db.query(NotificationLeaguePreference).filter(NotificationLeaguePreference.user_id == user.id, NotificationLeaguePreference.league_id == league_id).first())]
+        if not leagues:
+            return False
+        row.league_id = leagues[0]
+        row.payload = {**payload, "league_ids": leagues, "league_id": leagues[0], "destination": {"type": "player", "league_id": leagues[0], "resource_id": event.player_id}}
+    if row.event_type == "MAJOR_NEWS":
+        announcement = db.get(NewsAnnouncement, payload.get("announcement_id"))
+        return bool(announcement and announcement.status == "confirmed" and _news_user_eligible(db, user.id, announcement.audience))
+    return True
+
+
+def _news_user_eligible(db: Session, user_id: int, audience: dict) -> bool:
+    prefs = db.query(NotificationPreference).filter(NotificationPreference.user_id == user_id).first()
+    user = db.get(User, user_id)
+    if not user or not user.is_active or not prefs or not prefs.push_enabled or not prefs.push_major_news:
+        return False
+    if not audience:
+        return True
+    players = db.query(Player).join(RosterEntry, RosterEntry.player_id == Player.id).join(Team, Team.id == RosterEntry.team_id).filter(
+        Team.owner_user_id == user_id, func.lower(RosterEntry.status) == "active"
+    ).all()
+    if audience.get("player_id"):
+        players = [p for p in players if p.id == audience["player_id"]]
+    if audience.get("conference"):
+        from collegefootballfantasy_api.app.services.power4 import conference_for_school
+        players = [p for p in players if conference_for_school(p.school) == audience["conference"]]
+    return bool(players)
+
+
+def _announcement_data(db: Session, row: NewsAnnouncement) -> dict:
+    events = db.query(ScheduledNotification).filter(ScheduledNotification.event_type == "MAJOR_NEWS").all()
+    counts: dict[str, int] = {}
+    for event in events:
+        if (event.payload or {}).get("announcement_id") == row.id:
+            counts[event.status] = counts.get(event.status, 0) + 1
+    return {"id": row.id, "title": row.title, "body": row.body, "audience": row.audience, "status": row.status,
+            "confirmed_at": row.confirmed_at, "dispatch": counts}
+
+
+def _get_announcement(db: Session, announcement_id: int, *, lock: bool = False) -> NewsAnnouncement:
+    from fastapi import HTTPException
+    query = db.query(NewsAnnouncement).filter(NewsAnnouncement.id == announcement_id)
+    row = (query.with_for_update() if lock else query).one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Announcement not found")
+    return row
+
+
+def create_news_announcement(db: Session, admin_id: int, payload) -> dict:
+    row = NewsAnnouncement(created_by=admin_id, title=payload.title, body=payload.body,
+        audience={key: value for key, value in {"conference": payload.conference, "player_id": payload.player_id}.items() if value is not None}, status="draft")
+    db.add(row)
+    db.commit()
+    return _announcement_data(db, row)
+
+
+def preview_news_announcement(db: Session, announcement_id: int) -> dict:
+    row = _get_announcement(db, announcement_id)
+    recipients = [user.id for user in db.query(User).filter(User.is_active.is_(True)).all() if _news_user_eligible(db, user.id, row.audience)]
+    return {**_announcement_data(db, row), "recipient_count": len(recipients)}
+
+
+def confirm_news_announcement(db: Session, announcement_id: int) -> dict:
+    row = _get_announcement(db, announcement_id, lock=True)
+    if row.status != "confirmed":
+        row.status = "confirmed"
+        row.confirmed_at = utcnow()
+        db.add(row)
+        for user in db.query(User).filter(User.is_active.is_(True)).all():
+            if _news_user_eligible(db, user.id, row.audience):
+                queue_notification_event(db, league_id=None, user_id=user.id, event_type="MAJOR_NEWS",
+                    event_key=f"news:{row.id}:{user.id}", title=row.title, body=row.body,
+                    payload={"announcement_id": row.id}, channels=("in_app", "push"))
+        db.commit()
+    return _announcement_data(db, row)
+
+
+def read_news_announcement(db: Session, user_id: int, announcement_id: int) -> dict:
+    from fastapi import HTTPException
+    row = _get_announcement(db, announcement_id)
+    if row.status != "confirmed" or not _news_user_eligible(db, user_id, row.audience):
+        raise HTTPException(status_code=404, detail="Announcement is unavailable")
+    return _announcement_data(db, row)
+
+
+def list_news_announcements(db: Session) -> dict:
+    return {"data": [_announcement_data(db, row) for row in db.query(NewsAnnouncement).order_by(NewsAnnouncement.id.desc()).limit(50).all()]}
+
+
+def open_notification_event(db: Session, user_id: int, event_id: int) -> dict:
+    from fastapi import HTTPException
+    row = db.query(ScheduledNotification).filter(ScheduledNotification.id == event_id, ScheduledNotification.user_id == user_id).one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Notification is unavailable")
+    user = db.get(User, user_id)
+    allowed = user is not None and user.is_active and row.canceled_at is None
+    if row.expires_at and _as_utc(row.expires_at) <= utcnow():
+        allowed = False
+    if row.event_type != "INJURY" and row.league_id is not None and not db.query(LeagueMember.id).filter(LeagueMember.user_id == user_id, LeagueMember.league_id == row.league_id).first():
+        allowed = False
+    if allowed:
+        allowed = _event_still_eligible(db, row, user)
+    destination = _validated_destination(row.payload) if allowed else None
+    return {"allowed": allowed and destination is not None, "destination": destination, "message": None if allowed else "This alert is no longer available. Your notification history is still in Alerts."}

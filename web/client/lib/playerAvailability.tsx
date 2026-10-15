@@ -13,6 +13,7 @@ const ACTIVE_STATUSES = new Set([
   "FULL",
   "HEALTHY",
   "N/A",
+  "N A",
   "NA",
   "NONE",
   "UNREPORTED",
@@ -58,7 +59,7 @@ export function playerAvailabilityDotClass(status?: string | null) {
     .replace(/-/g, " ")
     .replace(/\s+/g, " ");
 
-  if (["", "N/A", "NA", "NONE", "UNREPORTED"].includes(normalized)) return "bg-slate-300/70";
+  if (["", "N/A", "N A", "NA", "NONE", "UNREPORTED"].includes(normalized)) return "bg-slate-300/70";
   if (ACTIVE_STATUSES.has(normalized)) return "bg-emerald-300";
 
   const badge = playerAvailabilityBadge(status);
@@ -87,8 +88,8 @@ export function PlayerAvailabilityIndicator({ status, children, showActive = tru
       {children}
       <span
         aria-label={badge.label}
-        title={badge.label}
-        className={`inline-flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full border px-1 text-[9px] font-black leading-none ${badge.className}`}
+        title={`${badge.label}${status && status.toUpperCase().replace(/_/g, " ") !== badge.label.toUpperCase() ? ` • ${status.replace(/_/g, " ")}` : ""}`}
+        className={`inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded border px-1 text-[11px] font-black leading-none ${badge.className}`}
       >
         {badge.code}
       </span>

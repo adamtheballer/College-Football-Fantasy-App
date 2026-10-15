@@ -8,6 +8,7 @@ import React, {
 import { useLocation, useNavigate, useNavigationType } from "react-router-dom";
 
 import { AppOnboardingTour } from "./AppOnboardingTour";
+import { AppReviewCoordinator } from "./AppReviewCoordinator";
 import { AppShell } from "./app-shell/AppShell";
 import {
   getShellNavItems,
@@ -115,6 +116,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   return (
     <>
+      <AppReviewCoordinator accountId={user?.id ?? null} sessionReady={sessionReady} onboarding={isGuideActive}
+        screenKey={location.key} pathname={location.pathname} />
       {user ? (
         <AppOnboardingTour
           isOpen={isGuideActive}

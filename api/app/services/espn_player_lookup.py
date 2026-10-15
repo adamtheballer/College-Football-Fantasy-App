@@ -201,7 +201,12 @@ def _item_name_matches(item: dict[str, Any], player: Player) -> bool:
             player_tokens[0], player_tokens[-1]
         ) == (candidate_tokens[0], candidate_tokens[-1]):
             return True
-    return False
+    from collegefootballfantasy_api.app.services.reviewed_espn_identities import reviewed_espn_identity
+    reviewed = reviewed_espn_identity(player)
+    return bool(reviewed and str(item.get("id")) == reviewed["provider_player_id"] and any(
+        normalize_espn_lookup_text(str(item.get(key) or "")) in {normalize_espn_lookup_text(name) for name in reviewed["provider_names"]}
+        for key in ("displayName", "name", "fullName")
+    ))
 
 
 def _name_tokens(value: str | None) -> tuple[str, ...]:
@@ -234,7 +239,11 @@ def _position_matches(profile_payload: dict[str, Any] | None, player: Player) ->
     profile_position = _profile_position(profile_payload)
     if not profile_position:
         return False
-    return profile_position == (player.position or "").strip().upper()
+    if profile_position == (player.position or "").strip().upper():
+        return True
+    from collegefootballfantasy_api.app.services.reviewed_espn_identities import reviewed_espn_identity
+    reviewed = reviewed_espn_identity(player)
+    return bool(reviewed and str(_profile_athlete(profile_payload).get("id")) == reviewed["provider_player_id"] and profile_position in reviewed["provider_positions"])
 
 
 def resolve_espn_player_identity_and_profile(
@@ -252,6 +261,10 @@ def resolve_espn_player_identity_and_profile(
         for item in espn_client.search_players(player.name, limit=10)
         if _item_is_college_football_player(item) and _item_name_matches(item, player) and item.get("id")
     ]
+    from collegefootballfantasy_api.app.services.reviewed_espn_identities import reviewed_espn_identity
+    reviewed = reviewed_espn_identity(player)
+    if reviewed:
+        candidates.append({"id": reviewed["provider_player_id"]})
     matches: list[ResolvedESPNPlayer] = []
     seen_provider_ids: set[str] = set()
     for candidate in candidates:
@@ -260,6 +273,10 @@ def resolve_espn_player_identity_and_profile(
             continue
         seen_provider_ids.add(provider_player_id)
         profile_payload = espn_client.get_athlete_profile(provider_player_id)
+        # Reviewed candidates must still verify the provider's current name.
+        # Legacy exact search candidates retain the existing missing-name shape.
+        if reviewed and provider_player_id == reviewed["provider_player_id"] and not _item_name_matches(_profile_athlete(profile_payload), player):
+            continue
         if not (_school_matches(profile_payload, player) and _position_matches(profile_payload, player)):
             continue
         matches.append(ResolvedESPNPlayer(provider_player_id=provider_player_id, profile_payload=profile_payload))

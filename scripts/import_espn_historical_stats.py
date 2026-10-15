@@ -41,6 +41,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Allow imports even when ESPN_HISTORICAL_STATS_ENABLED is false.",
     )
+    parser.add_argument("--game-log-season", type=int, action="append", dest="game_log_seasons", help="Also import verified per-game history for this season. Repeatable; remains independent of live league scores.")
     return parser.parse_args()
 
 
@@ -192,20 +193,52 @@ def main() -> int:
         started_at = datetime.now(timezone.utc)
         run = HistoricalStatImportRun(
             provider="espn",
-            requested_player_ids=[player.id for player in mapped_players],
+            requested_player_ids=[player.id for player in players],
+            requested_seasons=args.game_log_seasons,
+            players_unmatched=len(players)-len(mapped_players),
+            players_not_found=resolution.not_found,
             status="running",
             started_at=started_at,
-            players_requested=len(mapped_players),
+            players_requested=len(players),
             trigger_type="manual",
         )
         db.add(run)
         db.commit()
 
-        errors: dict[str, str] = {}
+        errors: dict[str, str] = {str(player.id): "No trusted ESPN identity; production unknown." for player in players if player.id not in {row.id for row in mapped_players}}
+        coverage: dict = {}
         for player in mapped_players:
             try:
-                fetch_and_store_player_history(db, player, allow_disabled=args.ignore_feature_flag)
-                run.players_succeeded += 1
+                response=fetch_and_store_player_history(db, player, allow_disabled=args.ignore_feature_flag)
+                coverage[str(player.id)]={"season_stats":response.status,"game_logs":[]}
+                if args.game_log_seasons:
+                    from collegefootballfantasy_api.app.services.providers.espn_historical.client import ESPNHistoricalStatsClient
+                    from collegefootballfantasy_api.app.services.player_game_history import store_player_game_history
+                    provider_id=resolve_espn_player_id(db,player)
+                    provider=ESPNHistoricalStatsClient()
+                    for season in sorted(set(args.game_log_seasons)):
+                        payload=provider.get_athlete_game_log(provider_id,season=season)
+                        result=store_player_game_history(db,player,provider_player_id=provider_id,season=season,payload=payload)
+                        if player.position=='K' and result['games']==0:
+                            from collegefootballfantasy_api.app.services.player_game_history import store_boxscore_game_history,game_history_fallback_team_ids,completed_schedule_event_ids
+                            summaries=ESPNClient()
+                            profile=summaries.get_athlete_profile(provider_id)
+                            event_ids=set(payload.get('events',{}))
+                            for team_id in game_history_fallback_team_ids(payload,season=season,profile=profile):
+                                events=summaries.get_team_schedule_events(team_id,season=season)
+                                event_ids.update(completed_schedule_event_ids(events,team_id=team_id))
+                            for event_id in sorted(event_ids):
+                                boxed=store_boxscore_game_history(db,player,provider_player_id=provider_id,season=season,summary=summaries.get_summary(event_id))
+                                result['games']+=boxed['games']
+                                for key in ('inserted','updated','unchanged'):result[key]+=boxed[key]
+                                time.sleep(1/max(settings.espn_historical_stats_requests_per_second,.1))
+                            if result['games']:result['status']='available'
+                        coverage[str(player.id)]["game_logs"].append(result)
+                if response.status=="available" or any(row["games"] for row in coverage[str(player.id)]["game_logs"]):
+                    run.players_succeeded += 1
+                else:
+                    run.players_not_found += 1
+                    errors[str(player.id)]="Provider returned no season or game stats"
                 db.commit()
             except Exception as exc:
                 db.rollback()
@@ -217,7 +250,7 @@ def main() -> int:
         run = db.get(HistoricalStatImportRun, run.id)
         run.completed_at = datetime.now(timezone.utc)
         run.status = "completed_with_errors" if errors else "completed"
-        run.error_summary = errors or None
+        run.error_summary = {"errors":errors,"coverage":coverage}
         db.commit()
         print(
             "ESPN historical statistics import: "

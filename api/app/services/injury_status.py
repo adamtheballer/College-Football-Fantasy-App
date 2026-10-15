@@ -5,13 +5,37 @@ from sqlalchemy.orm import Session
 from collegefootballfantasy_api.app.models.injury import Injury
 
 
+def reviewed_injuries_for_week(
+    db: Session, *, season: int, week: int, player_ids: set[int] | None = None
+) -> dict[int, Injury]:
+    """Newest weekly report plus persistent, already-effective season absences.
+
+    Select a row before interpreting its status so a newer FULL report clears
+    an older OUT row. Never carry ordinary weekly injuries into a later week.
+    """
+    if player_ids == set():
+        return {}
+    query = db.query(Injury).filter(Injury.season == season, Injury.week <= week)
+    if player_ids is not None:
+        query = query.filter(Injury.player_id.in_(player_ids))
+    rows = query.order_by(Injury.updated_at.desc(), Injury.id.desc()).all()
+    current: dict[int, Injury] = {}
+    season_absences: dict[int, Injury] = {}
+    for row in rows:
+        if row.week == week:
+            current.setdefault(row.player_id, row)
+        if normalize_injury_status(row.status) == "OUT_FOR_SEASON":
+            season_absences.setdefault(row.player_id, row)
+    return {**current, **season_absences}
+
+
 def normalize_injury_status(raw_status: str | None) -> str:
     """Return the canonical reviewed-injury designation used by all API readers."""
     status = " ".join((raw_status or "FULL").strip().upper().replace("_", " ").replace("-", " ").split())
 
     if status in {"", "FULL", "HEALTHY", "ACTIVE", "AVAILABLE"}:
         return "FULL"
-    if status in {"N/A", "NA", "NOT APPLICABLE"}:
+    if status in {"N/A", "N A", "NA", "NOT APPLICABLE"}:
         return "N_A"
     if status in {"TBD", "TO BE DETERMINED"}:
         return "TBD"
@@ -33,7 +57,7 @@ def normalize_injury_status(raw_status: str | None) -> str:
         return "QUESTIONABLE"
     if "PROBABLE" in status:
         return "PROBABLE"
-    return "FULL"
+    return "TBD"
 
 
 def is_current_injury_designation(status: str | None) -> bool:

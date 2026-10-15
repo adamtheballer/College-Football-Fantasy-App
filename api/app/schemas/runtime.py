@@ -12,6 +12,7 @@ class RuntimeIdentityRead(BaseModel):
     web_git_sha: str
     worker_git_sha: str
     environment: str
+    ios_app_review_enabled: bool = False
     email_enabled: bool
     password_reset_enabled: bool
     password_reset_email_configured: bool

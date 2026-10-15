@@ -5,6 +5,7 @@ import {
   readNativeRefreshToken,
   saveNativeRefreshToken,
 } from "./native-session";
+import { isNameChangeEligibility } from "./name-change";
 
 export const resolveDefaultApiBase = (
   protocol = typeof window === "undefined" ? "" : window.location.protocol
@@ -62,6 +63,7 @@ export class ApiError extends Error {
   field?: string;
   retryAt?: string;
   lastSuccessfulChangeAt?: string;
+  nameChangeEligibility?: import("./name-change").NameChangeEligibility;
 
   constructor(
     status: number,
@@ -308,12 +310,17 @@ const buildError = async (res: Response) => {
   if (detail && typeof detail === "object" && "detail" in detail) {
     const actionable = parseActionableErrorDetail((detail as { detail?: unknown }).detail);
     if (actionable?.message) {
-      return new ApiError(res.status, actionable.message, detail, {
+      const error = new ApiError(res.status, actionable.message, detail, {
         code: actionable.code,
         field: actionable.field,
         retryAt: actionable.retry_at,
         lastSuccessfulChangeAt: actionable.last_successful_change_at,
       });
+      if (actionable.code === "NAME_CHANGE_COOLDOWN") {
+        const timing = (detail as { detail: unknown }).detail;
+        if (isNameChangeEligibility(timing)) error.nameChangeEligibility = timing;
+      }
+      return error;
     }
   }
 
@@ -356,6 +363,8 @@ type RequestOptions = {
   body?: unknown;
   signal?: AbortSignal;
   retryOn401?: boolean;
+  reviewAccountPrecondition?: number;
+  profileAccountPrecondition?: number;
 };
 
 const createRequestSignal = (externalSignal?: AbortSignal) => {
@@ -391,11 +400,19 @@ const apiRequest = async <T>({
   body,
   signal,
   retryOn401 = true,
+  reviewAccountPrecondition,
+  profileAccountPrecondition,
 }: RequestOptions): Promise<T> => {
   const headers: Record<string, string> = {
     ...buildAuthHeaders(),
-    ...(path.startsWith("/auth/") ? nativeSessionHeaders() : {}),
+    ...(path.startsWith("/auth/") || path.startsWith("/app-review/") ? nativeSessionHeaders() : {}),
   };
+  if (reviewAccountPrecondition !== undefined && path.startsWith("/app-review/")) {
+    headers["X-CFFB-Review-Account"] = String(reviewAccountPrecondition);
+  }
+  if (profileAccountPrecondition !== undefined && path === "/auth/me") {
+    headers["X-CFFB-Profile-Account"] = String(profileAccountPrecondition);
+  }
   if (body !== undefined) {
     headers["Content-Type"] = "application/json";
   }
@@ -440,6 +457,8 @@ const apiRequest = async <T>({
         body,
         signal,
         retryOn401: false,
+        reviewAccountPrecondition,
+        profileAccountPrecondition,
       });
     }
     if (refreshResult === "transient_failure") {
@@ -455,6 +474,12 @@ const apiRequest = async <T>({
   }
   return parseJson<T>(res);
 };
+
+export const apiReviewRequest = <T>(path: "/app-review/state" | "/app-review/claim", accountId: number, signal: AbortSignal, body?: unknown) =>
+  apiRequest<T>({ method: body === undefined ? "GET" : "POST", path, body, signal, reviewAccountPrecondition: accountId });
+
+export const apiUserProfilePatch = <T>(accountId: number, body: unknown, signal?: AbortSignal) =>
+  apiRequest<T>({ method: "PATCH", path: "/auth/me", body, signal, profileAccountPrecondition: accountId });
 
 export const apiGet = async <T>(
   path: string,

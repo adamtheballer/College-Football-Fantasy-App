@@ -8,6 +8,7 @@ endpoints belonging to the embedded report vendor.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 import os
 from collections.abc import Callable
 from typing import Any
@@ -41,6 +42,47 @@ OFFICIAL_CONFERENCE_REPORTS = (
 
 class ConferenceReportUnavailable(RuntimeError):
     """Raised when a public report cannot be read as a document."""
+
+
+def parse_archive_document(html: str, *, conference: str, source_url: str) -> list[dict[str, str | None]]:
+    """Read dated archive rows for deliberate audits/backfills, never live fallback.
+
+    The public archives expose final and intermediate statuses in separate
+    columns. Pick the last populated update, retaining the game date so a caller
+    cannot accidentally assign old absences to this week's pending games.
+    """
+    rows: list[dict[str, str | None]] = []
+    for table in BeautifulSoup(html, "html.parser").find_all("table"):
+        header = table.find("tr")
+        if header is None:
+            continue
+        headers = [cell.get_text(" ", strip=True) for cell in header.find_all(["th", "td"])]
+        if not _has_heading(headers, "player") or not _has_heading(headers, "game day status"):
+            continue
+        for tr in table.find_all("tr")[1:]:
+            values = [cell.get_text(" ", strip=True) for cell in tr.find_all(["td", "th"])]
+            if len(values) != len(headers):
+                continue
+            date = _field(headers, values, "date")
+            parsed_date = None
+            for pattern in ("%m/%d/%y", "%a, %b %d, %Y"):
+                try:
+                    parsed_date = datetime.strptime(date or "", pattern).date().isoformat()
+                    break
+                except ValueError:
+                    pass
+            name = _field(headers, values, "player")
+            team = _field(headers, values, "team")
+            status = _field(headers, values, "game day status", "update 2 status", "update 1 status", "initial status")
+            if not parsed_date or not name or not team or not status or status.upper() == "EXEMPT":
+                continue
+            rows.append({"player_name": name, "team_name": team, "status": status,
+                         "conference": conference, "source_url": source_url,
+                         "game_date": parsed_date, "position": None, "injury": None,
+                         "return_timeline": None, "practice_level": None, "notes": None})
+    if not rows:
+        raise ConferenceReportUnavailable(f"{conference} archive did not contain readable dated report rows")
+    return rows
 
 
 def report_source_for(conference: str) -> ConferenceReportSource:

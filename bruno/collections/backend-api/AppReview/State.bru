@@ -1,0 +1,18 @@
+meta {
+  name: iOS App Review State
+  type: http
+  seq: 1
+}
+get {
+  url: {{base_url}}/app-review/state
+}
+headers {
+  Authorization: Bearer {{access_token}}
+  Origin: capacitor://localhost
+  X-CFFB-Native-Session: ios
+  X-CFFB-Review-Account: {{review_account_id}}
+}
+docs {
+  Local test accounts only. Set review_account_id to the authenticated user ID.
+  This precondition cannot select another account; the server derives it from JWT.
+}

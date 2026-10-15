@@ -1,3 +1,4 @@
+import {canonicalDraftPool} from "./fixtures/draft-pool";
 import { expect, test, type Page } from "@playwright/test";
 import type { DraftRoom } from "../../client/types/draft";
 
@@ -17,7 +18,8 @@ const newRoom = (): DraftRoom => ({
   transition_ends_at: null, seconds_remaining: 30, pick_started_at: null, pick_expires_at: null, server_time: new Date().toISOString(),
 });
 
-async function fixture(page: Page) {
+async function fixture(page: Page, initialPlayers = players) {
+  let currentPlayers = initialPlayers;
   let room = newRoom();
   let failing = false;
   let submissions = 0;
@@ -35,7 +37,9 @@ async function fixture(page: Page) {
     let status = 200;
     if (path === "/health/runtime") status = 503;
     if (path === "/auth/me") data = { id: 42, first_name: "Coach", email: "draft-test@example.com" };
-    if (path === "/players") data = { data: players, total: players.length, limit: 200, offset: 0 };
+    if (path === "/players") data = canonicalDraftPool(currentPlayers);
+    if (/^\/players\/\d+$/.test(path)) data = currentPlayers.find(row => row.id === Number(path.split("/")[2]));
+    if (/^\/players\/\d+\/card$/.test(path)) { status=404; data={detail:"No player card in this isolated draft fixture"}; }
     if (path === "/leagues/77") data = { id: 77, name: "Audit Test League", max_teams: 2, members: [{user_id:42},{user_id:43}], status: room.status === "completed" ? "post_draft" : "draft_live" };
     if (path === "/leagues/77/draft-room") {
       status = failing ? 503 : 200;
@@ -46,7 +50,7 @@ async function fixture(page: Page) {
       if (reject) { status = 409; data = { detail: "Pick expired; waiting for auto-pick" }; }
       else {
         const playerId = route.request().postDataJSON().player_id;
-        const player = players.find((row) => row.id === playerId)!;
+        const player = currentPlayers.find((row) => row.id === playerId)!;
         room = { ...room, draft_version: room.draft_version + 1, current_pick: 2, current_team_id: final ? null : 2,
           current_team_name: final ? null : "Other Team", can_make_pick: false, status: final ? "completed" : "on_clock",
           server_time: new Date().toISOString(), current_pick_deadline: final ? null : new Date(Date.now()+30_000).toISOString(),
@@ -60,12 +64,64 @@ async function fixture(page: Page) {
   });
   return {
     get room() { return room; },
+    setPlayers(rows: typeof players) { currentPlayers = rows; },
     setRoom(value: Partial<DraftRoom>) { room = { ...room, ...value }; },
     setFailure(value: boolean) { failing = value; },
     reject() { reject = true; },
     finishOnPick() { final = true; },
     submissions: () => submissions,
   };
+}
+
+for (const width of [1440, 390]) {
+  test(`real and mock sorts preserve ranks and player identity ${width}px`, async ({ page }, info) => {
+    const pool = [
+      {id:601,name:'Rank Two',position:'WR',school:'Texas',board_rank:1,sheet_projected_season_points:80,sheet_adp:2},
+      {id:602,name:'Rank Ten',position:'WR',school:'Texas',board_rank:2,sheet_projected_season_points:100,sheet_adp:10},
+      {id:603,name:'Rank Twenty',position:'WR',school:'Texas',board_rank:3,sheet_projected_season_points:0,sheet_adp:20},
+      {id:604,name:'Rank 119',position:'WR',school:'Texas',board_rank:4,sheet_projected_season_points:70,sheet_adp:119},
+    ];
+    const state = await fixture(page,pool);
+    state.setRoom({roster_slots:{WR:2,BENCH:5},current_pick_deadline:new Date(Date.now()+600_000).toISOString(),pick_timer_seconds:600});
+    await page.setViewportSize({width,height:900});
+    await page.addInitScript(now => localStorage.setItem('cfb_single_player_mock_draft',JSON.stringify({
+      id:'sort-contract',settings:{leagueSize:4,rounds:13,pickTimerSeconds:120},status:'live',createdAt:now,intermissionEndsAt:now,currentPick:1,pickStartedAt:now,pickExpiresAt:now+600_000,userTeamId:1,
+      teams:[{id:1,name:'Your Team',managerType:'user'},...Array.from({length:3},(_,i)=>({id:i+2,name:`Bot ${i+2}`,managerType:'bot'}))],picks:[],queuedPlayerIds:[604,601]
+    })),Date.now());
+    for(const route of ['/league/77/draft','/draft/mock/single-player']) {
+      await page.goto(route);
+      const rows=page.getByTestId('draft-player-row');
+      await expect(rows).toHaveCount(4);
+      await expect(rows.nth(0)).toContainText('Rank Two');
+      await page.getByLabel('Draft board sort').selectOption('adp');
+      for(const [i,name] of ['Rank Two','Rank Ten','Rank Twenty','Rank 119'].entries()) await expect(rows.nth(i)).toContainText(name);
+      await page.getByLabel('Draft board sort').selectOption('projected_points');
+      for(const [i,name] of ['Rank Ten','Rank Two','Rank 119','Rank Twenty'].entries()) await expect(rows.nth(i)).toContainText(name);
+      await expect(rows.nth(3)).toContainText('0.0');
+      await page.getByPlaceholder('Search players, schools...').fill('Rank 119');
+      await expect(rows).toHaveCount(1);
+      await expect(rows.nth(0).locator('p').first()).toHaveText('4');
+      await page.getByPlaceholder('Search players, schools...').fill('');
+      await expect(rows).toHaveCount(4);
+      await page.screenshot({path:info.outputPath(`${route.includes('mock')?'mock':'real'}-sort-${width}.png`),animations:'disabled'});
+      expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+      if(route.includes('mock')) expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('cfb_single_player_mock_draft')!).queuedPlayerIds)).toEqual([604,601]);
+    }
+    await page.clock.install();
+    await page.goto('/league/77/draft');
+    const rows=page.getByTestId('draft-player-row');
+    await expect(rows).toHaveCount(4);
+    await rows.filter({hasText:'Rank Two'}).getByText('Rank Two',{exact:true}).click();
+    await expect(page.getByRole('dialog')).toContainText('Rank Two');
+    state.setPlayers([...pool].reverse().map((row,index)=>({...row,board_rank:index+1})));
+    await page.clock.fastForward(61_000);
+    await expect(rows.nth(0)).toContainText('Rank 119');
+    await expect(page.getByRole('dialog')).toContainText('Rank Two');
+    await page.getByRole('button',{name:'Close player card',exact:true}).click();
+    await page.getByRole('button',{name:'Draft Rank Two',exact:true}).click();
+    expect(state.room.picks[0].player_id).toBe(601);
+    await expect(page.getByTestId('pick-confirmation')).toContainText('Rank Two');
+  });
 }
 
 test("live expiry disables draft actions while preserving authoritative pick", async ({ page }, testInfo) => {

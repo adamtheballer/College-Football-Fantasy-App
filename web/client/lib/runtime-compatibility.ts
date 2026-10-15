@@ -4,6 +4,7 @@ export type RuntimeIdentity = {
   runtime_id?: string | null;
   runtime_mode: string;
   environment: string;
+  ios_app_review_enabled?: boolean;
   api_process_instance_uuid: string;
   web_git_sha: string;
   worker_git_sha: string;

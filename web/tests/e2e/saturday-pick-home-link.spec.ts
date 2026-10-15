@@ -60,11 +60,12 @@ test.beforeEach(async ({ page }) => {
   await page.route("**/saturday-pick-6/rewards", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
 });
 
-test("the homepage West Georgia Cornhole event button opens the live Pick 6 player totals", async ({ page }) => {
+test("homepage promotion stays removed while archived Pick 6 totals remain accessible", async ({ page }) => {
   await page.goto("/");
-  const sponsorButton = page.getByRole("link", { name: "Open Saturday Pick 6 event" });
-  await expect(sponsorButton).toBeVisible();
-  await sponsorButton.click();
+  await expect(page.getByRole("heading", { name: /Good to see you/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open Saturday Pick 6 event" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Make Your Pick", exact: true })).toHaveCount(0);
+  await page.goto("/saturday-pick-6");
 
   await expect(page).toHaveURL(/\/saturday-pick-6$/);
   await expect(page.getByRole("heading", { name: "Featured Player" })).toBeVisible();

@@ -12,6 +12,13 @@ describe("notification destination routing", () => {
       .toBe("/chats?leagueId=4&threadId=7");
   });
 
+  it("routes injury and announcement taps to existing protected pages", () => {
+    expect(resolveNotificationPath({ type: "player", league_id: 4, resource_id: 18 })).toBe("/injury-center?playerId=18&leagueId=4");
+    expect(resolveNotificationPath({ type: "announcement", league_id: null, resource_id: 12 })).toBe("/announcements/12");
+    expect(resolveNotificationPath({ type: "matchup", league_id: 4, resource_id: 8, week: 7 })).toBe("/league/4/matchup?week=7&matchup=8");
+    expect(resolveNotificationPath({ type: "player", league_id: -1, resource_id: 18 })).toBe("/alerts");
+  });
+
   it("keeps incomplete or missing destinations inside the notification center", () => {
     expect(resolveNotificationPath({ type: "trade", league_id: 4, resource_id: null }))
       .toBe("/trade");

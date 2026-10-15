@@ -1,0 +1,111 @@
+{
+  "season": 2026,
+  "eligible": 816,
+  "apply_local": false,
+  "weeks": [
+    {
+      "week": 1,
+      "finalized": false,
+      "actual_snapshots_before": 0,
+      "value_snapshots_before": 0,
+      "actual_snapshots_after": 0,
+      "value_snapshots_after": 0
+    },
+    {
+      "week": 2,
+      "finalized": false,
+      "actual_snapshots_before": 0,
+      "value_snapshots_before": 0,
+      "actual_snapshots_after": 0,
+      "value_snapshots_after": 0
+    },
+    {
+      "week": 3,
+      "finalized": false,
+      "actual_snapshots_before": 0,
+      "value_snapshots_before": 0,
+      "actual_snapshots_after": 0,
+      "value_snapshots_after": 0
+    },
+    {
+      "week": 4,
+      "finalized": false,
+      "actual_snapshots_before": 0,
+      "value_snapshots_before": 0,
+      "actual_snapshots_after": 0,
+      "value_snapshots_after": 0
+    },
+    {
+      "week": 5,
+      "finalized": false,
+      "actual_snapshots_before": 0,
+      "value_snapshots_before": 0,
+      "actual_snapshots_after": 0,
+      "value_snapshots_after": 0
+    },
+    {
+      "week": 6,
+      "finalized": false,
+      "actual_snapshots_before": 0,
+      "value_snapshots_before": 0,
+      "actual_snapshots_after": 0,
+      "value_snapshots_after": 0
+    },
+    {
+      "week": 7,
+      "finalized": false,
+      "actual_snapshots_before": 0,
+      "value_snapshots_before": 0,
+      "actual_snapshots_after": 0,
+      "value_snapshots_after": 0
+    },
+    {
+      "week": 8,
+      "finalized": false,
+      "actual_snapshots_before": 0,
+      "value_snapshots_before": 0,
+      "actual_snapshots_after": 0,
+      "value_snapshots_after": 0
+    },
+    {
+      "week": 9,
+      "finalized": false,
+      "actual_snapshots_before": 0,
+      "value_snapshots_before": 0,
+      "actual_snapshots_after": 0,
+      "value_snapshots_after": 0
+    },
+    {
+      "week": 10,
+      "finalized": false,
+      "actual_snapshots_before": 0,
+      "value_snapshots_before": 0,
+      "actual_snapshots_after": 0,
+      "value_snapshots_after": 0
+    },
+    {
+      "week": 11,
+      "finalized": false,
+      "actual_snapshots_before": 0,
+      "value_snapshots_before": 0,
+      "actual_snapshots_after": 0,
+      "value_snapshots_after": 0
+    },
+    {
+      "week": 12,
+      "finalized": false,
+      "actual_snapshots_before": 0,
+      "value_snapshots_before": 0,
+      "actual_snapshots_after": 0,
+      "value_snapshots_after": 0
+    },
+    {
+      "week": 13,
+      "finalized": false,
+      "actual_snapshots_before": 0,
+      "value_snapshots_before": 0,
+      "actual_snapshots_after": 0,
+      "value_snapshots_after": 0
+    }
+  ]
+}

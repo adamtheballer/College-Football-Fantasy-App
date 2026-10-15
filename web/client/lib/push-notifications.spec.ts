@@ -99,7 +99,7 @@ describe("OneSignal subscription registration", () => {
       {
         subscription_id: "subscription-created-after-grant",
         platform: "web",
-        provider: "onesignal",
+        provider: "onesignal", account_id: 7,
       },
     ));
   });
@@ -131,7 +131,7 @@ describe("OneSignal subscription registration", () => {
       {
         subscription_id: "restored-subscription",
         platform: "web",
-        provider: "onesignal",
+        provider: "onesignal", account_id: 7,
       },
     );
   });

@@ -68,15 +68,14 @@ def test_player_trajectory_uses_published_weekly_rows_without_converting_a_seaso
 
     assert response.status_code == 200
     body = response.json()
-    assert [point["week"] for point in body["projection"]] == [1, 2]
-    assert [point["week"] for point in body["value"]] == [0, 1]
+    assert [point["week"] for point in body["projection"]] == [1]
+    assert [point["week"] for point in body["value"]] == [0]
     assert body["value"][0] == {"week": 0, "value": 92.0, "source": "preseason"}
     assert body["preseason_projection_points"] == 260.0
     assert body["projection"][0]["week"] == 1
-    assert body["projection"][0]["points"] == 14.0
+    assert body["projection"][0]["points"] == 22.0
     assert body["projection"][0]["source"] == "published"
     assert body["projection"][0]["projection_version"] == "FINAL"
-    assert body["projection"][1] == {"week": 2, "points": None, "actual_points": None, "source": "bye", "projection_status": "BYE", "projection_version": None, "published_at": None}
     assert body["value"][0]["source"] == "preseason"
     assert all(0 <= point["value"] <= 100 for point in body["value"])
     assert all(point["points"] is None or point["points"] >= 0 for point in body["projection"])
@@ -89,7 +88,7 @@ def test_player_trajectory_overlays_canonical_league_actuals_on_the_pregame_base
     db_session.flush()
     db_session.add_all(
         [
-            TeamSchedule(team_name="Texas", season=2026, week=1, opponent_name="Ohio State", location="home", is_bye=False),
+            TeamSchedule(team_name="Texas", season=2026, week=1, opponent_name="Ohio State", location="home", is_bye=False, kickoff_at=datetime.now(timezone.utc) + timedelta(days=1)),
             WeeklyProjection(player_id=player.id, season=2026, week=1, is_published=True, fantasy_points=16.4),
             PlayerWeekScore(
                 league_id=league.id,
@@ -104,6 +103,10 @@ def test_player_trajectory_overlays_canonical_league_actuals_on_the_pregame_base
     )
     db_session.commit()
 
+    from tests.api.scoring_helpers import create_scoring_fixture
+    _l, _h, _a, _p, matchup = create_scoring_fixture(db_session)
+    matchup.status = "final"
+    db_session.commit()
     response = client.get(f"/players/{player.id}/trajectory", params={"season": 2026, "league_id": league.id})
 
     assert response.status_code == 200
@@ -112,6 +115,7 @@ def test_player_trajectory_overlays_canonical_league_actuals_on_the_pregame_base
             "week": 1,
             "points": 16.4,
             "actual_points": 24.6,
+            "is_finalized": True,
             "source": "published",
             "projection_status": "ACTIVE",
             "projection_version": "FINAL",
@@ -141,8 +145,7 @@ def test_player_trajectory_includes_a_published_weekly_snapshot_without_a_wall_c
     assert body["projection"][0]["week"] == 1
     assert body["projection"][0]["points"] == 14.0
     assert body["projection"][0]["source"] == "published"
-    assert [point["week"] for point in body["value"]] == [0, 1]
-    assert body["value"][1] == {"week": 1, "value": 84.0, "source": "published"}
+    assert [point["week"] for point in body["value"]] == [0]
 
 
 def test_player_trajectory_rejects_unknown_league_context(client, db_session):

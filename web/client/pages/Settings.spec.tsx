@@ -6,6 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   updateProfile: vi.fn(),
+  refreshEligibility: vi.fn(),
+  acceptEligibility: vi.fn(),
+  eligibilityPhase: "ready",
+  eligibility: null as import("@/lib/name-change").NameChangeEligibility | null,
   deleteAccount: vi.fn(),
   setActiveLeagueId: vi.fn(),
   prepareProfileImage: vi.fn(),
@@ -21,6 +25,11 @@ vi.mock("@/hooks/use-auth", () => ({
     deleteAccount: state.deleteAccount,
     updateProfile: state.updateProfile,
   }),
+}));
+
+vi.mock("@/hooks/use-name-change-eligibility", () => ({
+  useNameChangeEligibility: () => ({ phase: state.eligibilityPhase, timing: state.eligibility, remainingSeconds: state.eligibility?.remaining_wait_seconds ?? 0,
+    refresh: state.refreshEligibility, accept: state.acceptEligibility, invalidate: vi.fn() }),
 }));
 
 vi.mock("@/hooks/use-leagues", () => ({
@@ -78,6 +87,10 @@ describe("Settings beta preferences", () => {
     state.deleteAccount.mockResolvedValue(undefined);
     state.prepareProfileImage.mockReset();
     state.runtimeCapabilities = {};
+    state.eligibilityPhase = "ready";
+    state.eligibility = { account_id: 7, current_name: "Adam", server_time: "2026-10-13T12:00:00Z", last_successful_change_at: null, next_eligible_at: null, remaining_wait_seconds: 0, can_change_name: true };
+    state.refreshEligibility.mockReset();
+    state.acceptEligibility.mockImplementation((timing) => { state.eligibility = timing; });
     state.user = { id: 7, firstName: "Adam", email: "adam@example.com", isAdmin: false, avatarUrl: null, managerNameChangeAvailableAt: null };
   });
 
@@ -101,7 +114,7 @@ describe("Settings beta preferences", () => {
     expect(state.updateProfile).not.toHaveBeenCalled();
     expect(screen.getByRole("heading", { name: /change manager name/i })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /confirm name change/i }));
-    await waitFor(() => expect(state.updateProfile).toHaveBeenCalledWith({ firstName: "Updated Adam", avatarUrl: null }));
+    await waitFor(() => expect(state.updateProfile).toHaveBeenCalledWith({ firstName: "Updated Adam" }, expect.any(AbortSignal)));
   });
 
   it("does not report a manager-name save when the profile response retains the old name", async () => {
@@ -133,30 +146,80 @@ describe("Settings beta preferences", () => {
     expect(state.updateProfile).not.toHaveBeenCalled();
   });
 
+  it("eligible name edits omit an invalid unchanged legacy avatar", async () => {
+    state.user = { ...state.user, avatarUrl: "http://legacy.example.com/avatar.jpg" };
+    render(<MemoryRouter><Settings /></MemoryRouter>);
+    fireEvent.change(screen.getByLabelText("Manager Name"), { target: { value: "Updated Adam" } });
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+    fireEvent.click(screen.getByRole("button", { name: /confirm name change/i }));
+    await waitFor(() => expect(state.updateProfile).toHaveBeenCalledWith({ firstName: "Updated Adam" }, expect.any(AbortSignal)));
+  });
+
+  it("does not falsely label network/server errors as a cooldown or show success", async () => {
+    state.updateProfile.mockRejectedValue(new ApiError(500, "Could not save your profile."));
+    render(<MemoryRouter><Settings /></MemoryRouter>);
+    fireEvent.change(screen.getByLabelText("Manager Name"), { target: { value: "Updated Adam" } });
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+    fireEvent.click(screen.getByRole("button", { name: /confirm name change/i }));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Could not save your profile."));
+    expect(screen.queryByTestId("name-change-wait")).toBeNull(); expect(screen.queryByRole("button", { name: /^saved$/i })).toBeNull();
+  });
+
+  it("unavailable eligibility shows Retry and prevents a changed-name save", () => {
+    state.eligibilityPhase = "error"; state.eligibility = null;
+    render(<MemoryRouter><Settings /></MemoryRouter>);
+    expect(screen.getByRole("button", { name: /retry availability check/i })).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Manager Name"), { target: { value: "Updated Adam" } });
+    expect(screen.getByRole("button", { name: /save changes/i }).getAttribute("disabled")).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /retry availability check/i })); expect(state.refreshEligibility).toHaveBeenCalled();
+    expect(state.updateProfile).not.toHaveBeenCalled();
+  });
+
+  it("duplicate taps are ignored while saving and closing Settings aborts the save", async () => {
+    let resolve!: (value: unknown) => void; state.updateProfile.mockReturnValue(new Promise((done) => { resolve = done; }));
+    const view = render(<MemoryRouter><Settings /></MemoryRouter>);
+    fireEvent.change(screen.getByLabelText("Manager Name"), { target: { value: "Updated Adam" } });
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i })); fireEvent.click(screen.getByRole("button", { name: /confirm name change/i }));
+    fireEvent.keyDown(screen.getByLabelText("Manager Name"), { key: "Enter" });
+    expect(state.updateProfile).toHaveBeenCalledTimes(1); const signal = state.updateProfile.mock.calls[0][1];
+    view.unmount(); expect(signal.aborted).toBe(true); resolve({ id: 7, firstName: "Updated Adam", avatarUrl: null });
+  });
+
+  it("canceling confirmation and saving an unchanged name do not send a profile patch", () => {
+    render(<MemoryRouter><Settings /></MemoryRouter>); fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+    expect(state.updateProfile).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("Manager Name"), { target: { value: "Updated Adam" } });
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i })); fireEvent.click(screen.getByRole("button", { name: /keep current name/i }));
+    expect(state.updateProfile).not.toHaveBeenCalled();
+  });
+
   it("disables manager-name edits until the seven-day cooldown ends", () => {
     state.user = {
       ...state.user,
     managerNameChangeAvailableAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     };
+    state.eligibility = { ...state.eligibility!, next_eligible_at: "2026-10-20T12:00:00Z", remaining_wait_seconds: 604800, can_change_name: false };
     render(<MemoryRouter><Settings /></MemoryRouter>);
 
     expect(screen.getByLabelText("Manager Name").getAttribute("disabled")).not.toBeNull();
-    expect(screen.getByText(/name changes are available again on/i)).toBeTruthy();
+    expect(screen.getByText(/You can change your name again in 7 days/i)).toBeTruthy();
   });
 
   it("shows the server-enforced manager-name cooldown beside the field and retains its unlock time", async () => {
     const retryAt = new Date(Date.now() + 6 * 24 * 60 * 60 * 1000).toISOString();
-    state.updateProfile.mockRejectedValueOnce(new ApiError(
+    const cooldown = new ApiError(
       429,
       "Manager name changes are temporarily unavailable.",
       undefined,
       {
-        code: "manager_name_cooldown",
+        code: "NAME_CHANGE_COOLDOWN",
         field: "first_name",
         retryAt,
         lastSuccessfulChangeAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
       },
-    ));
+    );
+    cooldown.nameChangeEligibility = { ...state.eligibility!, next_eligible_at: retryAt, remaining_wait_seconds: 518400, can_change_name: false };
+    state.updateProfile.mockRejectedValueOnce(cooldown);
     render(<MemoryRouter><Settings /></MemoryRouter>);
 
     fireEvent.change(screen.getByLabelText("Manager Name"), { target: { value: "Updated Adam" } });
@@ -164,7 +227,7 @@ describe("Settings beta preferences", () => {
     fireEvent.click(screen.getByRole("button", { name: /confirm name change/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole("alert").textContent).toMatch(/This attempt did not change your name or restart the seven-day wait\./);
+      expect(screen.getByRole("alert").textContent).toMatch(/This attempt did not restart the waiting period\./);
     });
     expect(screen.getByLabelText("Manager Name").getAttribute("disabled")).not.toBeNull();
   });
@@ -194,12 +257,13 @@ describe("Settings beta preferences", () => {
   it("keeps the image-address fallback available and removes it immediately", async () => {
     render(<MemoryRouter><Settings /></MemoryRouter>);
 
+    state.updateProfile.mockResolvedValueOnce({ id: 7, firstName: "Adam", avatarUrl: "https://images.example.com/adam.jpg" });
     fireEvent.change(screen.getByLabelText("Profile image URL (optional)"), { target: { value: "https://images.example.com/adam.jpg" } });
     fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
-    await waitFor(() => expect(state.updateProfile).toHaveBeenCalledWith({ firstName: "Adam", avatarUrl: "https://images.example.com/adam.jpg" }));
+    await waitFor(() => expect(state.updateProfile).toHaveBeenCalledWith({ avatarUrl: "https://images.example.com/adam.jpg" }, expect.any(AbortSignal)));
 
     fireEvent.click(screen.getByRole("button", { name: /remove picture/i }));
-    await waitFor(() => expect(state.updateProfile).toHaveBeenLastCalledWith({ avatarUrl: null }));
+    await waitFor(() => expect(state.updateProfile).toHaveBeenLastCalledWith({ avatarUrl: null }, expect.any(AbortSignal)));
   });
 
   it("shows a chosen mobile photo for review and updates the visible avatar as soon as Confirm Photo is clicked", async () => {
@@ -220,7 +284,7 @@ describe("Settings beta preferences", () => {
     expect(screen.getByText(/manager\.png is ready/i)).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: /confirm photo/i }));
-    await waitFor(() => expect(state.updateProfile).toHaveBeenCalledWith({ avatarUrl: "data:image/jpeg;base64,/9j/4AAQ" }));
+    await waitFor(() => expect(state.updateProfile).toHaveBeenCalledWith({ avatarUrl: "data:image/jpeg;base64,/9j/4AAQ" }, expect.any(AbortSignal)));
     expect(screen.queryByRole("button", { name: /select photo/i })).toBeNull();
     expect(screen.getByAltText("Adam profile picture").getAttribute("src")).toBe(photoDataUrl);
 

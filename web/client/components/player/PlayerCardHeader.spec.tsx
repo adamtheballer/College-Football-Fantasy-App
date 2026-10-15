@@ -56,6 +56,10 @@ describe("PlayerCardHeader injury status", () => {
   it("normalizes provider casing for active labels", () => {
     expect(resolvePlayerCardStatus(undefined, "active")).toBe("ACTIVE");
   });
+  it("clears a stale contextual injury when the refreshed card has no current designation", () => {
+    expect(resolvePlayerCardStatus({ current_injury_status: null } as never, "OUT")).toBe("ACTIVE");
+    expect(resolvePlayerCardStatus(undefined, "OUT")).toBe("OUT");
+  });
 
   it("renders the reviewed injury designation instead of generic Active availability", () => {
     render(

@@ -3,6 +3,7 @@ import App from "./App";
 import { registerNativeDeepLinks } from "./lib/native-deep-links";
 
 void registerNativeDeepLinks();
+void import("./lib/push-notifications").then(({ initializeNativePush }) => initializeNativePush()).catch(() => { /* Settings exposes native configuration errors. */ });
 
 const container = document.getElementById("root");
 if (container) {

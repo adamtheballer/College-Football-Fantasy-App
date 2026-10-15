@@ -3,8 +3,8 @@ export function formatDraftProjection({
   seasonProjection,
   fallbackSeasonProjection,
 }: {
-  restOfSeasonProjection?: number;
-  seasonProjection?: number;
+  restOfSeasonProjection?: number | null;
+  seasonProjection?: number | null;
   /**
    * The preseason importer stores the same verified annual total inside its
    * statline payload.  Keep this as a display-only fallback so a partial API
@@ -13,7 +13,7 @@ export function formatDraftProjection({
   fallbackSeasonProjection?: number | null;
 }): string {
   for (const annualProjection of [restOfSeasonProjection, seasonProjection, fallbackSeasonProjection]) {
-    if (typeof annualProjection === "number" && Number.isFinite(annualProjection) && annualProjection > 0) {
+    if (typeof annualProjection === "number" && Number.isFinite(annualProjection) && annualProjection >= 0) {
       return annualProjection.toFixed(1);
     }
   }

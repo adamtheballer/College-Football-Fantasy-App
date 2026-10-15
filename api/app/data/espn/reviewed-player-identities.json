@@ -1,0 +1,185 @@
+{
+  "schema_version": 1,
+  "players": [
+    {
+      "player_id": 1865,
+      "catalog_name": "Cameron Ball",
+      "school": "West Virginia",
+      "catalog_position": "TE",
+      "provider_player_id": "4890881",
+      "provider_names": [
+        "Cam Ball"
+      ],
+      "provider_positions": [
+        "TE"
+      ],
+      "source_url": "https://wvusports.com/sports/football/roster/cam-ball/19673",
+      "provider_profile_url": "https://site.web.api.espn.com/apis/common/v3/sports/football/college-football/athletes/4890881",
+      "reviewed_at": "2026-10-14",
+      "evidence": {
+        "provider_display_name": "Cam Ball",
+        "provider_school": "West Virginia",
+        "provider_position": "TE"
+      },
+      "reason": "Official current roster and exact provider ID confirm the catalog spelling/abbreviation or documented role difference; school remains an exact separate check."
+    },
+    {
+      "player_id": 1296,
+      "catalog_name": "Carter Vegas",
+      "school": "California",
+      "catalog_position": "RB",
+      "provider_player_id": "5148905",
+      "provider_names": [
+        "Carter Vargas"
+      ],
+      "provider_positions": [
+        "RB"
+      ],
+      "source_url": "https://calbears.com/sports/football/roster",
+      "provider_profile_url": "https://site.web.api.espn.com/apis/common/v3/sports/football/college-football/athletes/5148905",
+      "reviewed_at": "2026-10-14",
+      "evidence": {
+        "provider_display_name": "Carter Vargas",
+        "provider_school": "California",
+        "provider_position": "RB"
+      },
+      "reason": "Official current roster and exact provider ID confirm the catalog spelling/abbreviation or documented role difference; school remains an exact separate check."
+    },
+    {
+      "player_id": 1241,
+      "catalog_name": "Joshua Phifer",
+      "school": "UCLA",
+      "catalog_position": "TE",
+      "provider_player_id": "5084910",
+      "provider_names": [
+        "Josh Phifer",
+        "Joshua Joseph Phifer"
+      ],
+      "provider_positions": [
+        "TE"
+      ],
+      "source_url": "https://uclabruins.com/sports/football/roster/season/2026/player/joshua-phifer",
+      "provider_profile_url": "https://site.web.api.espn.com/apis/common/v3/sports/football/college-football/athletes/5084910",
+      "reviewed_at": "2026-10-14",
+      "evidence": {
+        "provider_display_name": "Josh Phifer",
+        "provider_school": "UCLA",
+        "provider_position": "TE"
+      },
+      "reason": "Official current roster and exact provider ID confirm the catalog spelling/abbreviation or documented role difference; school remains an exact separate check."
+    },
+    {
+      "player_id": 1230,
+      "catalog_name": "Kameron Anthony",
+      "school": "Rutgers",
+      "catalog_position": "TE",
+      "provider_player_id": "5193264",
+      "provider_names": [
+        "Kam Anthony"
+      ],
+      "provider_positions": [
+        "TE"
+      ],
+      "source_url": "https://scarletknights.com/sports/football/roster/kameron-anthony/16485",
+      "provider_profile_url": "https://site.web.api.espn.com/apis/common/v3/sports/football/college-football/athletes/5193264",
+      "reviewed_at": "2026-10-14",
+      "evidence": {
+        "provider_display_name": "Kam Anthony",
+        "provider_school": "Rutgers",
+        "provider_position": "TE"
+      },
+      "reason": "Official current roster and exact provider ID confirm the catalog spelling/abbreviation or documented role difference; school remains an exact separate check."
+    },
+    {
+      "player_id": 1108,
+      "catalog_name": "Lendon Phillips Jr",
+      "school": "Iowa",
+      "catalog_position": "RB",
+      "provider_player_id": "5155048",
+      "provider_names": [
+        "L.J. Phillips Jr."
+      ],
+      "provider_positions": [
+        "RB"
+      ],
+      "source_url": "https://hawkeyesports.com/sports/football/roster/player/lj-phillips-jr",
+      "provider_profile_url": "https://site.web.api.espn.com/apis/common/v3/sports/football/college-football/athletes/5155048",
+      "reviewed_at": "2026-10-14",
+      "evidence": {
+        "provider_display_name": "L.J. Phillips Jr.",
+        "provider_school": "Iowa",
+        "provider_position": "RB"
+      },
+      "reason": "Official current roster and exact provider ID confirm the catalog spelling/abbreviation or documented role difference; school remains an exact separate check."
+    },
+    {
+      "player_id": 1415,
+      "catalog_name": "Derrick McFall",
+      "school": "SMU",
+      "catalog_position": "RB",
+      "provider_player_id": "5079523",
+      "provider_names": [
+        "Derrick McFall"
+      ],
+      "provider_positions": [
+        "WR",
+        "RB"
+      ],
+      "source_url": "https://smumustangs.com/sports/football/roster/derrick-mcfall/15560",
+      "provider_profile_url": "https://site.web.api.espn.com/apis/common/v3/sports/football/college-football/athletes/5079523",
+      "reviewed_at": "2026-10-14",
+      "evidence": {
+        "provider_display_name": "Derrick McFall",
+        "provider_school": "SMU",
+        "provider_position": "WR"
+      },
+      "reason": "Official current roster and exact provider ID confirm the catalog spelling/abbreviation or documented role difference; school remains an exact separate check."
+    },
+    {
+      "player_id": 1255,
+      "catalog_name": "Ryon Sayeri",
+      "school": "USC",
+      "catalog_position": "K",
+      "provider_player_id": "5221037",
+      "provider_names": [
+        "Ryon Sayeri"
+      ],
+      "provider_positions": [
+        "P",
+        "K"
+      ],
+      "source_url": "https://usctrojans.com/sports/football/roster/ryon-sayeri/18859",
+      "provider_profile_url": "https://site.web.api.espn.com/apis/common/v3/sports/football/college-football/athletes/5221037",
+      "reviewed_at": "2026-10-14",
+      "evidence": {
+        "provider_display_name": "Ryon Sayeri",
+        "provider_school": "USC",
+        "provider_position": "P"
+      },
+      "reason": "Official current roster and exact provider ID confirm the catalog spelling/abbreviation or documented role difference; school remains an exact separate check."
+    },
+    {
+      "player_id": 1734,
+      "catalog_name": "Will Stone",
+      "school": "UCF",
+      "catalog_position": "K",
+      "provider_player_id": "4868929",
+      "provider_names": [
+        "Will Stone"
+      ],
+      "provider_positions": [
+        "P",
+        "K"
+      ],
+      "source_url": "https://ucfknights.com/sports/football/roster/player/will-stone",
+      "provider_profile_url": "https://site.web.api.espn.com/apis/common/v3/sports/football/college-football/athletes/4868929",
+      "reviewed_at": "2026-10-14",
+      "evidence": {
+        "provider_display_name": "Will Stone",
+        "provider_school": "UCF",
+        "provider_position": "P"
+      },
+      "reason": "Official current roster and exact provider ID confirm the catalog spelling/abbreviation or documented role difference; school remains an exact separate check."
+    }
+  ]
+}

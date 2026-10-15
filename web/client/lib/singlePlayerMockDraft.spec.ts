@@ -735,3 +735,15 @@ describe("single-player mock draft engine", () => {
     expect(lastPick.assignedSlot).toBe("K");
   });
 });
+
+
+it("preserves deliberate queue precedence after the board is reordered", () => {
+  const base = createSinglePlayerMockDraft(1_000);
+  const currentPick = Array.from({length:base.teams.length},(_,index)=>index+1).find(pickNumber=>getTeamIdForPick(pickNumber,base.teams.length)===base.userTeamId)!;
+  const state = {...base,status:"live" as const,currentPick,pickStartedAt:1_000,pickExpiresAt:2_000,queuedPlayerIds:[604,601]};
+  const board = [player(601,"WR"),player(604,"WR")];
+  const advanced = advanceSinglePlayerMockDraft(state,board,2_001);
+  expect(advanced.picks[0].playerId).toBe(604);
+  expect(advanced.queuedPlayerIds).toEqual([601]);
+  expect(state.queuedPlayerIds).toEqual([604,601]);
+});

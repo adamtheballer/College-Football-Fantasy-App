@@ -12,6 +12,7 @@ import { PlayerTrajectoryChart } from "./PlayerTrajectoryChart";
 type PlayerCardTab = "news" | "summary" | "game-log" | "projections" | "history" | "value";
 
 export type PlayerCardModalPlayer = {
+  imageUrl?: string | null;
   id: number;
   name: string;
   school?: string | null;
@@ -301,7 +302,7 @@ export const completedSeasonGameTotals = (
     (game) => game.game_status === "final" && game.location !== "bye" && game.stats,
   );
   return {
-    gamesPlayed: completedGames.length,
+    gamesWithStats: completedGames.length,
     totals: gameLogColumnsForPosition(position).map(([label, keys]) => {
       let total = 0;
       let hasValue = false;
@@ -477,10 +478,12 @@ export function PlayerCardModal({
     activeTab === "game-log",
   );
   const historyQuery = useLeaguePlayerHistory(leagueId ?? undefined, player.id, activeTab === "history" && hasLeagueContext);
-  const valueQuery = usePlayerTradeValues(player.id, 2026);
+  // The API owns the configured football season. The live-game calendar
+  // year and the separately selected historical game-log year can differ.
+  const valueQuery = usePlayerTradeValues(player.id);
   const trajectoryQuery = usePlayerTrajectory(
     player.id,
-    2026,
+    undefined,
     leagueId,
     activeTab === "projections" || activeTab === "value",
   );
@@ -508,10 +511,6 @@ export function PlayerCardModal({
     () => completedSeasonGameTotals(selectedGameLogData?.games ?? [], position),
     [selectedGameLogData?.games, position],
   );
-  // Historical season totals are verified imports, but the app does not have
-  // complete historical schedules. Only the current CFB season can surface a
-  // schedule/game-by-game section.
-  const shouldShowGameLogSchedule = selectedGameLogData?.season === 2026;
   const weeklyProjectionStats = player.hasWeeklyProjection === false ? null : player.projection;
   const weeklyProjectionHighlights = [
     ["Fantasy", weeklyProjectionStats?.fpts ?? player.projectedPoints],
@@ -865,6 +864,14 @@ export function PlayerCardModal({
                   </select>
                 </label>
               </div>
+              {selectedGameLogData && !selectedGameLogData.games.some(row => row.stats) && selectedGameLogData.available_seasons.some(season => season < selectedGameLogData.season) ? (
+                <div className="mt-4 flex flex-wrap items-center gap-3 px-4 text-sm text-white/65 sm:px-0">
+                  <span>No verified game stats are available for {selectedGameLogData.season}.</span>
+                  <button type="button" className="font-bold text-cfb-brand underline underline-offset-4" onClick={() => setSelectedGameLogSeason(Math.max(...selectedGameLogData.available_seasons.filter(season => season < selectedGameLogData.season)))}>
+                    View {Math.max(...selectedGameLogData.available_seasons.filter(season => season < selectedGameLogData.season))} stats
+                  </button>
+                </div>
+              ) : null}
               {gameLogQuery.isLoading ? (
                 <div className="mt-5 flex min-h-40 items-center justify-center gap-3 rounded-2xl border border-white/10 bg-black/20 text-[10px] font-black uppercase tracking-[0.18em] text-white/55">
                   <Loader2 className="h-4 w-4 animate-spin" /> Loading game log
@@ -875,7 +882,7 @@ export function PlayerCardModal({
                 </p>
               ) : selectedGameLogData ? (
                 <>
-                {selectedGameLogData.season_summary || calculatedGameLogSummary.gamesPlayed > 0 ? (
+                {selectedGameLogData.season_summary || calculatedGameLogSummary.gamesWithStats > 0 ? (
                   <section className="mt-5 border-y border-cfb-border-subtle bg-cfb-surface px-4 py-4" aria-label={`${selectedGameLogData.season} season summary`}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">Season summary</p>
@@ -884,7 +891,7 @@ export function PlayerCardModal({
                     {selectedGameLogData.season_summary?.teams.length ? <p className="mt-1 text-xs font-bold text-white/55">{selectedGameLogData.season_summary.teams.join(" · ")}</p> : null}
                 <div className="mt-4 grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2 xl:grid-cols-3">
                       {[
-                        ...(selectedGameLogData.season_summary?.games_played !== null && selectedGameLogData.season_summary?.games_played !== undefined ? [["Games", selectedGameLogData.season_summary.games_played] as const] : calculatedGameLogSummary.gamesPlayed > 0 ? [["Games", calculatedGameLogSummary.gamesPlayed] as const] : []),
+                        ...(selectedGameLogData.season_summary?.games_played !== null && selectedGameLogData.season_summary?.games_played !== undefined ? [["Games", selectedGameLogData.season_summary.games_played] as const] : calculatedGameLogSummary.gamesWithStats > 0 ? [["Games with stats", calculatedGameLogSummary.gamesWithStats] as const] : []),
                         ...(selectedGameLogData.season_summary?.games_started !== null && selectedGameLogData.season_summary?.games_started !== undefined ? [["Starts", selectedGameLogData.season_summary.games_started] as const] : []),
                         ...(selectedGameLogData.season_summary?.stats.map((stat) => [stat.label, stat.value] as const) ?? calculatedGameLogSummary.totals.filter(([, value]) => value !== null)),
                         ...(selectedGameLogData.season_summary?.fantasy_points !== null && selectedGameLogData.season_summary?.fantasy_points !== undefined ? [["Fantasy points", selectedGameLogData.season_summary.fantasy_points] as const] : []),
@@ -897,7 +904,7 @@ export function PlayerCardModal({
                     </div>
                   </section>
                 ) : null}
-                {shouldShowGameLogSchedule && selectedGameLogData.games.length ? (
+                {selectedGameLogData.games.length ? (
                 <>
                 <div className="mt-5 overflow-x-auto border-y border-cfb-border-subtle" data-testid="player-game-log-table">
                   <table className="min-w-[44rem] w-full border-collapse text-left">
@@ -918,7 +925,7 @@ export function PlayerCardModal({
                         const resultLabel = gameLogResultLabel(row);
                         const isLive = isLiveGameLog(row);
                         return (
-                          <tr key={row.schedule_id} className="text-xs font-bold text-white/75 sm:text-sm">
+                          <tr key={row.provider_event_id ?? row.schedule_id} className="text-xs font-bold text-white/75 sm:text-sm">
                             <td className="px-3 py-3.5 font-black tabular-nums text-white sm:px-4 sm:py-4">{row.week}</td>
                             <td className="px-3 py-3.5 sm:px-4 sm:py-4">
                               <p className="font-black text-white">{gameLogOpponentLabel(row)}</p>
@@ -956,6 +963,7 @@ export function PlayerCardModal({
           ) : activeTab === "projections" ? (
             <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
               <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Fantasy Projection</p>
+              {trajectoryQuery.isError && trajectoryQuery.data ? <p role="status" className="mt-3 text-sm text-amber-200">Chart refresh failed. Showing the last loaded data.</p> : null}
               <div className="mt-5">
                 {trajectoryQuery.isLoading ? (
                   <div className="flex min-h-56 items-center justify-center gap-3 rounded-3xl border border-white/10 bg-black/20 text-[10px] font-black uppercase tracking-[0.18em] text-white/55">
@@ -971,17 +979,18 @@ export function PlayerCardModal({
                     <PlayerTrajectoryChart
                       ariaLabel={`${player.name} projected fantasy points by week`}
                       points={trajectoryQuery.data.projection.map((point) => (
-                        // A completed game owns its week. Do not overlay the
+                        // An authoritatively finalized week owns its actual. Do not overlay the
                         // old pregame estimate with a second point, which can
                         // look like two fantasy totals for one matchup.
-                        typeof point.actual_points === "number"
-                          ? { ...point, value: point.actual_points, actualValue: null, source: "actual" as const }
-                          : { ...point, value: point.points, actualValue: null }
+                        point.is_finalized
+                          ? { ...point, isFinalized:point.is_finalized, value: point.actual_points ?? null, forecastValue: point.points, actualValue: null, source: point.source === "bye" ? "bye" as const : point.actual_points == null ? "unavailable" as const : "actual" as const }
+                          : { ...point, isFinalized:point.is_finalized, value: point.points, actualValue: null }
                       ))}
                       yLabel="Points"
                       yMax={30}
                       valueFormatter={(value) => `${value.toFixed(1)} pts`}
                       seriesKind="projection"
+                      scoringLabel={hasLeagueContext ? "Selected league scoring" : "Standard CFFB scoring"}
                     />
                   </>
                 ) : trajectoryQuery.data ? (
@@ -1080,6 +1089,7 @@ export function PlayerCardModal({
           ) : (
             <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-5">
               <p className={cn("text-[10px] font-black uppercase tracking-[0.22em]", palette.accent)}>Trade Value</p>
+              {trajectoryQuery.isError && trajectoryQuery.data ? <p role="status" className="mt-3 text-sm text-amber-200">Chart refresh failed. Showing the last loaded data.</p> : null}
               <div className="mt-5">
                 {trajectoryQuery.isLoading ? (
                   <div className="flex min-h-56 items-center justify-center gap-3 rounded-3xl border border-white/10 bg-black/20 text-[10px] font-black uppercase tracking-[0.18em] text-white/55">
@@ -1091,7 +1101,7 @@ export function PlayerCardModal({
                     points={trajectoryQuery.data.value.map((point) => ({ ...point, value: point.value }))}
                     yLabel="Value"
                     yMax={100}
-                    valueFormatter={(value) => value.toFixed(0)}
+                    valueFormatter={(value) => value.toFixed(1)}
                     seriesKind="value"
                   />
                 ) : (

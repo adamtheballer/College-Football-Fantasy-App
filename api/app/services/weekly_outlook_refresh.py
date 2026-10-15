@@ -13,7 +13,7 @@ from collegefootballfantasy_api.app.models.defense_rating import DefenseRating
 from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
-from collegefootballfantasy_api.app.models.player_stat import PlayerStat
+from collegefootballfantasy_api.app.models.player_trade_value import PlayerTradeValue
 from collegefootballfantasy_api.app.models.team_environment import TeamEnvironment
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
@@ -25,7 +25,6 @@ from collegefootballfantasy_api.app.services.projections.engine import build_wee
 from collegefootballfantasy_api.app.services.projections.ranges import weighted_projection_outcomes
 from collegefootballfantasy_api.app.services.projections.usage import compute_usage_shares
 from collegefootballfantasy_api.app.services.power4 import canonical_school_name, normalize_school
-from collegefootballfantasy_api.app.scoring import calculate_fantasy_points
 
 
 POSTGAME_PROJECTION_VERSION = "MIDWEEK"
@@ -86,13 +85,8 @@ def _school_key(name: str | None) -> str | None:
 
 
 def _verified_fantasy_points(stats: dict | None, *, position: str) -> float | None:
-    if not stats:
-        return None
-    for key in ("fantasy_points", "fantasyPoints", "fpts"):
-        value = stats.get(key)
-        if isinstance(value, (int, float)) and not isinstance(value, bool):
-            return float(value)
-    return calculate_fantasy_points(stats, position=position)
+    from collegefootballfantasy_api.app.services.player_chart_publication import points_from_verified_stats
+    return points_from_verified_stats(stats or {},position=position)
 
 
 def performance_residual_adjustment(
@@ -298,7 +292,7 @@ def refresh_post_final_outlook(
     *,
     season: int,
     completed_week: int,
-) -> dict[str, int | str]:
+) -> dict[str, object]:
     """Refresh next-week model snapshots and values after an entire week is final.
 
     Existing higher-authority FINAL projections continue to win over these
@@ -306,13 +300,24 @@ def refresh_post_final_outlook(
     intentional and idempotently replaces only this service's snapshot.
     """
     next_week = completed_week + 1
+    chart_publication = {}
+    # Historical publication is independent of next week's schedule and must
+    # also run after the last regular-season week. It never changes standings.
+    if 1 <= completed_week <= 13 and _week_is_certified_final(db, season=season, week=completed_week):
+        from collegefootballfantasy_api.app.services.player_chart_publication import publish_finalized_chart_week
+        chart_publication = {"actual":publish_finalized_chart_week(db, season=season, week=completed_week),"value":calculate_weekly_trade_values(db, season=season, week=completed_week)}
     if completed_week < 0 or next_week > 13:
-        return {"status": "not_applicable", "projected_week": next_week, "projections": 0, "values": 0}
+        return {"status": "not_applicable", "projected_week": next_week, "projections": 0, "values": chart_publication.get("value",{}).get("calculated",0), "chart_publication":chart_publication}
     week_zero_teams = _completed_week_zero_teams(db, season=season) if completed_week == 0 else set()
     if completed_week == 0 and not week_zero_teams:
         return {"status": "waiting_for_finality", "projected_week": next_week, "projections": 0, "values": 0}
     if completed_week > 0 and not _week_is_certified_final(db, season=season, week=completed_week):
         return {"status": "waiting_for_finality", "projected_week": next_week, "projections": 0, "values": 0}
+    if completed_week==0:
+        # The opener is that school's fantasy Week 1 game. Freeze its valid
+        # pregame inputs before Week 0 production informs later forecasts.
+        from collegefootballfantasy_api.app.services.chart_forecasts import capture_started_chart_forecasts
+        capture_started_chart_forecasts(db,season=season,week=1)
 
     schedules = db.query(TeamSchedule).filter(
         TeamSchedule.season == season,
@@ -329,7 +334,7 @@ def refresh_post_final_outlook(
             key for team_name in week_zero_teams if (key := _school_key(team_name)) is not None
         )
     if not scheduled_team_keys:
-        return {"status": "waiting_for_schedule", "projected_week": next_week, "projections": 0, "values": 0}
+        return {"status": "waiting_for_schedule", "projected_week": next_week, "projections": 0, "values": chart_publication.get("value",{}).get("calculated",0), "chart_publication":chart_publication}
 
     # Do not use a case-sensitive SQL ``IN`` match here. The player pool
     # intentionally preserves source labels, including uppercase school
@@ -339,15 +344,8 @@ def refresh_post_final_outlook(
         for player in db.query(Player).all()
         if _school_key(player.school) in scheduled_team_keys
     ]
-    stats_by_player = {
-        row.player_id: row.stats
-        for row in db.query(PlayerStat).filter(
-            PlayerStat.season == season,
-            PlayerStat.week == completed_week,
-            PlayerStat.verified.is_(True),
-        )
-        .all()
-    }
+    from collegefootballfantasy_api.app.services.player_chart_publication import verified_fantasy_week_stats
+    stats_by_player = {player_id:row.stats for player_id,row in verified_fantasy_week_stats(db,season=season,week=completed_week,players=players).items()}
     prior_projection_by_player_id = {
         row.player_id: row
         for row in db.scalars(
@@ -479,15 +477,12 @@ def refresh_post_final_outlook(
 
     # Week 0 is player-data only. It must not change trade values tied to a
     # fantasy matchup period.
-    value_result = (
-        {"calculated": 0}
-        if completed_week == 0
-        else calculate_weekly_trade_values(db, season=season, week=completed_week)
-    )
+    value_result = {"calculated": 0 if completed_week == 0 else db.query(PlayerTradeValue).filter_by(season=season, week=completed_week).count()}
     db.flush()
     return {
         "status": "refreshed",
         "projected_week": next_week,
         "projections": len(projections),
         "values": int(value_result["calculated"]),
+        "chart_publication":chart_publication,
     }

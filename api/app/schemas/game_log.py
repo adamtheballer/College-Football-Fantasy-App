@@ -31,7 +31,10 @@ class PlayerGameLogSeasonSummaryRead(BaseModel):
 
 
 class PlayerGameLogRowRead(BaseModel):
-    schedule_id: int
+    schedule_id: int | None = None
+    provider_event_id: str | None = None
+    season_type: str | None = None
+    source_url: str | None = None
     game_id: int | None = None
     team_name: str
     week: int

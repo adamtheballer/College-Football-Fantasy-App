@@ -23,7 +23,7 @@ describe("PlayerTrajectoryChart", () => {
   it("renders a canonical weekly preweek baseline without inventing a preseason point", () => {
     renderChart([{ week: 1, value: 18.4, source: "published" }]);
 
-    expect(screen.getByText("Preweek baseline — actual fantasy points publish after each game")).toBeTruthy();
+    expect(screen.getByText("Projected until weekly finalization • Standard CFFB scoring")).toBeTruthy();
     expect(screen.getByText("Preweek")).toBeTruthy();
     expect(screen.getByText("Weekly projection")).toBeTruthy();
     expect(screen.getByText("Final fantasy points")).toBeTruthy();
@@ -33,17 +33,26 @@ describe("PlayerTrajectoryChart", () => {
     expect(screen.getByRole("img", { name: "Projection trajectory" }).querySelectorAll("circle[fill='#ffffff']")).toHaveLength(1);
   });
 
-  it("connects only consecutive published weekly records", () => {
-    renderChart([
-      { week: 1, value: 20.1, source: "published" },
-      { week: 2, value: 18.4, source: "published" },
-    ]);
+  it("does not draw multiple future forecasts returned by an older server", () => {
+    renderChart([{week: 1, value: 20.1, source: "published"}, {week: 2, value: 18.4, source: "published"}]);
+    expect(screen.queryByTestId("trajectory-projection-line")).toBeNull();
+    expect(screen.getByRole("img").querySelectorAll("circle[fill='#ffffff']")).toHaveLength(1);
+  });
 
-    expect(screen.getByText("Preweek baseline — actual fantasy points publish after each game")).toBeTruthy();
-    const projectionLine = screen.getByTestId("trajectory-projection-line");
-    expect(projectionLine.getAttribute("stroke")).toBe("#ffffff");
-    expect(projectionLine.getAttribute("stroke-dasharray")).toBe("7 7");
-    expect(screen.getByTestId("trajectory-point-baseline-1-0").getAttribute("fill")).toBe("#ffffff");
+  it("anchors the single dotted forecast to the last finalized actual without adding a point", () => {
+    renderChart([{week: 6, value: 18.4, source: "actual"}, {week: 7, value: 21.2, source: "published"}]);
+    expect(screen.getByTestId("trajectory-projection-line").getAttribute("stroke-dasharray")).toBe("7 7");
+    expect(screen.getByRole("img").querySelectorAll("circle")).toHaveLength(2);
+    expect(screen.queryByTestId("trajectory-actual-line")).toBeNull();
+  });
+
+  it("uses solid blue for all consecutive value history and supports negative actual points", () => {
+    const {unmount} = render(<PlayerTrajectoryChart ariaLabel="Value" points={[{week:0,value:91,source:"preseason"},{week:1,value:80,source:"published"}]} yLabel="Value" yMax={100} valueFormatter={String} />);
+    expect(screen.getByTestId("trajectory-value-line").getAttribute("stroke")).toBe("#2f80ff");
+    expect(screen.getByTestId("trajectory-value-line").getAttribute("stroke-dasharray")).toBeNull();
+    unmount();
+    renderChart([{week:1,value:-2,source:"actual"},{week:2,value:0,source:"actual"}]);
+    expect(screen.getByTestId("trajectory-point-week-1").getAttribute("cy")).not.toBe(screen.getByTestId("trajectory-point-week-2").getAttribute("cy"));
   });
 
   it("uses blue only for actual fantasy-point totals", () => {
@@ -72,7 +81,7 @@ describe("PlayerTrajectoryChart", () => {
     const chart = screen.getByRole("img", { name: "Projection trajectory" });
     expect(chart.querySelectorAll("circle[fill='#5ee7ff']")).toHaveLength(0);
     expect(chart.querySelectorAll("circle[fill='#2f80ff']")).toHaveLength(1);
-    expect(chart.querySelector("title")?.textContent).toBe("Week 1 actual fantasy points: 25.2 pts");
+    expect(chart.querySelector("title")?.textContent).toBe("Week 1 actual fantasy points (Finalized): 25.2 pts • Projected 18.4 pts");
   });
 
   it("keeps each final total under the week that produced it", () => {
@@ -81,17 +90,17 @@ describe("PlayerTrajectoryChart", () => {
       { week: 2, value: 19.0, actualValue: 4.2, source: "published" },
     ]);
 
-    const weekOne = screen.getByTestId("trajectory-point-actual-1-0");
-    const weekTwo = screen.getByTestId("trajectory-point-actual-2-1");
+    const weekOne = screen.getByTestId("trajectory-point-week-1");
+    const weekTwo = screen.getByTestId("trajectory-point-week-2");
     expect(weekOne.getAttribute("cx")).not.toBe(weekTwo.getAttribute("cx"));
-    expect(weekOne.getAttribute("aria-label")).toContain("Week 1 actual fantasy points: 17.1 pts");
-    expect(weekTwo.getAttribute("aria-label")).toContain("Week 2 actual fantasy points: 4.2 pts");
+    expect(weekOne.getAttribute("aria-label")).toContain("Week 1 actual fantasy points (Finalized): 17.1 pts");
+    expect(weekTwo.getAttribute("aria-label")).toContain("Week 2 actual fantasy points (Finalized): 4.2 pts");
   });
 
   it("shows a precise value on hover and lets touch users toggle that value", () => {
     renderChart([{ week: 1, value: 18.4, source: "published" }]);
 
-    const point = screen.getByTestId("trajectory-point-baseline-1-0");
+    const point = screen.getByTestId("trajectory-point-week-1");
     fireEvent.pointerEnter(point);
     expect(screen.getByTestId("trajectory-point-value").textContent).toContain("18.4 pts");
 
@@ -126,5 +135,37 @@ describe("PlayerTrajectoryChart", () => {
 
     expect(screen.getByText("BYE")).toBeTruthy();
     expect(screen.getByRole("img", { name: "Projection trajectory" }).querySelectorAll("circle")).toHaveLength(0);
+  });
+});
+
+
+describe("Chart refresh identity", () => {
+  afterEach(cleanup);
+  it("retains the selected week when an earlier week arrives and a projection finalizes", () => {
+    const props = {ariaLabel:"Refresh", yLabel:"Points", yMax:30, valueFormatter:String, seriesKind:"projection" as const};
+    const {rerender} = render(<PlayerTrajectoryChart {...props} points={[{week:6,value:18.4,source:"actual"},{week:7,value:21.2,source:"published"}]} />);
+    fireEvent.click(screen.getByTestId("trajectory-point-week-7"));
+    rerender(<PlayerTrajectoryChart {...props} points={[{week:5,value:0,source:"actual"},{week:6,value:18.4,source:"actual"},{week:7,value:24.6,forecastValue:21.2,source:"actual"},{week:8,value:23,source:"published"}]} />);
+    expect(screen.getByTestId("trajectory-point-week-7").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("trajectory-point-value").textContent).toContain("24.6 • Projected 21.2");
+    expect(screen.getByTestId("trajectory-point-week-6").getAttribute("aria-label")).not.toContain("Projected");
+  });
+  it("does not manufacture original forecasts from actual-only records", () => {
+    renderChart([{week:6,value:18.4,source:"actual"}]);
+    expect(screen.getByTestId("trajectory-point-week-6").getAttribute("aria-label")).not.toContain("Projected");
+  });
+  it("breaks the solid path across a missing week", () => {
+    renderChart([{week:4,value:10,source:"actual"},{week:5,value:11,source:"actual"},{week:7,value:12,source:"actual"}]);
+    expect(screen.getByTestId("trajectory-actual-line").getAttribute("d")?.match(/M/g)).toHaveLength(2);
+  });
+});
+
+describe("Unfinished historical gaps",()=>{
+  afterEach(cleanup);
+  it("labels a delayed week without claiming it is finalized or scoring it as zero",()=>{
+    render(<PlayerTrajectoryChart ariaLabel="Pending week" points={[{week:2,value:null,source:"unavailable",isFinalized:false}]} yLabel="Points" yMax={30} valueFormatter={String} seriesKind="projection" />);
+    const chart=screen.getByRole("img");
+    expect(chart.querySelector("title")?.textContent).toContain("awaiting weekly finalization");
+    expect(chart.querySelectorAll("circle")).toHaveLength(0);
   });
 });

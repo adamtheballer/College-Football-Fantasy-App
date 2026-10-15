@@ -95,7 +95,12 @@ def canonical_historical_season_rows(
             < HISTORICAL_PROVIDER_PRIORITY.get(existing.provider, 99)
         ):
             canonical_rows[key] = row
-    return sorted(canonical_rows.values(), key=lambda row: (row.season, row.id), reverse=True)
+    # Keep official imported season totals authoritative. For a season with
+    # no such rows, expose the verified per-game history already in storage.
+    from collegefootballfantasy_api.app.services.player_game_history import derived_historical_season_rows
+    known_seasons={row.season for row in canonical_rows.values()}
+    derived=[row for row in derived_historical_season_rows(db,player_id=player_id,season=season) if row.season not in known_seasons]
+    return sorted([*canonical_rows.values(),*derived], key=lambda row: (row.season, row.id or 0), reverse=True)
 
 
 def _team_id_for_provider_team(db: Session, provider_team_id: str | None, team_name: str | None) -> int | None:
@@ -208,6 +213,7 @@ def upsert_historical_player_history(
                 PlayerHistoricalSeasonStat.provider == history.provider,
                 PlayerHistoricalSeasonStat.season == season.season,
                 PlayerHistoricalSeasonStat.season_type == season.season_type,
+                PlayerHistoricalSeasonStat.team_name == season.team_name,
             )
             .first()
         )

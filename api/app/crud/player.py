@@ -45,6 +45,8 @@ def list_players(
     available_only: bool = False,
     draft_eligible: bool = False,
     sort: str | None = None,
+    ranking_snapshot: dict | None = None,
+    season: int | None = None,
 ) -> tuple[list[Player], int]:
     # Retained legacy-canonical rows are historical records, not discoverable
     # current players.  Keep generic provider/history rows available while
@@ -63,7 +65,7 @@ def list_players(
         # can expose historical/provider records.  A draft board cannot be:
         # it must be exactly the approved immutable snapshot for the league
         # season (or the current beta season when browsing outside a league).
-        season = 2026
+        season = season or settings.current_season_year
         if league_id is not None:
             league_season = db.scalar(select(League.season_year).where(League.id == league_id))
             if league_season is not None:
@@ -104,10 +106,27 @@ def list_players(
         )
         stmt = stmt.where(Player.id.not_in(rostered_players), Player.id.not_in(draft_picked_players))
 
+    if draft_eligible and sort in {"rank", "draft_rank", "adp", "projected_points"}:
+        from collegefootballfantasy_api.app.services.draft_rankings import build_draft_ranking_snapshot, rank, number
+        snapshot = ranking_snapshot or build_draft_ranking_snapshot(db, season=season, league_id=league_id)
+        candidates = db.scalars(stmt).all()
+        board = snapshot["board"]
+        def key(player):
+            row = board.get(player.id, {})
+            if sort == "adp":
+                adp = rank(player.sheet_adp)
+                return (adp is None, adp if adp is not None else float("inf"), player.id)
+            if sort == "projected_points":
+                points = number(row.get("projectedPoints"))
+                return (points is None, -points if points is not None else 0, player.id)
+            return (row.get("masterDraftRank", float("inf")), player.id)
+        candidates.sort(key=key)
+        return candidates[offset:offset+limit], len(candidates)
+
     if sort == "rank":
         invalid_rank_sort_bucket = case(
-            (Player.cfb27_rank.isnot(None), 0),
-            (Player.sheet_adp.isnot(None), 1),
+            (Player.cfb27_rank > 0, 0),
+            (Player.sheet_adp > 0, 1),
             else_=2,
         )
         stmt = stmt.order_by(
@@ -130,11 +149,11 @@ def list_players(
             Player.id.asc(),
         )
     elif sort == "school":
-        stmt = stmt.order_by(Player.school.asc(), Player.name.asc())
+        stmt = stmt.order_by(Player.school.asc(), Player.name.asc(), Player.id.asc())
     elif sort == "position":
-        stmt = stmt.order_by(Player.position.asc(), Player.name.asc())
+        stmt = stmt.order_by(Player.position.asc(), Player.name.asc(), Player.id.asc())
     else:
-        stmt = stmt.order_by(Player.name.asc())
+        stmt = stmt.order_by(Player.name.asc(), Player.id.asc())
 
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total = db.scalar(count_stmt)

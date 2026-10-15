@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { User, Sliders, Shield, Save, LogOut, ImagePlus, Trash2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,8 @@ import {
 import { useNavigate } from "react-router-dom";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
+import { useNameChangeEligibility } from "@/hooks/use-name-change-eligibility";
+import { formatNameChangeWait } from "@/lib/name-change";
 import { restartGuide } from "@/lib/onboarding";
 import { useLeagues } from "@/hooks/use-leagues";
 import { useActiveLeagueId } from "@/hooks/use-active-league";
@@ -124,9 +126,9 @@ export default function Settings() {
   const [avatarPreviewError, setAvatarPreviewError] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileErrorField, setProfileErrorField] = useState<"first_name" | "avatar_url" | null>(null);
-  const [managerNameCooldownOverride, setManagerNameCooldownOverride] = useState<string | null>(null);
-  const [managerNameLastChangedOverride, setManagerNameLastChangedOverride] = useState<string | null>(null);
-  const [managerNameCooldownNow, setManagerNameCooldownNow] = useState(() => Date.now());
+  const eligibility = useNameChangeEligibility(user?.id ?? null, Boolean(user) && !isBootstrapping);
+  const profileSaveRef = useRef<AbortController>();
+  const accountIdRef = useRef(user?.id);
   const [pendingNameChange, setPendingNameChange] = useState<{ name: string; avatarUrl: string | null } | null>(null);
   const [securityMessage, setSecurityMessage] = useState<string | null>(null);
   const [isSendingReset, setIsSendingReset] = useState(false);
@@ -153,94 +155,83 @@ export default function Settings() {
     setAvatarPreviewError(false);
     setProfileError(null);
     setProfileErrorField(null);
-    setManagerNameCooldownOverride(null);
-    setManagerNameLastChangedOverride(null);
+
   }, [user]);
 
-  const managerNameChangeAvailableAt = managerNameCooldownOverride ?? user?.managerNameChangeAvailableAt ?? null;
-  const managerNameLastChangedAt = managerNameLastChangedOverride ?? user?.managerNameChangedAt ?? null;
-  useEffect(() => {
-    const availableAt = managerNameChangeAvailableAt ? Date.parse(managerNameChangeAvailableAt) : Number.NaN;
-    if (!Number.isFinite(availableAt) || availableAt <= Date.now()) return undefined;
-    // Keep a still-open Settings page accurate at the exact unlock time; the
-    // durable timestamp still comes from the user record on every refresh.
-    const timeout = window.setTimeout(() => setManagerNameCooldownNow(Date.now()), availableAt - Date.now() + 50);
-    return () => window.clearTimeout(timeout);
-  }, [managerNameChangeAvailableAt]);
-  const managerNameCooldownActive = Boolean(
-    managerNameChangeAvailableAt && Number.isFinite(Date.parse(managerNameChangeAvailableAt)) && Date.parse(managerNameChangeAvailableAt) > managerNameCooldownNow,
-  );
-  const managerNameAvailableDate = managerNameChangeAvailableAt
-    ? new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(new Date(managerNameChangeAvailableAt))
-    : null;
-  const managerNameAvailableDateTime = managerNameChangeAvailableAt
-    ? new Intl.DateTimeFormat(undefined, {
-      month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
-    }).format(new Date(managerNameChangeAvailableAt))
-    : null;
-  const managerNameLastChangedDateTime = managerNameLastChangedAt
-    ? new Intl.DateTimeFormat(undefined, {
-      month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
-    }).format(new Date(managerNameLastChangedAt))
+  useLayoutEffect(() => {
+    accountIdRef.current = user?.id;
+    setSaveState("idle");
+    setPendingNameChange(null);
+    return () => {
+      accountIdRef.current = undefined;
+      profileSaveRef.current?.abort();
+      profileSaveRef.current = undefined;
+      if (saveStateResetTimeoutRef.current) clearTimeout(saveStateResetTimeoutRef.current);
+    };
+  }, [user?.id]);
+
+  const managerNameCooldownActive = eligibility.phase === "ready" && eligibility.timing?.can_change_name === false;
+  const managerNameAvailableDateTime = eligibility.timing?.next_eligible_at
+    ? new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit", timeZoneName: "short" }).format(new Date(eligibility.timing.next_eligible_at))
     : null;
 
   const showProfileError = (error: unknown, fallback: string, preferredField: "first_name" | "avatar_url" | null = null) => {
     const apiError = error instanceof ApiError ? error : null;
-    const field = apiError?.field === "first_name" || apiError?.field === "avatar_url"
-      ? apiError.field
-      : preferredField;
-    if (apiError?.retryAt && field === "first_name") {
-      setManagerNameCooldownOverride(apiError.retryAt);
-      setManagerNameLastChangedOverride(apiError.lastSuccessfulChangeAt ?? null);
-      const retryAt = new Date(apiError.retryAt);
-      const message = Number.isNaN(retryAt.getTime())
-        ? "Need to wait before changing your manager name."
-        : `Your previous manager-name change is still locked until ${new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }).format(retryAt)}. This attempt did not change your name or restart the seven-day wait.`;
-      setProfileError(message);
+    const field = apiError?.field === "first_name" || apiError?.field === "avatar_url" ? apiError.field : preferredField;
+    if (apiError?.code === "NAME_CHANGE_COOLDOWN") {
+      if (apiError.nameChangeEligibility) eligibility.accept(apiError.nameChangeEligibility);
+      void eligibility.refresh();
+      setProfileError("Your name was not changed. This attempt did not restart the waiting period.");
     } else {
       setProfileError(error instanceof Error && error.message ? error.message : fallback);
     }
     setProfileErrorField(field);
   };
 
+  // Only reconcile a newly fetched name when the manager has not started
+  // editing. An earlier eligibility request cannot overwrite an in-flight save.
+  const previousAuthoritativeName = useRef(user?.firstName ?? "");
+  useEffect(() => {
+    const name = eligibility.timing?.current_name;
+    if (eligibility.phase !== "ready" || !name || profileSaveRef.current) return;
+    setManagerName((draft) => draft === previousAuthoritativeName.current ? name : draft);
+    previousAuthoritativeName.current = name;
+  }, [eligibility.phase, eligibility.timing]);
+
   const saveProfile = async (nextName: string, nextAvatarUrl: string | null) => {
-    if (!user) return;
+    if (!user || profileSaveRef.current) return;
+    const input: { firstName?: string; avatarUrl?: string | null } = {};
+    if (nextName !== (eligibility.timing?.current_name ?? user.firstName)) input.firstName = nextName;
+    if (nextAvatarUrl !== (user.avatarUrl?.trim() || null)) input.avatarUrl = nextAvatarUrl;
+    if (Object.keys(input).length === 0) return;
+    const accountId = user.id;
+    const controller = new AbortController(); profileSaveRef.current = controller;
+    eligibility.invalidate();
     setSaveState("saving");
-    setProfileError(null);
-    setProfileErrorField(null);
+    setProfileError(null); setProfileErrorField(null);
     try {
-      const updatedUser = await updateProfile({ firstName: nextName, avatarUrl: nextAvatarUrl });
-      // A profile PATCH response is the source of truth. Never show a success
-      // state merely because the request completed: a gateway/cache regression
-      // that returns the old profile must stay visible to the manager instead
-      // of looking like a successful name change.
-      if (updatedUser.firstName !== nextName) {
-        throw new Error("Your manager name was not changed. Please try again.");
-      }
-      setManagerName(updatedUser.firstName);
-      setAvatarUrl(updatedUser.avatarUrl ?? "");
-      setManagerNameCooldownOverride(updatedUser.managerNameChangeAvailableAt ?? null);
-      setManagerNameLastChangedOverride(updatedUser.managerNameChangedAt ?? null);
+      // Omit unchanged fields. Re-validating an unrelated legacy avatar used
+      // to reject an otherwise eligible display-name update with HTTP 422.
+      const updatedUser = await updateProfile(input, controller.signal);
+      if (controller.signal.aborted || accountIdRef.current !== accountId) return;
+      if (updatedUser.id !== accountId || updatedUser.firstName !== nextName) throw new Error("Your manager name was not changed. Please try again.");
+      setManagerName(updatedUser.firstName); setAvatarUrl(updatedUser.avatarUrl ?? "");
+      previousAuthoritativeName.current = updatedUser.firstName;
       setSaveState("saved");
-      if (saveStateResetTimeoutRef.current) {
-        clearTimeout(saveStateResetTimeoutRef.current);
-      }
-      saveStateResetTimeoutRef.current = setTimeout(() => {
-        saveStateResetTimeoutRef.current = null;
-        setSaveState("idle");
-      }, 1500);
+      void eligibility.refresh();
+      if (saveStateResetTimeoutRef.current) clearTimeout(saveStateResetTimeoutRef.current);
+      saveStateResetTimeoutRef.current = setTimeout(() => { saveStateResetTimeoutRef.current = null; setSaveState("idle"); }, 1500);
     } catch (error) {
-      showProfileError(
-        error,
-        "Unable to save your profile. Your previous settings are still active.",
-        "first_name"
-      );
+      if (controller.signal.aborted || accountIdRef.current !== accountId) return;
+      showProfileError(error, "Unable to save your profile. Your previous settings are still active.", "first_name");
       setSaveState("error");
+    } finally {
+      if (profileSaveRef.current === controller) profileSaveRef.current = undefined;
     }
   };
 
   const handleSave = () => {
-    if (!user) return;
+    if (!user || profileSaveRef.current || photoState === "saving") return;
     const nextName = managerName.trim();
     const nextAvatarUrl = avatarUrl.trim() || null;
     if (!nextName) {
@@ -257,7 +248,10 @@ export default function Settings() {
     }
     setProfileError(null);
     setProfileErrorField(null);
-    const isNameChange = nextName !== user.firstName;
+    const isNameChange = nextName !== (eligibility.timing?.current_name ?? user.firstName);
+    if (isNameChange && eligibility.phase !== "ready") {
+      setProfileError("Name-change availability could not be confirmed. Retry the availability check before saving."); setProfileErrorField("first_name"); return;
+    }
     if (isNameChange && managerNameCooldownActive) {
       setProfileError(`Need to wait until ${managerNameAvailableDateTime ?? "a later date"} before changing your manager name.`);
       setProfileErrorField("first_name");
@@ -278,6 +272,7 @@ export default function Settings() {
   };
 
   const handlePhotoChosen = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const accountId = user?.id;
     const photo = event.target.files?.[0];
     // Reset first so choosing the same image again emits a change event.
     event.target.value = "";
@@ -289,17 +284,21 @@ export default function Settings() {
     setAvatarPreviewError(false);
     try {
       const preparedPhoto = await prepareProfileImage(photo);
+      if (accountIdRef.current !== accountId) return;
       setPendingAvatarUrl(preparedPhoto);
       setPendingAvatarName(photo.name);
     } catch (error) {
+      if (accountIdRef.current !== accountId) return;
       showProfileError(error, "Unable to prepare this photo.", "avatar_url");
     } finally {
-      setPhotoState("idle");
+      if (accountIdRef.current === accountId) setPhotoState("idle");
     }
   };
 
   const handleConfirmPhoto = async () => {
-    if (!pendingAvatarUrl) return;
+    if (!pendingAvatarUrl || !user || profileSaveRef.current) return;
+    const accountId = user.id;
+    const controller = new AbortController(); profileSaveRef.current = controller;
     const confirmedAvatarUrl = pendingAvatarUrl;
     const previousAvatarUrl = avatarUrl;
 
@@ -315,17 +314,22 @@ export default function Settings() {
     setProfileError(null);
     setProfileErrorField(null);
     try {
-      const updatedUser = await updateProfile({ avatarUrl: confirmedAvatarUrl });
+      const updatedUser = await updateProfile({ avatarUrl: confirmedAvatarUrl }, controller.signal);
+      if (controller.signal.aborted || accountIdRef.current !== accountId) return;
       setAvatarUrl(updatedUser.avatarUrl ?? confirmedAvatarUrl);
     } catch (error) {
+      if (controller.signal.aborted || accountIdRef.current !== accountId) return;
       setAvatarUrl(previousAvatarUrl);
       showProfileError(error, "Unable to update your profile picture. Your previous picture is still active.", "avatar_url");
     } finally {
-      setPhotoState("idle");
+      if (profileSaveRef.current === controller) { profileSaveRef.current = undefined; setPhotoState("idle"); }
     }
   };
 
   const handleRemovePhoto = async () => {
+    if (!user || profileSaveRef.current) return;
+    const accountId = user.id;
+    const controller = new AbortController(); profileSaveRef.current = controller;
     setPendingAvatarUrl(null);
     setPendingAvatarName(null);
     setAvatarPreviewError(false);
@@ -333,12 +337,14 @@ export default function Settings() {
     setProfileError(null);
     setProfileErrorField(null);
     try {
-      await updateProfile({ avatarUrl: null });
+      await updateProfile({ avatarUrl: null }, controller.signal);
+      if (controller.signal.aborted || accountIdRef.current !== accountId) return;
       setAvatarUrl("");
     } catch (error) {
+      if (controller.signal.aborted || accountIdRef.current !== accountId) return;
       showProfileError(error, "Unable to remove your profile picture. Your previous picture is still active.", "avatar_url");
     } finally {
-      setPhotoState("idle");
+      if (profileSaveRef.current === controller) { profileSaveRef.current = undefined; setPhotoState("idle"); }
     }
   };
 
@@ -457,7 +463,7 @@ export default function Settings() {
           <Button
             className="h-10 w-full rounded-md bg-primary px-5 text-[10px] font-black uppercase tracking-[0.14em] text-primary-foreground shadow-none sm:w-auto"
             onClick={handleSave}
-            disabled={saveState === "saving" || photoState === "saving"}
+            disabled={saveState === "saving" || photoState === "saving" || (managerName.trim() !== (eligibility.timing?.current_name ?? user.firstName) && eligibility.phase !== "ready")}
           >
             <Save className="w-4 h-4 mr-3" />
             {saveState === "saving" ? "Saving..." : saveState === "saved" ? "Saved" : "Save Changes"}
@@ -506,10 +512,17 @@ export default function Settings() {
                 </p>
               ) : null}
               {managerNameCooldownActive ? (
-                <p className="text-xs font-medium text-muted-foreground">
-                  {managerNameLastChangedDateTime ? `Your last successful manager-name change was ${managerNameLastChangedDateTime}. ` : ""}
-                  Name changes are available again on {managerNameAvailableDate}. Attempts while locked do not reset this date.
+                <p className="text-xs font-medium text-muted-foreground" data-testid="name-change-wait">
+                  You can change your name again in {formatNameChangeWait(eligibility.remainingSeconds)}.
+                  <span className="block">Available: {managerNameAvailableDateTime}.</span>
                 </p>
+              ) : eligibility.phase === "checking" ? (
+                <p className="text-xs font-medium text-muted-foreground">Checking name-change availability…</p>
+              ) : eligibility.phase === "error" ? (
+                <div className="text-xs font-medium text-muted-foreground">
+                  <p>We couldn’t check name-change availability. Your name is unchanged.</p>
+                  <Button type="button" variant="link" className="h-auto px-0 text-xs" onClick={() => void eligibility.refresh()}>Retry availability check</Button>
+                </div>
               ) : (
                 <p className="text-xs font-medium text-muted-foreground">You can change your manager name once every 7 days.</p>
               )}
