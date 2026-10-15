@@ -1,0 +1,16 @@
+meta {
+  name: Season Championship
+  type: http
+  seq: 6
+}
+get {
+  url: {{base_url}}/weekly-challenges/leaderboard?season={{challenge_season}}
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+docs {
+  Combined-release feature: run only against the isolated local preview until release approval.
+  Read current IDs, publication version and entry revision from API responses.
+  SaveEntry and Configure examples are for Lock of the Week; other formats need their complete published selections.
+}

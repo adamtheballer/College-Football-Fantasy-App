@@ -69,7 +69,10 @@ def test_before_expiration_rejects_with_ceiling_and_complete_server_timing(clien
     with TestingSessionLocal() as db:
         user = db.get(User, user_id)
         assert user.first_name == "Old Manager"
-        assert user.manager_name_changed_at.replace(tzinfo=timezone.utc) == last
+        stored = user.manager_name_changed_at
+        # PostgreSQL may return the session's Eastern offset; replacing that
+        # offset changes the instant. SQLite alone needs the naive UTC fallback.
+        assert (stored if stored.tzinfo else stored.replace(tzinfo=timezone.utc)) == last
 
 
 def test_expired_name_only_save_does_not_resend_invalid_unchanged_legacy_avatar(client):

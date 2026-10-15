@@ -805,3 +805,28 @@ def test_legacy_play_preferences_cannot_be_reenabled_globally_or_per_league(clie
     assert not retired.keys() & response.json()["data"][0].keys()
     db_session.refresh(global_pref); db_session.refresh(league_pref)
     assert all(getattr(pref,key) is False for pref in (global_pref,league_pref) for key in retired)
+
+
+def test_diagnostic_alert_without_league_returns_actionable_validation(client, db_session):
+    identity = create_user(client, 'diagnostic-no-league')
+    response = client.post('/notifications/alerts/test', headers=auth_headers(identity['access_token']))
+    assert response.status_code == 422
+    assert response.json()['detail'] == 'join a league before creating a test notification'
+    assert db_session.query(ScheduledNotification).count() == 0
+
+
+def test_diagnostic_alert_for_multiple_leagues_uses_one_membership_and_real_worker(client, db_session):
+    identity = create_user(client, 'diagnostic-multi-league')
+    token = identity['access_token']
+    first = create_league(client, token, 'First diagnostic league')
+    create_league(client, token, 'Second diagnostic league')
+    response = client.post('/notifications/alerts/test', headers=auth_headers(token))
+    assert response.status_code == 200
+    event = db_session.get(ScheduledNotification, response.json()['id'])
+    assert event.user_id == identity['user']['id'] and event.league_id == first['id']
+    assert event.status == 'pending'
+    push, email = FakePushProvider(), FakeEmailProvider()
+    process_due_notifications_once(db_session, now=datetime.now(timezone.utc)+timedelta(seconds=1), push_provider=push, email_provider=email)
+    history = client.get('/notifications/alerts', headers=auth_headers(token)).json()
+    assert any(row['title'] == response.json()['title'] for row in history['data'])
+    assert history['unread_count'] >= 1

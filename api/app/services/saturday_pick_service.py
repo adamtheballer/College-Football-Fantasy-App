@@ -108,19 +108,8 @@ def _eligible_schedule(db: Session, player: Player, season: int, week: int) -> T
 
 
 def _is_known_out(db: Session, player_id: int, season: int, week: int) -> bool:
-    return (
-        db.query(PlayerAvailabilityEvent.id)
-        .filter(
-            PlayerAvailabilityEvent.player_id == player_id,
-            PlayerAvailabilityEvent.season == season,
-            PlayerAvailabilityEvent.status.in_(("OUT", "SUSPENDED", "INELIGIBLE")),
-            PlayerAvailabilityEvent.effective_from_week <= week,
-            (PlayerAvailabilityEvent.effective_until_week.is_(None))
-            | (PlayerAvailabilityEvent.effective_until_week >= week),
-        )
-        .first()
-        is not None
-    )
+    from collegefootballfantasy_api.app.services.injury_status import confirmed_nonparticipant_ids
+    return player_id in confirmed_nonparticipant_ids(db, season=season, week=week, player_ids={player_id}, reviewed_only=False)
 
 
 def _weekly_projection(db: Session, player_id: int, season: int, week: int) -> float | None:

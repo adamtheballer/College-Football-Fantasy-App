@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   apiGet,
+  apiChallengeWrite,
+  apiReleaseNoticeClaim,
   apiPatch,
   apiDelete,
   apiPut,
@@ -360,5 +362,38 @@ describe("api client", () => {
     expect(storage.get("cfb_access_token_expires_at")).toBeUndefined();
     expect(removeItem).toHaveBeenCalledWith("cfb_access_token");
     expect(dispatchEvent).toHaveBeenCalledWith(expect.objectContaining({ type: "cfb-auth-changed" }));
+  });
+});
+
+
+describe("weekly challenge account preconditions", () => {
+  it("preserves the original account across a token refresh", async () => {
+    const storage = new Map<string, string>();
+    vi.stubGlobal("window", { dispatchEvent: vi.fn(), location: { hostname: "localhost", protocol: "http:", origin: "http://localhost" } });
+    vi.stubGlobal("localStorage", { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value), removeItem: (key: string) => storage.delete(key) });
+    storeAccessTokenSession("expired-challenge-token", "2026-01-01T00:00:00Z");
+    globalThis.fetch = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ detail: "expired access token" }), { status: 401 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "refreshed-token", access_token_expires_at: "2099-01-01T00:00:00Z" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ detail: { code: "VERSION_CONFLICT", message: "Your signed-in account changed." } }), { status: 409 }));
+    await expect(apiChallengeWrite(11, "PUT", "/weekly-challenges/challenges/13/entry", { expected_revision: 0, selections: [] })).rejects.toMatchObject({ status: 409 });
+    for (const index of [1, 3]) expect(globalThis.fetch).toHaveBeenNthCalledWith(index, expect.stringContaining("/weekly-challenges/challenges/13/entry"), expect.objectContaining({ headers: expect.objectContaining({ "X-CFFB-Challenge-Account": "11" }) }));
+    clearAccessTokenSession();
+  });
+});
+
+describe("release notice account preconditions", () => {
+  it("keeps the account precondition through authentication refresh", async () => {
+    const storage = new Map<string, string>();
+    vi.stubGlobal("window", { dispatchEvent: vi.fn(), location: { hostname: "localhost", protocol: "http:", origin: "http://localhost" } });
+    vi.stubGlobal("localStorage", { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value), removeItem: (key: string) => storage.delete(key) });
+    storeAccessTokenSession("expired-update-token", "2026-01-01T00:00:00Z");
+    globalThis.fetch = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ detail: "expired token" }), { status: 401 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "new-token", access_token_expires_at: "2099-01-01T00:00:00Z" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ detail: "release notice account changed" }), { status: 409 }));
+    await expect(apiReleaseNoticeClaim(11)).rejects.toMatchObject({ status: 409 });
+    for (const index of [1, 3]) expect(globalThis.fetch).toHaveBeenNthCalledWith(index, expect.stringContaining("/release-notes/1.03/claim"), expect.objectContaining({ headers: expect.objectContaining({ "X-CFFB-Release-Account": "11" }) }));
+    clearAccessTokenSession();
   });
 });

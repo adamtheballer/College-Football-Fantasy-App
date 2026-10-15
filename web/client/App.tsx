@@ -46,6 +46,11 @@ const Announcement = lazyWithRouteRecovery(() => import("./pages/Announcement"))
 const AdminScoring = lazyWithRouteRecovery(() => import("./pages/AdminScoring"));
 const AdminSchedule = lazyWithRouteRecovery(() => import("./pages/AdminSchedule"));
 const ComingSoon = lazyWithRouteRecovery(() => import("./pages/ComingSoon"));
+const WeeklyChallenges = lazyWithRouteRecovery(() => import("./pages/WeeklyChallenges"));
+const WeeklyChallengeDetail = lazyWithRouteRecovery(() => import("./pages/WeeklyChallengeDetail"));
+const WeeklyChallengeLeaderboard = lazyWithRouteRecovery(() => import("./pages/WeeklyChallengeLeaderboard"));
+const AdminWeeklyChallenges = lazyWithRouteRecovery(() => import("./pages/AdminWeeklyChallenges"));
+const ManagerProfile = lazyWithRouteRecovery(() => import("./pages/ManagerProfile"));
 const SaturdayPick6 = lazyWithRouteRecovery(() => import("./pages/SaturdayPick6"));
 const AdminSaturdayPick6 = lazyWithRouteRecovery(() => import("./pages/AdminSaturdayPick6"));
 const PrivacyPolicy = lazyWithRouteRecovery(() => import("./pages/PrivacyPolicy"));
@@ -229,6 +234,11 @@ const ApplicationRoutes = () => (
                 <Route path="/trade/:leagueId/:playerId" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
                 <Route path="/leagues/:leagueId/trades/:tradeId" element={<ProtectedRoute><Trade /></ProtectedRoute>} />
                 <Route path="/coming-soon" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
+                <Route path="/weekly-challenges" element={<ProtectedRoute><WeeklyChallenges /></ProtectedRoute>} />
+                <Route path="/weekly-challenges/leaderboard" element={<ProtectedRoute><WeeklyChallengeLeaderboard /></ProtectedRoute>} />
+                <Route path="/weekly-challenges/:challengeId" element={<ProtectedRoute><WeeklyChallengeDetail /></ProtectedRoute>} />
+                <Route path="/admin/weekly-challenges" element={<ProtectedRoute><AdminWeeklyChallenges /></ProtectedRoute>} />
+                <Route path="/managers/:userId" element={<ProtectedRoute><ManagerProfile /></ProtectedRoute>} />
                 <Route path="/saturday-pick-6" element={<ProtectedRoute><SaturdayPick6 /></ProtectedRoute>} />
                 <Route path="/admin/announcements" element={<ProtectedRoute><AdminAnnouncements /></ProtectedRoute>} />
                 <Route path="/announcements/:announcementId" element={<ProtectedRoute><Announcement /></ProtectedRoute>} />

@@ -1,0 +1,22 @@
+meta {
+  name: Claim 1.03 update walkthrough
+  type: http
+  seq: 30
+}
+post {
+  url: {{base_url}}/release-notes/1.03/claim
+  body: json
+}
+headers {
+  Authorization: Bearer {{access_token}}
+  X-CFFB-Release-Account: {{user_id}}
+}
+body:json {
+  {}
+}
+docs {
+  Local combined-release verification only. This consumes the account's one presentation opportunity for 1.03.
+  Read user_id from the authenticated account; it is a stale-session precondition, never an owner selector.
+  First response: authorization granted. Every later request/device: already_seen with the same claimed_at.
+  The receipt is independent of native App Review eligibility. Do not claim any production user during testing.
+}

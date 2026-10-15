@@ -168,6 +168,29 @@ def resolve_current_week(
     return calendar_week
 
 
+def calendar_matchup_display_week(season: int, now: datetime | None = None) -> int:
+    """App-wide display cursor, independent of any manager's league membership."""
+    current = _as_utc(now or datetime.now(timezone.utc))
+    return _matchup_review_week(calendar_cfb_week(season, current), current)
+
+
+def _matchup_review_week(active_week: int, now: datetime) -> int:
+    eastern_now = _as_utc(now).astimezone(_timezone(FANTASY_WEEK_TIMEZONE))
+    # Before Tuesday's operational reset the calendar still names the old
+    # week. Subtracting then would briefly move Home and challenges backward.
+    review_window = (
+        eastern_now.weekday() == CFB_WEEK_START_WEEKDAY
+        and eastern_now.hour >= FANTASY_WEEK_RESET_HOUR
+    )
+    return active_week - 1 if review_window and active_week > 1 else active_week
+
+
+def matchup_display_rollover_at(season: int, week: int) -> datetime:
+    """The shared Wednesday boundary; UTC conversion preserves Eastern DST."""
+    day = season_week_one_start(season).date() + timedelta(days=week * 7 + 1)
+    return datetime.combine(day, time.min, tzinfo=_timezone(FANTASY_WEEK_TIMEZONE)).astimezone(timezone.utc)
+
+
 def resolve_matchup_display_week(
     db: Session,
     league: League,
@@ -188,10 +211,9 @@ def resolve_matchup_display_week(
     eastern_now = _as_utc(now or datetime.now(timezone.utc)).astimezone(
         _timezone(FANTASY_WEEK_TIMEZONE)
     )
-    if eastern_now.weekday() != CFB_WEEK_START_WEEKDAY or active_week <= 1:
+    completed_week = _matchup_review_week(active_week, eastern_now)
+    if completed_week == active_week:
         return active_week
-
-    completed_week = active_week - 1
     has_completed_week_matchup = (
         db.query(Matchup.id)
         .filter(
@@ -215,8 +237,7 @@ def next_matchup_display_rollover_at(
     not advance, and must not acquire an invented expiry or 24-hour timer.
     """
     current = _as_utc(now or datetime.now(timezone.utc))
-    boundary_date = season_week_one_start(league.season_year).date() + timedelta(days=current_week * 7 + 1)
-    boundary = datetime.combine(boundary_date, time.min, tzinfo=_timezone(FANTASY_WEEK_TIMEZONE)).astimezone(timezone.utc)
+    boundary = matchup_display_rollover_at(league.season_year, current_week)
     if boundary <= current or resolve_matchup_display_week(db, league, now=boundary) == current_week:
         return None
     return boundary

@@ -1,0 +1,20 @@
+meta {
+  name: Accept a complete duel
+  type: http
+  seq: 8
+}
+post {
+  url: {{base_url}}/weekly-challenges/challenges/{{weekly_challenge_id}}/duels/{{duel_id}}/accept
+  body: json
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+body:json {
+  {}
+}
+docs {
+  Combined-release feature: run only against the isolated local preview until release approval.
+  Read current IDs, publication version and entry revision from API responses.
+  SaveEntry and Configure examples are for Lock of the Week; other formats need their complete published selections.
+}

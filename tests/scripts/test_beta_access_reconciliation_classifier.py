@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 import pytest
 
 from scripts import import_beta_access_waitlist as importer
 from collegefootballfantasy_api.app.core.config import settings
-from collegefootballfantasy_api.app.services.auth_security import utcnow
 from collegefootballfantasy_api.app.services.beta_access import beta_access_hmac
+
+TEST_NOW = datetime(2026, 9, 1, tzinfo=timezone.utc)
 
 
 class Query:
@@ -29,6 +30,9 @@ class FakeSession:
 @pytest.fixture(autouse=True)
 def fake_hmac_secret(monkeypatch):
     monkeypatch.setattr(settings, "beta_access_code_hmac_secret", "test-only-reconciliation-secret")
+    # Collection-to-execution time grows with the full suite. Keep expiry
+    # classification deterministic instead of expiring a five-minute fixture.
+    monkeypatch.setattr(importer, "utcnow", lambda: TEST_NOW)
 
 
 def row(*, email="invite@example.com", code="EARLY-ABC123", status="READY_SENT", manual_review=False):
@@ -54,8 +58,8 @@ def classify(monkeypatch, source, beta_rows=(), users=()):
     [
         (row(), [beta()], [], "MATCHED"),
         (row(), [beta(matching=False)], [], "NEEDS_HMAC_RECONCILIATION"),
-        (row(), [beta(state="RESERVED", expires=utcnow() + timedelta(minutes=5))], [], "RESERVED_ACTIVE"),
-        (row(), [beta(state="RESERVED", expires=utcnow() - timedelta(minutes=5))], [], "RESERVED_EXPIRED"),
+        (row(), [beta(state="RESERVED", expires=TEST_NOW + timedelta(minutes=5))], [], "RESERVED_ACTIVE"),
+        (row(), [beta(state="RESERVED", expires=TEST_NOW - timedelta(minutes=5))], [], "RESERVED_EXPIRED"),
         (row(), [], [], "MISSING_PRODUCTION_ROW"),
         (row(), [beta(), beta()], [], "DUPLICATE_PRODUCTION_ROW"),
         (row(status="SKIPPED_SUPPRESSED"), [], [], "SUPPRESSED"),
@@ -70,7 +74,7 @@ def test_each_non_user_reconciliation_category(monkeypatch, source, beta_rows, u
 
 
 def test_redeemed_preserved_and_wrong_link_conflicts(monkeypatch):
-    user = SimpleNamespace(id=3, beta_access_granted_at=utcnow())
+    user = SimpleNamespace(id=3, beta_access_granted_at=TEST_NOW)
     outcomes, _ = classify(monkeypatch, row(), [beta(state="REDEEMED", redeemed_user_id=3)], [user])
     assert outcomes["REDEEMED_PRESERVE"] == 1
     outcomes, _ = classify(monkeypatch, row(), [beta(state="REDEEMED", redeemed_user_id=4)], [user])
@@ -81,7 +85,7 @@ def test_redeemed_preserved_and_wrong_link_conflicts(monkeypatch):
     ("beta_row", "users"),
     [
         (beta(manual_review=True), []),
-        (beta(), [SimpleNamespace(id=1, beta_access_granted_at=utcnow())]),
+        (beta(), [SimpleNamespace(id=1, beta_access_granted_at=TEST_NOW)]),
         (beta(), [SimpleNamespace(id=1, beta_access_granted_at=None), SimpleNamespace(id=2, beta_access_granted_at=None)]),
     ],
 )

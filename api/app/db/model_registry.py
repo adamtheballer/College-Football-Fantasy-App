@@ -89,6 +89,7 @@ def ensure_models_registered() -> None:
         transaction,
         usage_share,
         user,
+        user_release_notice,
         waiver_claim,
         waiver_claim_audit,
         waiver_priority,
@@ -97,4 +98,5 @@ def ensure_models_registered() -> None:
         watchlist,
         weekly_projection,
         worker_heartbeat,
+        weekly_challenge,
     )

@@ -365,6 +365,8 @@ type RequestOptions = {
   retryOn401?: boolean;
   reviewAccountPrecondition?: number;
   profileAccountPrecondition?: number;
+  challengeAccountPrecondition?: number;
+  releaseAccountPrecondition?: number;
 };
 
 const createRequestSignal = (externalSignal?: AbortSignal) => {
@@ -402,6 +404,8 @@ const apiRequest = async <T>({
   retryOn401 = true,
   reviewAccountPrecondition,
   profileAccountPrecondition,
+  challengeAccountPrecondition,
+  releaseAccountPrecondition,
 }: RequestOptions): Promise<T> => {
   const headers: Record<string, string> = {
     ...buildAuthHeaders(),
@@ -413,7 +417,13 @@ const apiRequest = async <T>({
   if (profileAccountPrecondition !== undefined && path === "/auth/me") {
     headers["X-CFFB-Profile-Account"] = String(profileAccountPrecondition);
   }
+  if (challengeAccountPrecondition !== undefined && (path.startsWith("/weekly-challenges/") || path.startsWith("/admin/weekly-challenges/"))) {
+    headers["X-CFFB-Challenge-Account"] = String(challengeAccountPrecondition);
+  }
   if (body !== undefined) {
+    if (releaseAccountPrecondition !== undefined && path.startsWith("/release-notes/")) {
+      headers["X-CFFB-Release-Account"] = String(releaseAccountPrecondition);
+    }
     headers["Content-Type"] = "application/json";
   }
   let res: Response;
@@ -459,6 +469,8 @@ const apiRequest = async <T>({
         retryOn401: false,
         reviewAccountPrecondition,
         profileAccountPrecondition,
+        challengeAccountPrecondition,
+        releaseAccountPrecondition,
       });
     }
     if (refreshResult === "transient_failure") {
@@ -480,6 +492,13 @@ export const apiReviewRequest = <T>(path: "/app-review/state" | "/app-review/cla
 
 export const apiUserProfilePatch = <T>(accountId: number, body: unknown, signal?: AbortSignal) =>
   apiRequest<T>({ method: "PATCH", path: "/auth/me", body, signal, profileAccountPrecondition: accountId });
+
+/** Account is a session precondition, never a server-side resource selector. */
+export const apiChallengeWrite = <T>(accountId: number, method: "POST" | "PUT", path: string, body: unknown) =>
+  apiRequest<T>({ method, path, body, challengeAccountPrecondition: accountId });
+
+export const apiReleaseNoticeClaim = <T>(accountId: number) =>
+  apiRequest<T>({ method: "POST", path: "/release-notes/1.03/claim", body: {}, releaseAccountPrecondition: accountId });
 
 export const apiGet = async <T>(
   path: string,

@@ -23,6 +23,7 @@ def _successful_services(monkeypatch):
     for name in (
         "process_expired_draft_picks_once",
         "refresh_open_pick_contests",
+        "process_weekly_challenges_once",
         "process_waiver_claims_once",
         "expire_trade_offers_once",
         "process_trade_offers_once",
@@ -42,6 +43,7 @@ def test_run_once_commits_schedule_sync_state(monkeypatch):
     result = worker.run_once()
 
     assert result["schedule_time_sync"] == {"status": "ok"}
+    assert result["weekly_challenges"] == {"status": "ok"}
     assert session.commits == 1
     assert session.rollbacks == 0
 

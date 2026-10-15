@@ -61,6 +61,7 @@ from collegefootballfantasy_api.app.models import (  # noqa: F401
     trade_review,
     standing,
     user,
+    user_release_notice,
     waiver_claim,
     waiver_claim_audit,
     waiver_processing_run,
@@ -68,6 +69,7 @@ from collegefootballfantasy_api.app.models import (  # noqa: F401
     waiver_priority,
     watchlist,
     weekly_projection,
+    weekly_challenge,
 )
 from collegefootballfantasy_api.app.models.user import User
 
