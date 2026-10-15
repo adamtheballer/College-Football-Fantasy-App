@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 const realStackEnabled = process.env.REAL_STACK_E2E === "1";
-const e2eEmail = "ci-beta-user@example.test";
+const e2eEmail = process.env.E2E_AUTH_EMAIL ?? "ci-beta-user@example.test";
 const e2ePassword = "RealE2ePass123!";
 
 test.describe("real seeded stack", () => {
@@ -33,15 +33,32 @@ test.describe("real seeded stack", () => {
       .not.toBeNull();
 
     const endGuide = page.getByRole("button", { name: /End Guide/i });
-    if (await endGuide.isVisible().catch(() => false)) {
-      await endGuide.click();
+    await expect(endGuide).toBeVisible();
+    const updateClaim = page.waitForResponse((response) =>
+      new URL(response.url()).pathname.endsWith("/release-notes/1.03/claim") &&
+      response.request().method() === "POST",
+    );
+    await endGuide.click();
+    expect((await (await updateClaim).json()).authorization).toBe("granted");
+    const update = page.getByRole("dialog", { name: "1.03 Update" });
+    await expect(update).toBeVisible();
+    await expect(update.getByText("Hi, Real E2E Manager.")).toBeVisible();
+    await update.getByRole("button", { name: "Next", exact: true }).click();
+    await expect(update.getByRole("heading", { name: "Weekly Challenges", exact: true })).toBeVisible();
+    for (let step = 2; step < 10; step += 1) {
+      await update.getByRole("button", { name: "Next", exact: true }).click();
     }
+    await expect(update.getByText("10 of 10")).toBeVisible();
+    await expect(update.getByRole("heading", { name: "Help shape CFFB" })).toBeVisible();
+    await update.getByRole("button", { name: "Got it", exact: true }).click();
+    await expect(update).toHaveCount(0);
 
     await page.reload();
     await expect(page).not.toHaveURL(/\/login$/);
 
     await page.goto("/leagues");
     await expect(page).toHaveURL(/\/leagues$/);
+    await expect(update).toHaveCount(0);
 
     expect(apiResponses.some((response) => response.url.includes("/auth/signup") && response.status === 201)).toBe(true);
 
@@ -58,5 +75,6 @@ test.describe("real seeded stack", () => {
 
     await page.goto("/leagues");
     await expect(page).toHaveURL(/\/leagues$/);
+    await expect(update).toHaveCount(0);
   });
 });
