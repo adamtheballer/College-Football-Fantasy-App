@@ -27,6 +27,11 @@ const seedAuthenticatedSession = async (page: Parameters<typeof test>[0]["page"]
     window.localStorage.removeItem(`cfb_pending_guide_${payload.user.id}`);
   }, mockAuthPayload);
 
+  // These are isolated browser fixtures. An unstubbed background read must
+  // not reach a real local API and invalidate the synthetic login with 401.
+  await page.route("**/api/**", route => route.fulfill({
+    status: 503, json: { detail: "No fixture for this background request" },
+  }));
   await page.route("**/notifications/preferences**", async (route) => {
     await route.fulfill({
       status: 200,
