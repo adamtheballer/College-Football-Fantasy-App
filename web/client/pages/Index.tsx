@@ -278,7 +278,7 @@ export default function Index() {
   const ownedTeamName = workspace?.owned_team?.name ?? "Your Team";
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6 pb-[calc(env(safe-area-inset-bottom)+5rem)] pt-1 sm:pb-16 sm:pt-3">
+    <div data-launch-notice-ready={sessionReady ? "true" : undefined} className="mx-auto w-full max-w-7xl space-y-6 pb-[calc(env(safe-area-inset-bottom)+5rem)] pt-1 sm:pb-16 sm:pt-3">
       <section className="space-y-4">
         <PageHeader
           eyebrow="League dashboard"

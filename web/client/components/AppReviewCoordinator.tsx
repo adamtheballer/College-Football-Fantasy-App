@@ -18,7 +18,12 @@ export function reviewScreenIsUsable(document: Document): boolean {
   const main = document.querySelector("main");
   if (!main || !main.textContent?.trim() || !visible(main)) return false;
   if (Array.from(document.querySelectorAll('[role="dialog"], [role="alertdialog"], [aria-modal="true"], [role="menu"], [data-review-blocking="true"]')).some(visible)) return false;
-  if (main.matches('[aria-busy="true"]') || Array.from(main.querySelectorAll('[aria-busy="true"]')).some(visible)) return false;
+  if (main.matches('[aria-busy="true"]')) return false;
+  // Home is present once the confirmed session and dashboard shell render.
+  // League/alert cards may keep loading beneath it without delaying launch notices.
+  const home = main.querySelector('[data-launch-notice-ready="true"]');
+  const homeReady = home !== null && visible(home) && !home.closest('[aria-busy="true"]');
+  if (!homeReady && Array.from(main.querySelectorAll('[aria-busy="true"]')).some(visible)) return false;
   return !document.activeElement?.matches('input, textarea, select, [contenteditable="true"]');
 }
 
@@ -47,10 +52,12 @@ export function AppReviewCoordinator({ accountId, sessionReady, onboarding, scre
         screenKey: current.screenKey });
     };
     refresh.current = update;
-    const interaction = () => { controller.interrupt(); update(); };
+    // This host has no idle-delay requirement. Recheck real blockers, but do
+    // not abort a durable claim for carousel scrolling or an unrelated key/tap.
+    const interaction = () => update();
     const mutation = new MutationObserver(update);
     mutation.observe(document.body, { subtree: true, childList: true, attributes: true,
-      attributeFilter: ["role", "aria-modal", "aria-busy", "class", "style", "hidden", "data-review-blocking"] });
+      attributeFilter: ["role", "aria-modal", "aria-busy", "class", "style", "hidden", "data-review-blocking", "data-launch-notice-ready"] });
     const removePresentation = observeReviewPresentation(update);
     document.addEventListener("visibilitychange", update);
     document.addEventListener("focusin", update);

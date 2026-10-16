@@ -11,7 +11,7 @@ function fixture(overrides: Partial<ReviewDependencies> = {}) {
   const consumed = new Set<number>();
   const adapter = { synchronize: vi.fn().mockResolvedValue({ ready: true, appVersion: "1.0", appBuild: "123" }), request: vi.fn().mockResolvedValue({ invoked: true }) };
   const dependencies = { adapter, state: vi.fn().mockResolvedValue(state), claim: vi.fn().mockResolvedValue(grant),
-    consumed: (id: number) => consumed.has(id), remember: vi.fn((id: number) => { consumed.add(id); }), now: Date.now };
+    consumed: (id: number) => consumed.has(id), remember: vi.fn((id: number) => { consumed.add(id); }), now: Date.now, presentationDelayMs: 3000 };
   const controller = new AppReviewCoordinator({ ...dependencies, ...overrides });
   controllers.push(controller);
   return { controller, dependencies, adapter, consumed };
@@ -22,8 +22,8 @@ afterEach(() => { controllers.forEach((controller) => controller.dispose()); vi.
 const wait = (ms = 3000) => vi.advanceTimersByTimeAsync(ms);
 
 describe("account lifetime review coordinator", () => {
-  it("supports immediate presentation after Home becomes usable without a three-second wait", async () => {
-    const { controller, adapter, dependencies } = fixture({ presentationDelayMs: 0 });
+  it("defaults to immediate presentation after Home becomes usable without a three-second wait", async () => {
+    const { controller, adapter, dependencies } = fixture({ presentationDelayMs: undefined });
     controller.update({ ...ready, safe: false }); await wait(0);
     expect(dependencies.claim).not.toHaveBeenCalled();
     controller.update(ready);

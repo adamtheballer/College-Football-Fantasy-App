@@ -197,6 +197,7 @@ export function AppUpdateExperience(props: Props) {
         "style",
         "hidden",
         "data-review-blocking",
+        "data-launch-notice-ready",
       ],
     });
     const removeBlockerListener = observeReviewPresentation(check);
