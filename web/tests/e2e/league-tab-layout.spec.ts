@@ -446,6 +446,15 @@ for (const path of ["/league/42/chat", "/chats?leagueId=42"]) {
     );
     await expect.poll(() => receipts).toContain(100);
     await expect(messages.locator("[data-message-id]")).toHaveCount(50);
+    const composer = page.getByPlaceholder("Message your league…");
+    const firstMessage = messages.locator("[data-message-id]").first();
+    await expect(composer).toBeInViewport();
+    expect((await composer.boundingBox())!.y).toBeLessThan(
+      (await firstMessage.boundingBox())!.y,
+    );
+    await page.screenshot({
+      path: info.outputPath("chat-initial-newest-and-composer.png"),
+    });
     await messages.getByRole("button", { name: "Load older messages" }).click();
     await expect(messages.locator("[data-message-id]")).toHaveCount(100);
     await expect(messages.locator("[data-message-id]").first()).toHaveAttribute(

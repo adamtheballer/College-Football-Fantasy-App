@@ -617,6 +617,11 @@ export default function Chats({ leagueId: lockedLeagueId, embedded = false }: Ch
               </div>
             </CardHeader>
             <CardContent className="flex min-h-0 flex-1 flex-col p-0">
+              <form onSubmit={handleSend} className="border-b border-white/10 bg-black/10 p-4">
+                {sendMessage.isError ? <p className="mb-3 rounded-xl border border-red-400/40 bg-red-950/20 px-3 py-2 text-xs text-red-100">{errorMessage(sendMessage.error)}</p> : null}
+                <div className="flex gap-3"><textarea value={draftMessage} onChange={(event) => setDraftMessage(event.target.value)} onKeyDown={handleComposerKeyDown} disabled={!selectedThread} maxLength={2000} placeholder={selectedThread ? "Message your league…" : "Select a thread first"} className="min-h-14 flex-1 resize-none rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-base text-foreground outline-none transition focus:border-primary/60 disabled:opacity-50 sm:text-sm" /><button type="submit" disabled={!draftMessage.trim() || !selectedThread || sendMessage.isPending} className="inline-flex h-14 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-[10px] font-black uppercase tracking-[0.16em] text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"><Send className="h-4 w-4" />Send</button></div>
+                <div className="mt-2 flex justify-between text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground"><span>Enter to send · Shift+Enter for a new line</span><span className={cn(draftMessage.length >= 1800 && "text-cfb-gold")}>{draftMessage.length}/2000</span></div>
+              </form>
               <div aria-label="Messages, newest first" className="flex-1 space-y-3 overflow-y-auto p-5">
                 {messages.isLoading ? <p className="py-12 text-center text-xs text-muted-foreground">Loading messages…</p> : null}
                 {messages.isError ? <p className="rounded-xl border border-red-400/40 bg-red-950/20 p-4 text-sm text-red-100">{errorMessage(messages.error)}</p> : null}
@@ -633,11 +638,6 @@ export default function Chats({ leagueId: lockedLeagueId, embedded = false }: Ch
                 {olderMessagePage.isError ? <p role="alert" className="text-center text-sm text-red-200">Older messages could not be loaded. Try again below.</p> : null}
                 {canLoadOlder ? <div className="flex justify-center"><button type="button" onClick={handleLoadOlder} disabled={olderMessagePage.isFetching} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground disabled:opacity-50">{olderMessagePage.isFetching ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <ChevronDown className="h-3.5 w-3.5" />}Load older messages</button></div> : null}
               </div>
-              <form onSubmit={handleSend} className="border-t border-white/10 bg-black/10 p-4">
-                {sendMessage.isError ? <p className="mb-3 rounded-xl border border-red-400/40 bg-red-950/20 px-3 py-2 text-xs text-red-100">{errorMessage(sendMessage.error)}</p> : null}
-                <div className="flex gap-3"><textarea value={draftMessage} onChange={(event) => setDraftMessage(event.target.value)} onKeyDown={handleComposerKeyDown} disabled={!selectedThread} maxLength={2000} placeholder={selectedThread ? "Message your league…" : "Select a thread first"} className="min-h-14 flex-1 resize-none rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-base text-foreground outline-none transition focus:border-primary/60 disabled:opacity-50 sm:text-sm" /><button type="submit" disabled={!draftMessage.trim() || !selectedThread || sendMessage.isPending} className="inline-flex h-14 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-[10px] font-black uppercase tracking-[0.16em] text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"><Send className="h-4 w-4" />Send</button></div>
-                <div className="mt-2 flex justify-between text-[9px] font-bold uppercase tracking-[0.12em] text-muted-foreground"><span>Enter to send · Shift+Enter for a new line</span><span className={cn(draftMessage.length >= 1800 && "text-cfb-gold")}>{draftMessage.length}/2000</span></div>
-              </form>
             </CardContent>
           </Card>
         </div>
