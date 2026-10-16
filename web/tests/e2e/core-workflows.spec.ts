@@ -1860,7 +1860,7 @@ test.describe("critical browser workflows", () => {
       const scoreboardBox = scoreboard.getBoundingClientRect();
       const barBox = bar.getBoundingClientRect();
       return {
-        scrollerTop: scrollerBox.top,
+        scrollerTop: scrollerBox.top + (document.querySelector<HTMLElement>("[data-testid=league-navigation]")?.getBoundingClientRect().height ?? 0),
         scoreboardTop: scoreboardBox.top,
         scoreboardBottom: scoreboardBox.bottom,
         barTop: barBox.top,

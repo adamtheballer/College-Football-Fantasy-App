@@ -235,8 +235,8 @@ CFFB0020000000000000000E = {isa = PBXSourcesBuildPhase; buildActionMask = 214748
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
-CFFB00200000000000000012 = {isa = XCBuildConfiguration; name = Debug; buildSettings = {APPLICATION_EXTENSION_API_ONLY = YES; CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = 84TV35F6T5; CODE_SIGN_ENTITLEMENTS = OneSignalNotificationServiceExtension/Extension.entitlements; CURRENT_PROJECT_VERSION = 41; MARKETING_VERSION = 1.0.3; INFOPLIST_FILE = OneSignalNotificationServiceExtension/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 15.0; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@executable_path/../../Frameworks",); PRODUCT_BUNDLE_IDENTIFIER = org.collegefantasyfootball.app.OneSignalNotificationServiceExtension; PRODUCT_NAME = "$(TARGET_NAME)"; SKIP_INSTALL = YES; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; }; };
-CFFB00200000000000000013 = {isa = XCBuildConfiguration; name = Release; buildSettings = {APPLICATION_EXTENSION_API_ONLY = YES; CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = 84TV35F6T5; CODE_SIGN_ENTITLEMENTS = OneSignalNotificationServiceExtension/Extension.entitlements; CURRENT_PROJECT_VERSION = 41; MARKETING_VERSION = 1.0.3; INFOPLIST_FILE = OneSignalNotificationServiceExtension/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 15.0; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@executable_path/../../Frameworks",); PRODUCT_BUNDLE_IDENTIFIER = org.collegefantasyfootball.app.OneSignalNotificationServiceExtension; PRODUCT_NAME = "$(TARGET_NAME)"; SKIP_INSTALL = YES; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; }; };
+CFFB00200000000000000012 = {isa = XCBuildConfiguration; name = Debug; buildSettings = {APPLICATION_EXTENSION_API_ONLY = YES; CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = 84TV35F6T5; CODE_SIGN_ENTITLEMENTS = OneSignalNotificationServiceExtension/Extension.entitlements; CURRENT_PROJECT_VERSION = 42; MARKETING_VERSION = 1.0.3; INFOPLIST_FILE = OneSignalNotificationServiceExtension/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 15.0; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@executable_path/../../Frameworks",); PRODUCT_BUNDLE_IDENTIFIER = org.collegefantasyfootball.app.OneSignalNotificationServiceExtension; PRODUCT_NAME = "$(TARGET_NAME)"; SKIP_INSTALL = YES; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; }; };
+CFFB00200000000000000013 = {isa = XCBuildConfiguration; name = Release; buildSettings = {APPLICATION_EXTENSION_API_ONLY = YES; CODE_SIGN_STYLE = Automatic; DEVELOPMENT_TEAM = 84TV35F6T5; CODE_SIGN_ENTITLEMENTS = OneSignalNotificationServiceExtension/Extension.entitlements; CURRENT_PROJECT_VERSION = 42; MARKETING_VERSION = 1.0.3; INFOPLIST_FILE = OneSignalNotificationServiceExtension/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 15.0; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks", "@executable_path/../../Frameworks",); PRODUCT_BUNDLE_IDENTIFIER = org.collegefantasyfootball.app.OneSignalNotificationServiceExtension; PRODUCT_NAME = "$(TARGET_NAME)"; SKIP_INSTALL = YES; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2"; }; };
 
 		504EC3141FED79650016851F /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -356,7 +356,7 @@ CFFB00200000000000000013 = {isa = XCBuildConfiguration; name = Release; buildSet
 				DEVELOPMENT_TEAM = 84TV35F6T5;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CFFB_APNS_ENVIRONMENT = development;
-				CURRENT_PROJECT_VERSION = 41;
+				CURRENT_PROJECT_VERSION = 42;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -381,7 +381,7 @@ CFFB00200000000000000013 = {isa = XCBuildConfiguration; name = Release; buildSet
 				DEVELOPMENT_TEAM = 84TV35F6T5;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CFFB_APNS_ENVIRONMENT = production;
-				CURRENT_PROJECT_VERSION = 41;
+				CURRENT_PROJECT_VERSION = 42;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (

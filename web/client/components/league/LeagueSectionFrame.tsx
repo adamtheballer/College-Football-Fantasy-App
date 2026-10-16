@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { Bell, MessageCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -18,6 +18,27 @@ export function LeagueSectionFrame({
   children: ReactNode;
 }) {
   const navigate = useNavigate();
+  const frameRef = useRef<HTMLDivElement>(null);
+  const navigationRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const frame = frameRef.current;
+    const navigation = navigationRef.current;
+    if (!frame || !navigation) return;
+    // Keep other sticky league content below this measured shared context,
+    // including resized text, desktop spacing and the native safe-area shell.
+    const measure = () =>
+      frame.style.setProperty(
+        "--league-navigation-height",
+        `${navigation.getBoundingClientRect().height}px`,
+      );
+    measure();
+    const observer =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(measure);
+    observer?.observe(navigation);
+    return () => observer?.disconnect();
+  }, [sessionReady]);
   // Uses the pages' existing query key/cache; no second league data source.
   const { data: league } = useLeagueDetail(leagueId, sessionReady);
   const initials =
@@ -30,9 +51,13 @@ export function LeagueSectionFrame({
       .join("") || "LG";
 
   return (
-    <div data-testid="league-section-frame" className="min-w-0 pt-1 sm:pt-4">
+    <div ref={frameRef} data-testid="league-section-frame" className="min-w-0">
       {sessionReady ? (
-        <>
+        <div
+          ref={navigationRef}
+          data-testid="league-navigation"
+          className="sticky top-0 z-50 bg-cfb-canvas pt-1 sm:pt-4"
+        >
           <header className="flex h-16 items-center gap-3 border-b border-cfb-border-subtle px-3 sm:px-5">
             <span
               aria-hidden="true"
@@ -51,7 +76,12 @@ export function LeagueSectionFrame({
             >
               <Bell className="h-4 w-4" aria-hidden="true" />
             </button>
-            <button type="button" onClick={() => navigate("/chats")} aria-label="Messages" className="cfb-icon-button">
+            <button
+              type="button"
+              onClick={() => navigate("/chats")}
+              aria-label="Messages"
+              className="cfb-icon-button"
+            >
               <MessageCircle className="h-4 w-4" aria-hidden="true" />
             </button>
           </header>
@@ -70,7 +100,7 @@ export function LeagueSectionFrame({
               />
             )}
           </div>
-        </>
+        </div>
       ) : null}
       <div className={fullWidth ? "min-w-0" : "min-w-0 px-3 sm:px-5"}>
         {children}

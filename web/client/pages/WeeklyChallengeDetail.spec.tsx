@@ -253,3 +253,157 @@ it("closes presentation using server time even when the device wall clock is cha
   await act(async () => vi.advanceTimersByTime(1000));
   expect(screen.getByText("Closed — Live")).toBeTruthy();
 });
+
+describe("selection requirements match every challenge format", () => {
+  const games = Array.from({ length: 12 }, (_, i) => ({
+    id: i + 1,
+    home_team: `Home ${i + 1}`,
+    away_team: `Away ${i + 1}`,
+    start_date: "2026-10-17T16:00:00Z",
+    status: "scheduled",
+    home_points: null,
+    away_points: null,
+  }));
+  it("caps Upset Hunter at three, supports deselection, and never sends a fourth pick", () => {
+    mount(
+      challenge({
+        kind: "upset",
+        name: "Upset Hunter",
+        games,
+        underdogs: games.map((g) => ({
+          game_id: g.id,
+          team: g.away_team,
+          points: 2,
+        })),
+      }),
+    );
+    const submit = screen.getByRole("button", {
+      name: "Submit Official Entry",
+    }) as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+    for (let i = 1; i <= 3; i++)
+      fireEvent.click(
+        screen.getByRole("button", { name: `Away ${i} · 2 points` }),
+      );
+    expect(submit.disabled).toBe(false);
+    const fourth = screen.getByRole("button", {
+      name: "Away 4 · 2 points",
+    }) as HTMLButtonElement;
+    expect(fourth.disabled).toBe(true);
+    fireEvent.click(fourth);
+    expect(screen.getAllByRole("button", { pressed: true })).toHaveLength(3);
+    fireEvent.click(
+      screen.getByRole("button", { name: "✓ Away 2 · 2 points" }),
+    );
+    expect(submit.disabled).toBe(true);
+    expect(fourth.disabled).toBe(false);
+    fireEvent.click(fourth);
+    expect(screen.getAllByRole("button", { pressed: true })).toHaveLength(3);
+    expect(submit.disabled).toBe(false);
+    expect(mocks.write).not.toHaveBeenCalled();
+  });
+  it.each([
+    ["slate12", 12],
+    ["duels", 5],
+    ["lock", 1],
+  ] as const)(
+    "requires exactly the advertised number for %s and lets a selected game change teams",
+    (kind, count) => {
+      mount(
+        challenge({
+          kind,
+          games: games.slice(0, count),
+          featured_game_id: kind === "slate12" ? 1 : null,
+        }),
+      );
+      const submit = screen.getByRole("button", {
+        name: "Submit Official Entry",
+      }) as HTMLButtonElement;
+      expect(submit.disabled).toBe(true);
+      for (let i = 1; i <= count; i++)
+        fireEvent.click(screen.getByRole("button", { name: `Home ${i}` }));
+      if (kind === "slate12") {
+        expect(submit.disabled).toBe(true);
+        fireEvent.change(
+          screen.getByRole("spinbutton", { name: "Featured game total score" }),
+          { target: { value: "45" } },
+        );
+      }
+      expect(submit.disabled).toBe(false);
+      fireEvent.click(screen.getByRole("button", { name: "Away 1" }));
+      expect(screen.getAllByRole("button", { pressed: true })).toHaveLength(
+        count,
+      );
+      expect(submit.disabled).toBe(false);
+    },
+  );
+  it("blocks invalid oversized recovered drafts from saving or submitting, including form submission", () => {
+    sessionStorage.setItem(
+      "cffb_challenge_draft_11_2_13_2",
+      JSON.stringify({
+        picks: games
+          .slice(0, 4)
+          .map((g) => ({ game_id: g.id, team: g.away_team })),
+        revision: 0,
+        tiebreaker: "",
+      }),
+    );
+    mount(
+      challenge({
+        kind: "upset",
+        name: "Upset Hunter",
+        games,
+        underdogs: games.map((g) => ({
+          game_id: g.id,
+          team: g.away_team,
+          points: 2,
+        })),
+      }),
+    );
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Submit Official Entry",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    expect(
+      (screen.getByRole("button", { name: "Save Draft" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    fireEvent.submit(screen.getByRole("form", { name: "Upset Hunter entry" }));
+    expect(mocks.write).not.toHaveBeenCalled();
+    fireEvent.click(
+      screen.getByRole("button", { name: "✓ Away 4 · 2 points" }),
+    );
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Submit Official Entry",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(false);
+  });
+  it("requires all five distinct position-eligible Fantasy Five slots", () => {
+    const players = ["QB", "RB", "WR", "TE", "RB"].map((position, i) => ({
+      id: i + 1,
+      game_id: 1,
+      name: `Player ${i + 1}`,
+      school: "School",
+      position,
+      image_url: null,
+    }));
+    mount(challenge({ kind: "fantasy5", players }));
+    const submit = screen.getByRole("button", {
+      name: "Submit Official Entry",
+    }) as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+    for (const [i, slot] of ["QB", "RB", "WR", "TE", "FLEX"].entries()) {
+      fireEvent.change(
+        screen.getByRole("combobox", { name: `${slot} player` }),
+        { target: { value: String(i + 1) } },
+      );
+      expect(submit.disabled).toBe(i < 4);
+    }
+  });
+});

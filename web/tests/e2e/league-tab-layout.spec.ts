@@ -150,8 +150,12 @@ for (const width of [320, 390, 440, 1280]) {
       await rail.getByRole("link", { name: label, exact: true }).click();
       await expect(page).toHaveURL(new RegExp(`/league/42/${path}$`));
       await expect(rail).toBeVisible();
-      await expect(page.getByRole("button", { name: "Notifications", exact: true })).toBeVisible();
-      await expect(page.getByRole("button", { name: "Messages", exact: true })).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Notifications", exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("button", { name: "Messages", exact: true }),
+      ).toBeVisible();
       await expect(
         rail.getByRole("link", { name: label, exact: true }),
       ).toHaveAttribute("aria-current", "page");
@@ -249,3 +253,42 @@ test("league rail stays put through loading, errors, live refresh and native saf
       .evaluate((element) => element.scrollTop),
   ).toBe(0);
 });
+
+for (const width of [390, 1280]) {
+  test(`league tabs remain at the same level while scrolling and switching at ${width}px`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ width, height: 700 });
+    await leagueShell(page);
+    await page.goto("/league/42/waivers");
+    const rail = page.getByRole("navigation", { name: "League sections" });
+    await expect(page.getByTestId("league-player-board")).toBeVisible();
+    const initial = (await rail.boundingBox())!;
+    const scroller = page.locator("[data-app-scroll]");
+    await scroller.evaluate((el) => {
+      el.scrollTop = 350;
+    });
+    await expect
+      .poll(() => scroller.evaluate((el) => el.scrollTop))
+      .toBeGreaterThan(0);
+    await expect
+      .poll(async () => (await rail.boundingBox())!.y)
+      .toBe(initial.y);
+    for (const [label, path] of sections) {
+      await rail.getByRole("link", { name: label, exact: true }).click();
+      await expect(page).toHaveURL(new RegExp(`/league/42/${path}$`));
+      await expect
+        .poll(async () => (await rail.boundingBox())!.y)
+        .toBe(initial.y);
+      await scroller.evaluate((el) => {
+        el.scrollTop = 350;
+      });
+      await expect
+        .poll(async () => (await rail.boundingBox())!.y)
+        .toBe(initial.y);
+    }
+    await page.screenshot({
+      path: info.outputPath(`pinned-league-tabs-${width}.png`),
+    });
+  });
+}
