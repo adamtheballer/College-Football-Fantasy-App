@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import { Bookmark, Search, X } from "lucide-react";
 
-import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { ErrorState } from "@/components/states";
 import { Button } from "@/components/ui/button";
 import { useLeagueDetail } from "@/hooks/use-leagues";
@@ -108,11 +107,6 @@ export default function LeagueWatchlist() {
             <p className="mt-1 text-xl font-semibold tabular-nums text-cfb-text-primary">{watchedPlayers.length}</p>
           </div>
         </div>
-        <LeagueTabs
-          leagueId={parsedLeagueId}
-          draftStatus={leagueQuery.data?.draft?.status}
-          leagueStatus={leagueQuery.data?.status}
-        />
       </div>
 
       <section data-testid="league-watchlist-board" className="overflow-hidden rounded-lg border border-cfb-border-subtle bg-cfb-surface">

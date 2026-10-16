@@ -10,12 +10,14 @@ import { useLocation, useNavigate, useNavigationType } from "react-router-dom";
 import { AppOnboardingTour } from "./AppOnboardingTour";
 import { AppUpdateExperience } from "./AppUpdateExperience";
 import { AppShell } from "./app-shell/AppShell";
+import { LeagueSectionFrame } from "./league/LeagueSectionFrame";
 import {
   getShellNavItems,
   isAuthFlowRoute,
   isCreateLeagueRoute,
   isDraftRoomRoute,
   isLeagueMatchupRoute,
+  isLeagueSectionRoute,
   isSaturdayPick6Route,
 } from "./app-shell/navigation";
 import { useAuth } from "@/hooks/use-auth";
@@ -59,6 +61,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const isDraftRoomPage = isDraftRoomRoute(location.pathname);
   const isCreateLeaguePage = isCreateLeagueRoute(location.pathname);
   const isLeagueMatchupPage = isLeagueMatchupRoute(location.pathname);
+  const isLeagueSectionPage = isLeagueSectionRoute(location.pathname);
   const isSaturdayPick6Page = isSaturdayPick6Route(location.pathname);
   const isAuthFlowPage = isAuthFlowRoute(location.pathname);
   const replayGuideRequested = Boolean(
@@ -143,7 +146,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           isSaturdayPick6Page ||
           isAuthFlowPage
         }
-        compactContent={isDraftRoomPage || isCreateLeaguePage || isLeagueMatchupPage}
+        compactContent={isDraftRoomPage || isCreateLeaguePage || isLeagueSectionPage}
         // Draft rooms use the same page-level scroll owner as every other
         // route. A fixed outer viewport plus a nested player-board scroller
         // traps touch gestures and makes the board feel stuck on mobile.
@@ -152,7 +155,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         mainScrollRef={mainScrollRef}
         guidedNavItem={guidedNavItem}
       >
-        {children}
+        {isLeagueSectionPage ? (
+          <LeagueSectionFrame leagueId={Number(location.pathname.split("/")[2])} sessionReady={sessionReady} fullWidth={isLeagueMatchupPage}>
+            {children}
+          </LeagueSectionFrame>
+        ) : children}
       </AppShell>
     </>
   );

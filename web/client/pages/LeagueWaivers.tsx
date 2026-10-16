@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { ArrowDown, ArrowUp, Pencil, Search, Sparkles, UserPlus, Zap } from "lucide-react";
 
-import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { PlayerPopularityMetrics } from "@/components/league/PlayerPopularityMetrics";
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
 import { ErrorState } from "@/components/states";
@@ -682,11 +681,6 @@ export default function LeagueWaivers() {
             </div>
           </div>
         </div>
-        <LeagueTabs
-          leagueId={parsedLeagueId}
-          draftStatus={leagueQuery.data?.draft?.status}
-          leagueStatus={leagueQuery.data?.status}
-        />
       </div>
 
       <section data-testid="league-player-board" className="overflow-hidden rounded-lg border border-cfb-border-subtle bg-cfb-surface">

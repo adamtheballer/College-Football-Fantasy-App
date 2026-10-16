@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
 
-import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { RosterSlotTable } from "@/components/league/RosterSlotTable";
 import { WeekSelector } from "@/components/league/WeekSelector";
 import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
@@ -281,11 +280,6 @@ export default function LeagueRoster() {
             />
           </div>
         </div>
-        <LeagueTabs
-          leagueId={parsedLeagueId}
-          draftStatus={leagueQuery.data?.draft?.status}
-          leagueStatus={leagueQuery.data?.status}
-        />
       </div>
 
       <TeamRosterRail

@@ -34,11 +34,13 @@ export const isDraftRoomRoute = (pathname: string) =>
 
 export const isCreateLeagueRoute = (pathname: string) => pathname === "/leagues/create";
 
-// Matchups own their internal safe-area spacing so the scoreboard and lineup
-// tables can use the full available width on phones and beside the desktop
-// sidebar. Keeping the route check here makes that shell behavior explicit.
+// All six league sections share one header/rail and shell inset. Draft/lobby
+// routes keep their existing, separate layout.
+export const isLeagueSectionRoute = (pathname: string) =>
+  /^\/league\/[1-9]\d*(?:\/(?:roster|matchup|waivers|watchlist|chat|settings))?\/?$/.test(pathname);
+
 export const isLeagueMatchupRoute = (pathname: string) =>
-  /^\/league\/[^/]+\/matchup$/.test(pathname);
+  /^\/league\/[^/]+\/matchup\/?$/.test(pathname);
 
 export const isSaturdayPick6Route = (pathname: string) => pathname === "/saturday-pick-6";
 
