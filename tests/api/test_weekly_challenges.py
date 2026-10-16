@@ -528,3 +528,34 @@ def test_unselectable_games_cannot_set_an_invisible_deadline_or_avoid_no_contest
     c=w['db'].query(WeeklyChallenge).filter_by(round_id=w['round']['id'],kind='upset').one()
     blockers,_=svc.validate_config(w['db'],c,{'game_ids':[g.id for g in w['games'][:4]],'underdogs':[{'game_id':g.id,'team':g.away_team,'points':1} for g in w['games'][:3]]})
     assert any('explicitly designated underdog' in text for text in blockers)
+
+
+@pytest.mark.parametrize('kind', list(svc.KINDS))
+def test_every_format_rejects_wrong_count_without_mutating_an_official_entry(world, kind):
+    w = world
+    changes = {}
+    # More eligible options than permitted picks reproduces the real Upset Hunter slate.
+    if kind in {'upset', 'lock'}:
+        games = w['games'][:6]
+        changes['game_ids'] = [g.id for g in games]
+        if kind == 'upset':
+            changes['underdogs'] = [{'game_id': g.id, 'team': g.away_team, 'points': 2} for g in games]
+    publish(w, kind, **changes)
+    original = submit(w, kind)
+    assert original.status_code == 200, original.text
+    original = original.json()
+    selected = picks(w, kind)
+    too_many = selected + ([{'player_id': w['players'][5].id, 'slot': 'QB'}] if kind == 'fantasy5' else [
+        {'game_id': w['games'][len(selected)].id, 'team': w['games'][len(selected)].away_team if kind == 'upset' else w['games'][len(selected)].home_team}
+    ] if len(selected) < 12 else [selected[0]])
+    for submit_flag, choices in [(True, selected[:-1]), (True, too_many), (False, too_many)]:
+        rejected = submit(w, kind, expected_revision=1, submit=submit_flag, selections=choices)
+        assert rejected.status_code == 422, rejected.text
+        stored = w['client'].get(f'{BASE}/challenges/{w["challenges"][kind]["id"]}/entry', headers=w['accounts'][1][1]).json()
+        assert stored == original
+    # A partial entry is permitted only as an explicit draft, never as official.
+    draft = submit(w, kind, user=2, submit=False, selections=selected[:-1])
+    assert draft.status_code == 200 and draft.json()['status'] == 'draft', draft.text
+    rejected = submit(w, kind, user=2, expected_revision=1, selections=selected[:-1])
+    assert rejected.status_code == 422, rejected.text
+    assert w['db'].query(ChallengeEntry).filter_by(user_id=w['accounts'][2][0]).one().status == 'draft'

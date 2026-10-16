@@ -12,23 +12,37 @@ Create a Railway Cron service with the production API variables and select
 command:
 
 ```sh
-uv run python scripts/sync_official_availability_reports.py --season 2026 --only-local-hour 10 --only-local-weekday 2 --only-local-weekday 6
+uv run python scripts/sync_official_availability_reports.py --season 2026
 ```
 
-Configure the Railway schedule as `0 14,15 * * 0,3` (UTC). Railway cron has no
-timezone field, so the command's `--only-local-hour 10` guard runs exactly once
-at 10:00 AM `America/New_York` in both EST and EDT; the paired UTC invocation
-exits successfully. `--only-local-weekday 2` and `--only-local-weekday 6`
-restrict the refresh to Wednesday and Sunday respectively (Python weekday:
-Monday=0, Sunday=6). The command calculates the game week from the CFB calendar;
-use `--week` only for a deliberate backfill or rehearsal. The job is idempotent:
-retries do not duplicate player news or rostered-manager injury alerts.
+Configure the Railway schedule as `*/30 * * * *` (UTC). The job runs every 30
+minutes, including Thursday/Friday report updates and game-day final reports.
+The former Wednesday/Sunday 10 AM schedule missed those changes. No paired
+EST/EDT hours or local weekday filter is needed. The command calculates the
+football week from the shared calendar; `--week` is reserved for deliberate
+backfills. It is idempotent: unchanged designations do not duplicate news or
+rostered-manager injury alerts.
+
+Each conference uses an independent transaction and freshness record, scoped
+by season/week/conference. A broken source cannot roll back healthy sources
+or mark the entire P4 feed ready. Partial failures exit nonzero after recording
+the failed sources, while successful imports remain committed. Counts are
+stored with each successful source health record.
 
 Use the API Docker image for this Cron service. It contains Chromium and the
 public-page renderer required by the conference report apps; no undocumented
-vendor API is used. If a report does not render as either a public table or its
+vendor API is used. If a report does not render as a supported public table, dated grouped report cards, or its
 explicit no-games state, the run fails and its provider sync state records the
 failure rather than reporting an empty successful update.
+
+Grouped cards require a dated Games heading, explicit status groups and
+jersey-labelled player names. SEC/ACC/Big Ten team identity comes from public
+headings or logo labels. Big Ten range headings use each game’s dated footer.
+Big 12 publishes generic logo labels; those rows require a unique exact
+name/position match within Big 12 and a real game on the report date. Ambiguous
+identities are skipped. The Big Ten’s public report redirect is resolved only
+to its explicitly linked HDI report document. Dated rows must match an actual game in the
+requested season/week before they can update a player.
 
 Only exact existing P4 QB/RB/WR/TE/K matches are imported. An unknown name,
 an ambiguous name, or an unsupported position is skipped and never creates a

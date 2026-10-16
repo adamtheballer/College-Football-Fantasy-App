@@ -244,6 +244,12 @@
     padding-top: env(safe-area-inset-top, 0px);
   }
 
+  @media (max-width: 639px) {
+    .cfb-toast-viewport[data-native-toast="true"] {
+      top: max(env(safe-area-inset-top, 0px), 59px);
+    }
+  }
+
   @media (max-width: 1023px) {
     .cfb-app-viewport[data-native-shell="true"] {
       padding-top: max(env(safe-area-inset-top, 0px), 59px);

@@ -6,7 +6,6 @@ import {
   ArrowRightLeft,
   Check,
   ShieldAlert,
-  Users,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -49,24 +48,6 @@ const createClientTradeRequestId = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `trade-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-type TradeAnalyzePayload = {
-  receive_ids: number[];
-  give_ids: number[];
-  season: number;
-  week: number;
-  league_id?: number;
-  league_size: number;
-  roster_slots: Record<string, number>;
-};
-
-type TradeAnalyzeResult = {
-  receive_value: number | null;
-  give_value: number | null;
-  delta: number | null;
-  verdict: string;
-  unavailable_player_ids: number[];
-};
 
 type TradeOfferItem = {
   id: number;
@@ -252,19 +233,10 @@ export const tradeSelectionSignature = (
   });
 
 export const canSendTradeOffer = (
-  analysis: TradeAnalyzeResult | null,
-  analysisSignature: string | null,
+  reviewedSignature: string | null,
   currentSignature: string,
   isSending: boolean,
-) =>
-  Boolean(
-    analysis &&
-    analysis.receive_value !== null &&
-    analysis.give_value !== null &&
-    analysis.delta !== null &&
-    analysisSignature === currentSignature &&
-    !isSending,
-  );
+) => Boolean(reviewedSignature && reviewedSignature === currentSignature && !isSending);
 
 const formatTradeStatus = (status: string) =>
   status
@@ -272,22 +244,6 @@ const formatTradeStatus = (status: string) =>
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
 
-const toTradeRosterSlots = (
-  slots: Record<string, number> | undefined,
-): Record<string, number> => {
-  if (!slots) {
-    return { QB: 1, RB: 2, WR: 2, TE: 1, K: 1, BE: 4, IR: 1 };
-  }
-  return {
-    QB: Number(slots.QB ?? 1),
-    RB: Number(slots.RB ?? 2),
-    WR: Number(slots.WR ?? 2),
-    TE: Number(slots.TE ?? 1),
-    K: Number(slots.K ?? 1),
-    BE: Number(slots.BENCH ?? slots.BE ?? 4),
-    IR: Number(slots.IR ?? 1),
-  };
-};
 
 const TradeList = ({
   title,
@@ -501,12 +457,7 @@ export default function Trade() {
   const [giveIds, setGiveIds] = useState<number[]>([]);
   const [receiveIds, setReceiveIds] = useState<number[]>([]);
   const [builderStep, setBuilderStep] = useState<TradeBuilderStep>("mine");
-  const [analysis, setAnalysis] = useState<TradeAnalyzeResult | null>(null);
-  const [analysisSignature, setAnalysisSignature] = useState<string | null>(
-    null,
-  );
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [reviewedSignature, setReviewedSignature] = useState<string | null>(null);
   const [tradeMessage, setTradeMessage] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -663,9 +614,7 @@ export default function Trade() {
   ]);
 
   useEffect(() => {
-    setAnalysis(null);
-    setAnalysisSignature(null);
-    setAnalysisError(null);
+    setReviewedSignature(null);
     setSendError(null);
   }, [giveIds, receiveIds, opponentTeamId, leagueId]);
 
@@ -721,8 +670,10 @@ export default function Trade() {
           client_request_id: clientRequestId,
         },
       ),
-    onSuccess: async () => {
-      await Promise.all([
+    onSuccess: () => {
+      // The server has persisted the offer. Background refreshes must not
+      // delay its confirmation or report a saved trade as a failed action.
+      void Promise.allSettled([
         queryClient.invalidateQueries({
           queryKey: ["league", leagueId, "trade-offers"],
         }),
@@ -800,54 +751,9 @@ export default function Trade() {
     );
   };
 
-  const handleAnalyze = async () => {
-    if (!league || !workspace || !giveIds.length || !receiveIds.length) {
-      return;
-    }
-    const payload: TradeAnalyzePayload = {
-      receive_ids: receiveIds,
-      give_ids: giveIds,
-      season: league.season_year,
-      week: Number(workspace.matchup_summary?.week ?? 1),
-      league_id: league.id,
-      league_size: league.max_teams,
-      roster_slots: toTradeRosterSlots(league.settings?.roster_slots_json),
-    };
-    setIsAnalyzing(true);
-    setAnalysisError(null);
-    try {
-      const result = await apiPost<TradeAnalyzeResult>(
-        "/trade/analyze",
-        payload,
-      );
-      setAnalysis(result);
-      setAnalysisSignature(currentTradeSignature);
-      setBuilderStep("review");
-    } catch (error) {
-      setAnalysis(null);
-      setAnalysisSignature(null);
-      setAnalysisError(formatTradeError(error, "Unable to analyze trade."));
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-  const analysisIsCurrent = Boolean(
-    analysis && analysisSignature === currentTradeSignature,
-  );
   const sendEnabled =
-    canSendTradeOffer(
-      analysis,
-      analysisSignature,
-      currentTradeSignature,
-      createOfferMutation.isPending,
-    ) &&
-    Boolean(
-      ownedTeamId &&
-      opponentTeamId &&
-      selectedGiveRows.length &&
-      selectedReceiveRows.length,
-    );
+    canSendTradeOffer(reviewedSignature, currentTradeSignature, createOfferMutation.isPending) &&
+    Boolean(ownedTeamId && opponentTeamId && selectedGiveRows.length && selectedReceiveRows.length);
   const selectionComplete = Boolean(
     league &&
     workspace &&
@@ -855,6 +761,12 @@ export default function Trade() {
     selectedGiveRows.length &&
     selectedReceiveRows.length,
   );
+
+  const reviewTrade = () => {
+    if (!selectionComplete || createOfferMutation.isPending) return;
+    setReviewedSignature(currentTradeSignature);
+    setBuilderStep("review");
+  };
 
   const returnToPreviousTradeStep = () => {
     if (builderStep === "review") {
@@ -870,7 +782,7 @@ export default function Trade() {
 
   const handleSendTrade = () => {
     if (!sendEnabled) {
-      setSendError("Run a fresh trade analysis before sending this offer.");
+      setSendError("Review the selected players before sending this offer.");
       return;
     }
     setSendError(null);
@@ -964,12 +876,10 @@ export default function Trade() {
             {builderStep === "opponent" ? (
               <Button
                 className="h-10 bg-cfb-brand px-4 text-xs font-black text-cfb-surface hover:bg-cfb-brand/90"
-                disabled={!selectionComplete || isAnalyzing}
-                onClick={() =>
-                  analysisIsCurrent ? setBuilderStep("review") : handleAnalyze()
-                }
+                disabled={!selectionComplete || createOfferMutation.isPending}
+                onClick={reviewTrade}
               >
-                {isAnalyzing ? "Reviewing..." : "Review trade"}
+                Review trade
               </Button>
             ) : null}
           </div>
@@ -1088,21 +998,12 @@ export default function Trade() {
                 </p>
                 <Button
                   className="bg-cfb-brand text-xs font-black text-cfb-surface hover:bg-cfb-brand/90"
-                  disabled={!selectionComplete || isAnalyzing}
-                  onClick={() =>
-                    analysisIsCurrent
-                      ? setBuilderStep("review")
-                      : handleAnalyze()
-                  }
+                  disabled={!selectionComplete || createOfferMutation.isPending}
+                  onClick={reviewTrade}
                 >
-                  {isAnalyzing ? "Reviewing..." : "Review trade"}
+                  Review trade
                 </Button>
               </div>
-              {analysisError ? (
-                <p className="text-sm font-semibold text-red-300">
-                  {analysisError}
-                </p>
-              ) : null}
               {theirRosterError ? (
                 <div className="flex items-center gap-3 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
                   <ShieldAlert className="h-4 w-4 shrink-0" />
@@ -1124,7 +1025,7 @@ export default function Trade() {
                       You send
                     </p>
                     <p className="mt-1 text-2xl font-black tabular-nums text-foreground">
-                      {analysis?.give_value?.toFixed(2) ?? "—"}
+                      {selectedGiveRows.length} player{selectedGiveRows.length === 1 ? "" : "s"}
                     </p>
                   </div>
                   <div className="divide-y divide-cfb-border-subtle">
@@ -1150,7 +1051,7 @@ export default function Trade() {
                       You receive
                     </p>
                     <p className="mt-1 text-2xl font-black tabular-nums text-foreground">
-                      {analysis?.receive_value?.toFixed(2) ?? "—"}
+                      {selectedReceiveRows.length} player{selectedReceiveRows.length === 1 ? "" : "s"}
                     </p>
                   </div>
                   <div className="divide-y divide-cfb-border-subtle">
@@ -1167,21 +1068,6 @@ export default function Trade() {
                     ))}
                   </div>
                 </section>
-              </div>
-              <div className="flex flex-col gap-3 rounded-xl border border-cfb-border-subtle bg-cfb-surface p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
-                    Trade verdict
-                  </p>
-                  <p className="mt-1 text-lg font-black text-foreground">
-                    {analysis?.verdict ?? "Analysis unavailable"}
-                  </p>
-                </div>
-                <p className="text-2xl font-black tabular-nums text-foreground">
-                  {analysis?.delta === null || analysis?.delta === undefined
-                    ? "—"
-                    : `${analysis.delta >= 0 ? "+" : ""}${analysis.delta.toFixed(2)}`}
-                </p>
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
@@ -1565,13 +1451,7 @@ export default function Trade() {
         </CardContent>
       </Card>
 
-      <Card className="rounded-[2rem] border border-emerald-400/20 bg-emerald-500/10">
-        <CardContent className="flex items-center gap-3 p-5 text-[10px] font-black uppercase tracking-[0.18em] text-emerald-100">
-          <Users className="h-4 w-4" />
-          Trade value is calculated from your league rosters and weekly
-          projections.
-        </CardContent>
-      </Card>
+
     </div>
   );
 }

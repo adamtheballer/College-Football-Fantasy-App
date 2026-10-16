@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 type TrajectoryPoint = {
   week: number;
@@ -14,7 +14,7 @@ type PlottedPoint = TrajectoryPoint & {
   value: number;
 };
 
-const CHART_WIDTH = 760;
+const MAX_CHART_WIDTH = 760;
 const CHART_HEIGHT = 312;
 const PADDING = { top: 24, right: 26, bottom: 46, left: 54 };
 
@@ -37,6 +37,20 @@ export function PlayerTrajectoryChart({
   seriesKind?: "projection" | "value";
   scoringLabel?: string;
 }) {
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const [chartWidth, setChartWidth] = useState(MAX_CHART_WIDTH);
+  useLayoutEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const measure = () => {
+      const width = canvas.getBoundingClientRect().width;
+      if (width > 0) setChartWidth(Math.max(240, Math.min(MAX_CHART_WIDTH, width)));
+    };
+    measure();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    observer?.observe(canvas);
+    return () => observer?.disconnect();
+  }, []);
   const [hoveredPointKey, setHoveredPointKey] = useState<string | null>(null);
   const [selectedPointKey, setSelectedPointKey] = useState<string | null>(null);
   const ordered = [...points].sort((left, right) => left.week - right.week);
@@ -52,7 +66,7 @@ export function PlayerTrajectoryChart({
         : point;
     })
     : ordered;
-  const plotWidth = CHART_WIDTH - PADDING.left - PADDING.right;
+  const plotWidth = chartWidth - PADDING.left - PADDING.right;
   const plotHeight = CHART_HEIGHT - PADDING.top - PADDING.bottom;
   const values = displayPoints.flatMap((point) => typeof point.value === "number" && Number.isFinite(point.value) ? [point.value] : []);
   const yMin = Math.min(0, ...values.map((value) => Math.floor(value / 10) * 10));
@@ -125,7 +139,7 @@ export function PlayerTrajectoryChart({
   const activeValueText = activePoint ? pointValueText(activePoint) : null;
   const activeLabelWidth = activeValueText ? Math.max(46, activeValueText.length * 7 + 18) : 0;
   const activeLabelX = activePoint
-    ? Math.max(PADDING.left, Math.min(x(activePoint.week) - activeLabelWidth / 2, CHART_WIDTH - PADDING.right - activeLabelWidth))
+    ? Math.max(PADDING.left, Math.min(x(activePoint.week) - activeLabelWidth / 2, chartWidth - PADDING.right - activeLabelWidth))
     : 0;
   const activeLabelY = activePoint ? Math.max(5, y(activePoint.value) - 32) : 0;
 
@@ -146,17 +160,17 @@ export function PlayerTrajectoryChart({
         </div>
         {plottedPoints.length ? <p className="text-xs font-black text-white">Peak: {valueFormatter(peak.value)} <span className="text-white/45">({peak.week === 0 ? "Preseason" : `W${peak.week}`})</span></p> : null}
       </div>
-      <div className="overflow-x-auto pb-1">
-        <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} className="h-auto min-w-[620px] w-full" role="img" aria-label={ariaLabel}>
+      <div ref={canvasRef} className="min-w-0 pb-1">
+        <svg viewBox={`0 0 ${chartWidth} ${CHART_HEIGHT}`} className="h-auto w-full" role="img" aria-label={ariaLabel}>
           {horizontalTicks.map((tick) => (
             <g key={tick}>
-              <line x1={PADDING.left} x2={CHART_WIDTH - PADDING.right} y1={y(tick)} y2={y(tick)} stroke="rgba(191,219,254,0.16)" strokeDasharray="4 6" />
+              <line x1={PADDING.left} x2={chartWidth - PADDING.right} y1={y(tick)} y2={y(tick)} stroke="rgba(191,219,254,0.16)" strokeDasharray="4 6" />
               <text x={PADDING.left - 10} y={y(tick) + 4} textAnchor="end" fill="rgba(226,232,240,0.62)" fontSize="11" fontWeight="700">
                 {Number(tick.toFixed(1))}
               </text>
             </g>
           ))}
-          {weeks.map((week) => (
+          {weeks.filter(week => chartWidth >= 500 || week % 2 === 0 || week === 13).map((week) => (
             <text key={`label-${week}`} x={x(week)} y={CHART_HEIGHT - 16} textAnchor="middle" fill="rgba(226,232,240,0.62)" fontSize="10" fontWeight="700">
               {week === 0 ? (isProjection ? "Preweek" : "Preseason") : `W${week}`}
             </text>

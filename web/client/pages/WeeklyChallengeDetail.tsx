@@ -19,7 +19,11 @@ import {
   useChallengeState,
 } from "@/hooks/use-weekly-challenges";
 
-const slots = ["QB", "RB", "WR", "TE", "FLEX"] as const;
+import {
+  CHALLENGE_PICK_COUNTS,
+  FANTASY_SLOTS,
+  challengeEntryError,
+} from "@/lib/challenge-entry";
 export function EntryForm({
   challenge: c,
   accountId,
@@ -53,6 +57,9 @@ export function EntryForm({
   const [revision, setRevision] = useState(initial.revision);
   const [official, setOfficial] = useState(c.entry?.status === "submitted");
   const [confirmation, setConfirmation] = useState("");
+  const requiredPicks = CHALLENGE_PICK_COUNTS[c.kind];
+  const draftError = challengeEntryError(c, picks, tiebreaker, false);
+  const submitError = challengeEntryError(c, picks, tiebreaker, true);
   useEffect(() => {
     try {
       sessionStorage.setItem(
@@ -64,8 +71,10 @@ export function EntryForm({
     }
   }, [storageKey, picks, tiebreaker, revision]);
   const mutation = useMutation({
-    mutationFn: (submit: boolean) =>
-      apiChallengeWrite<Entry>(
+    mutationFn: (submit: boolean) => {
+      const error = challengeEntryError(c, picks, tiebreaker, submit);
+      if (error) throw new Error(error);
+      return apiChallengeWrite<Entry>(
         accountId,
         "PUT",
         `/weekly-challenges/challenges/${c.id}/entry`,
@@ -75,7 +84,8 @@ export function EntryForm({
           selections: picks,
           tiebreaker: tiebreaker === "" ? null : Number(tiebreaker),
         },
-      ),
+      );
+    },
     onSuccess: (entry) => {
       setRevision(entry.revision);
       setOfficial(entry.status === "submitted");
@@ -98,11 +108,19 @@ export function EntryForm({
       (p) => p.game_id === game_id && p.team === team,
     );
     if (c.kind === "lock") change(selected ? [] : [{ game_id, team }]);
-    else
+    else {
+      // A replacement within an already selected game doesn't add a pick.
+      if (
+        !selected &&
+        !picks.some((p) => p.game_id === game_id) &&
+        picks.length >= requiredPicks
+      )
+        return;
       change([
         ...picks.filter((p) => p.game_id !== game_id),
         ...(selected ? [] : [{ game_id, team }]),
       ]);
+    }
   };
   const loadSaved = () => {
     setPicks(c.entry?.selections ?? []);
@@ -116,7 +134,7 @@ export function EntryForm({
     <form
       onSubmit={(event) => {
         event.preventDefault();
-        if (c.state !== "Open" || mutation.isPending) return;
+        if (c.state !== "Open" || mutation.isPending || submitError) return;
         setConfirmation("");
         mutation.mutate(true);
       }}
@@ -141,7 +159,7 @@ export function EntryForm({
         )}
         {c.kind === "fantasy5" ? (
           <div className="grid gap-4 sm:grid-cols-2">
-            {slots.map((slot) => {
+            {FANTASY_SLOTS.map((slot) => {
               const chosen = picks.find((p) => p.slot === slot)?.player_id;
               return (
                 <label key={slot} className="space-y-2">
@@ -236,10 +254,15 @@ export function EntryForm({
                         <button
                           key={team}
                           type="button"
-                          className={`min-h-11 rounded-md border px-3 py-2 text-sm font-bold ${picks.some((p) => p.game_id === g.id && p.team === team) ? "border-primary bg-primary/15 text-primary" : "border-border"}`}
+                          className={`min-h-11 rounded-md border px-3 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-40 ${picks.some((p) => p.game_id === g.id && p.team === team) ? "border-primary bg-primary/15 text-primary" : "border-border"}`}
                           aria-pressed={picks.some(
                             (p) => p.game_id === g.id && p.team === team,
                           )}
+                          disabled={
+                            c.kind !== "lock" &&
+                            picks.length >= requiredPicks &&
+                            !picks.some((p) => p.game_id === g.id)
+                          }
                           onClick={() => pickGame(g.id, team)}
                         >
                           {picks.some(
@@ -279,10 +302,22 @@ export function EntryForm({
             />
           </label>
         )}
-        <p className="text-sm text-muted-foreground">
-          {picks.length} selection{picks.length !== 1 ? "s" : ""} · Shared
-          deadline {deadlineText(c.lock_at)}
-        </p>
+        <div
+          aria-live="polite"
+          className="space-y-1 text-sm text-muted-foreground"
+        >
+          <p>
+            {picks.length} / {requiredPicks}{" "}
+            {c.kind === "fantasy5" ? "players" : "picks"} selected · Shared
+            deadline {deadlineText(c.lock_at)}
+          </p>
+          <p>
+            {submitError ??
+              (c.kind === "upset"
+                ? "All 3 picks selected. Remove a pick to choose a different game."
+                : "Your selections are complete.")}
+          </p>
+        </div>
         {mutation.isError && (
           <p role="alert" className="text-sm text-red-300">
             {challengeError(mutation.error)} Your choices are preserved. A
@@ -297,7 +332,9 @@ export function EntryForm({
         <div className="flex flex-wrap gap-3">
           <Button
             type="submit"
-            disabled={mutation.isPending || c.state !== "Open"}
+            disabled={
+              mutation.isPending || c.state !== "Open" || Boolean(submitError)
+            }
           >
             {mutation.isPending
               ? "Saving…"
@@ -311,9 +348,12 @@ export function EntryForm({
               variant="outline"
               onClick={() => {
                 setConfirmation("");
-                mutation.mutate(false);
+                if (!draftError && c.state === "Open" && !mutation.isPending)
+                  mutation.mutate(false);
               }}
-              disabled={mutation.isPending || c.state !== "Open"}
+              disabled={
+                mutation.isPending || c.state !== "Open" || Boolean(draftError)
+              }
             >
               Save Draft
             </Button>

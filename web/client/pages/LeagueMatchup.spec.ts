@@ -166,7 +166,7 @@ describe("league matchup scoreboard", () => {
     expect(screen.getByText("Week 1 matchup")).toBeTruthy();
     const scoreboard = screen.getByTestId("matchup-scoreboard");
     expect(scoreboard.className).toContain("sticky");
-    expect(scoreboard.className).toContain("top-0");
+    expect(scoreboard.className).toContain("top-[var(--league-navigation-height,0px)]");
     expect(scoreboard.className).toContain("z-40");
     expect(scoreboard.className).toContain("bg-cfb-surface");
     expect(screen.getByRole("heading", { name: "Updated Adam's Team vs Taylor's Team" })).toBeTruthy();

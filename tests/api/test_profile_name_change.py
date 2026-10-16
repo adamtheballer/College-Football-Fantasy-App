@@ -172,3 +172,42 @@ def test_two_devices_only_commit_one_different_name(client):
     winner = next(name for status, name in results if status == "saved")
     with TestingSessionLocal() as db:
         assert db.get(User, user_id).first_name == winner
+
+
+def test_generated_team_name_collision_does_not_block_manager_name_change(client, db_session):
+    from collegefootballfantasy_api.app.models.league import League
+    from collegefootballfantasy_api.app.models.team import Team
+
+    user_id, headers = account(client, 'collision')
+    other_id, _ = account(client, 'existing-adam')
+    leagues = [League(name=f'Name collision {i}', season_year=2026) for i in range(3)]
+    db_session.add_all(leagues); db_session.flush()
+    own = Team(league_id=leagues[0].id, name="Old Manager's Team", owner_name='Old Manager', owner_user_id=user_id)
+    existing = Team(league_id=leagues[0].id, name="Adam's Team", owner_name='Adam', owner_user_id=other_id)
+    reserved = Team(league_id=leagues[0].id, name="Adam's Team (2)", owner_user_id=None)
+    other_league = Team(league_id=leagues[1].id, name="Old Manager's Team", owner_name='Old Manager', owner_user_id=user_id)
+    custom = Team(league_id=leagues[2].id, name='Custom champions', owner_name='Old Manager', owner_user_id=user_id)
+    db_session.add_all([own, existing, reserved, other_league, custom]); db_session.commit()
+    response = client.patch('/auth/me', headers=headers, json={'first_name': 'Adam'})
+    assert response.status_code == 200, response.text
+    assert response.json()['first_name'] == 'Adam'
+    assert datetime.fromisoformat(response.json()['manager_name_changed_at']) == NOW
+    db_session.expire_all()
+    assert own.name == "Adam's Team (3)" and own.display_name == "Adam's Team (3)"
+    assert existing.name == "Adam's Team" and reserved.name == "Adam's Team (2)"
+    assert other_league.name == "Adam's Team"
+    assert custom.name == 'Custom champions' and custom.owner_name == 'Adam'
+    # An idempotent retry keeps the chosen team name and cooldown unchanged.
+    retry = client.patch('/auth/me', headers=headers, json={'first_name': 'Adam'})
+    assert retry.status_code == 200
+    assert retry.json()['manager_name_changed_at'] == response.json()['manager_name_changed_at']
+    assert own.name == "Adam's Team (3)"
+
+    # After the real seven-day window the suffixed generated label follows
+    # the next manager name, while custom and opponent labels stay intact.
+    set_changed(user_id, NOW - timedelta(hours=192))
+    response = client.patch('/auth/me', headers=headers, json={'first_name':'Next Manager'})
+    assert response.status_code == 200, response.text
+    db_session.expire_all()
+    assert own.name == "Next Manager's Team"
+    assert custom.name == 'Custom champions' and existing.name == "Adam's Team"

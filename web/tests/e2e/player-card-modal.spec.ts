@@ -537,6 +537,18 @@ test.describe("player card modal", () => {
     await expect(projectionChart.getByTestId("trajectory-projection-line")).toHaveAttribute("stroke-dasharray", "7 7");
     await expect(projectionChart.getByTestId("trajectory-actual-line")).toHaveAttribute("stroke", "#2f80ff");
     await expect(projectionChart.getByTestId("trajectory-actual-line")).not.toHaveAttribute("stroke-dasharray");
+    // Every weekly point must fit the phone without a horizontal scroll. In
+    // particular a current Week 7 forecast used to start offscreen at 620px.
+    const phoneChart = await projectionChart.boundingBox();
+    expect(phoneChart!.width).toBeLessThanOrEqual(390);
+    const chartScroll = await projectionChart.locator("..").evaluate(element => ({width:element.clientWidth,scrollWidth:element.scrollWidth}));
+    expect(chartScroll.scrollWidth).toBeLessThanOrEqual(chartScroll.width);
+    for (const point of await projectionChart.locator("circle[data-testid^='trajectory-point-week-']").all()) {
+      const box = await point.boundingBox();
+      expect(box!.x).toBeGreaterThanOrEqual(phoneChart!.x);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(phoneChart!.x + phoneChart!.width);
+    }
+    await page.screenshot({path:testInfo.outputPath("projection-chart-fits-phone.png")});
 
     await dialog.getByRole("button", { name: "Game Log", exact: true }).click();
     await dialog.getByLabel("Game log season").selectOption("2025");

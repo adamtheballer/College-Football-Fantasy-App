@@ -205,7 +205,7 @@ function CompactMatchupScoreboard({
   return (
     <section
       data-testid="matchup-scoreboard"
-      className="sticky top-0 z-40 isolate border-b border-cfb-border-subtle bg-cfb-surface px-3 pb-3 pt-6 shadow-[0_12px_24px_rgba(2,6,23,0.46)] sm:px-5 sm:pb-4 sm:pt-7"
+      className="sticky top-[var(--league-navigation-height,0px)] z-40 isolate border-b border-cfb-border-subtle bg-cfb-surface px-3 pb-3 pt-6 shadow-[0_12px_24px_rgba(2,6,23,0.46)] sm:px-5 sm:pb-4 sm:pt-7"
     >
       <h2 className="sr-only">
         {managerTeamName(myTeam, "Your team")} vs {managerTeamName(opponentTeam, "Opponent")}

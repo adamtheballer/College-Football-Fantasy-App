@@ -1860,7 +1860,7 @@ test.describe("critical browser workflows", () => {
       const scoreboardBox = scoreboard.getBoundingClientRect();
       const barBox = bar.getBoundingClientRect();
       return {
-        scrollerTop: scrollerBox.top,
+        scrollerTop: scrollerBox.top + (document.querySelector<HTMLElement>("[data-testid=league-navigation]")?.getBoundingClientRect().height ?? 0),
         scoreboardTop: scoreboardBox.top,
         scoreboardBottom: scoreboardBox.bottom,
         barTop: barBox.top,
@@ -2408,7 +2408,7 @@ test.describe("critical browser workflows", () => {
     await expect(page.getByText("Rival Team · 0-0-0 · Read-only", { exact: true })).toBeVisible();
   });
 
-  test("trade builder requires fresh analysis before sending an offer", async ({ page }) => {
+  test("trade builder reviews selected players without requiring a value evaluation", async ({ page }) => {
     await seedAuthenticatedSession(page);
     await page.addInitScript(() => {
       window.localStorage.setItem("cfb_active_league_id", "1");
@@ -2651,8 +2651,9 @@ test.describe("critical browser workflows", () => {
     await page.getByRole("button", { name: /^Review trade$/i }).last().click();
 
     await expect(page.getByRole("heading", { name: "Review trade" })).toBeVisible();
-    await expect(page.getByText("Strong Loss")).toBeVisible();
-    await expect(page.getByText("-6.00")).toBeVisible();
+    await expect(page.getByText("Strong Loss")).toHaveCount(0);
+    await expect(page.getByText("Trade verdict")).toHaveCount(0);
+    await expect(page.getByText("-6.00")).toHaveCount(0);
     await page.setViewportSize({ width: 390, height: 844 });
     const reviewPanel = page.getByRole("heading", { name: "Review trade" }).locator("xpath=ancestor::section[1]");
     const mobilePanelBox = await reviewPanel.boundingBox();
@@ -2660,18 +2661,16 @@ test.describe("critical browser workflows", () => {
     if (mobilePanelBox) {
       expect(mobilePanelBox.width).toBeLessThanOrEqual(390);
     }
-    await expect.poll(() => analyzePayload).not.toBeNull();
-    expect(analyzePayload).toMatchObject({
-      give_ids: [201],
-      receive_ids: [301],
-      season: 2026,
-      week: 1,
-      league_id: 1,
-      league_size: 2,
-    });
-
+    expect(analyzePayload).toBeNull();
     await expect(page.getByRole("button", { name: /^Send trade$/i })).toBeEnabled();
     await page.getByRole("button", { name: /^Send trade$/i }).click();
+    const confirmation = page.getByText("Trade sent successfully", { exact: true });
+    await expect(confirmation).toBeVisible();
+    await page.locator(".cfb-toast-viewport").evaluate(el => el.setAttribute("data-native-toast", "true"));
+    await expect(page.locator(".cfb-toast-viewport")).toHaveCSS("top", "59px");
+    await expect.poll(async () => (await confirmation.boundingBox())!.y).toBeGreaterThanOrEqual(59);
+    const confirmationBox = (await confirmation.boundingBox())!;
+    expect(confirmationBox.y + confirmationBox.height).toBeLessThan(844);
     await expect.poll(() => proposalPayload).not.toBeNull();
     expect(proposalPayload).toMatchObject({
       proposing_team_id: 11,
