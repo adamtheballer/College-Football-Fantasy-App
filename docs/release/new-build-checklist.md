@@ -869,3 +869,20 @@ Week 7's five real slates were independently provider-verified, server-validated
 and published through existing audited services. All five report Open; publication
 scope and deadlines are in `docs/operations/week-7-challenge-publication.md`.
 No App Store/TestFlight submission is authorized before the owner's test result.
+
+## Immediate launch notices — October 16
+
+Native test package 1.0.3 (41) includes the merged league navigation alignment
+and removes two launch-popup blockers: background dashboard cards no longer delay
+the ready Home shell, and harmless scroll/key/pointer events no longer cancel an
+in-flight review grant. The review coordinator defaults to zero idle delay.
+Authentication, account receipts, onboarding, active forms, other dialogs,
+foreground/scene checks and native permission guards remain required.
+
+The update brief appears on the first eligible authenticated Home render; its
+closure releases the immediate review request. Existing once-per-account and
+per-release receipts remain authoritative. No global reset is allowed. The
+owner's previously approved account-only replay remains a separate test exception.
+All 662 frontend tests, TypeScript projects, Chromium loading/once-only and league
+navigation checks, and WebKit launch checks passed. StoreKit display and owner
+replay still require physical verification; do not infer them from these tests.

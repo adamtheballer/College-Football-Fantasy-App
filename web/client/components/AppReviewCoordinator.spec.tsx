@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { StrictMode } from "react";
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppReviewCoordinator, isReviewSafeRoute, reviewScreenIsUsable } from "./AppReviewCoordinator";
 import { withReviewPresentationBlocker } from "@/lib/review-presentation";
@@ -28,6 +28,33 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); document.body.innerHTML = ""; });
 
 describe("Layout review integration", () => {
+  it.each(["dialog", "input"])("still cancels presentation when a real %s interrupts a pending claim", async (kind) => {
+    let resolve!: (value: unknown) => void;
+    mocks.claim.mockReturnValue(new Promise((done) => { resolve = done; }));
+    render(<AppReviewCoordinator {...props} />); await tick();
+    await act(async () => {
+      const blocker = document.createElement(kind === "input" ? "input" : "div");
+      if (kind === "dialog") blocker.setAttribute("role", "dialog");
+      document.querySelector("main")!.append(blocker);
+      if (kind === "input") blocker.focus();
+    });
+    await act(async () => { resolve({ account_id: 11, enabled: true, review_request_claimed_at: "2026-10-16T00:00:00Z", authorization: "granted" }); });
+    await tick(); expect(mocks.request).not.toHaveBeenCalled();
+  });
+
+  it.each(["scroll", "pointerdown", "keydown"])("does not lose a committed review grant to harmless %s events", async (event) => {
+    let resolve!: (value: unknown) => void;
+    mocks.claim.mockReturnValue(new Promise((done) => { resolve = done; }));
+    render(<AppReviewCoordinator {...props} />);
+    await tick();
+    expect(mocks.claim).toHaveBeenCalledTimes(1);
+    fireEvent(document.querySelector("main")!, new Event(event, { bubbles: true }));
+    await act(async () => { resolve({ account_id: 11, enabled: true, review_request_claimed_at: "2026-10-16T00:00:00Z", authorization: "granted" }); });
+    await tick();
+    expect(mocks.request).toHaveBeenCalledTimes(1);
+    expect(mocks.claim).toHaveBeenCalledTimes(1);
+  });
+
   it("browser visits install no native listeners or review network checks", async () => {
     mocks.native = false; render(<AppReviewCoordinator {...props} />); await tick();
     expect(mocks.observe).not.toHaveBeenCalled(); expect(mocks.state).not.toHaveBeenCalled(); expect(mocks.request).not.toHaveBeenCalled();

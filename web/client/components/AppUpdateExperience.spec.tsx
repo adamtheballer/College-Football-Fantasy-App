@@ -60,6 +60,15 @@ afterEach(() => {
 });
 
 describe("1.03 update walkthrough", () => {
+  it("opens on the authenticated Home shell while background cards are still loading", async () => {
+    document.body.innerHTML = '<main><div data-launch-notice-ready="true"><h1>Your fantasy dashboard</h1><div aria-busy="true">Loading your league matchups</div><div aria-busy="true">Loading your alerts</div></div></main>';
+    const p = props();
+    render(<AppUpdateExperience {...p} />);
+    await dialog();
+    expect(document.querySelectorAll('[aria-busy="true"]')).toHaveLength(2);
+    expect(mocks.claim).toHaveBeenCalledTimes(1);
+  });
+
   it("greets the manager, stays centered and reveals every update with Next/Back", async () => {
     render(<AppUpdateExperience {...props()} />);
     expect((await dialog()).className).toContain("top-[50%]");

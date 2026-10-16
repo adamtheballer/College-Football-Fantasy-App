@@ -42,6 +42,12 @@ onboarding, closed player/menu dialogs, document foreground, and completion of
 native permission requests. It rechecks presentation safety after the server
 responds. App Review stays blocked during that wait and throughout the popup.
 The update receipt does not modify App Review's independent lifetime claim.
+On confirmed Home, the mounted dashboard shell qualifies immediately while its
+league and alert cards fetch in the background. A route fallback, an entirely
+busy page, another dialog, or an active form still blocks presentation. Ordinary
+scroll/key/pointer events recheck those blockers without cancelling an in-flight
+review authorization; this host has no idle-window requirement. This prevents a
+carousel scroll from silently consuming the only review opportunity.
 Failed requests show no false success and preserve server-side eligibility when
 no receipt was committed.
 
