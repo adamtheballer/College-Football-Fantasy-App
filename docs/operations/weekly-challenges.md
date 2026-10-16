@@ -1,9 +1,8 @@
-# Weekly Challenges — local combined-build implementation
+# Weekly Challenges
 
-This feature is local and unreleased. Migration `0123_weekly_challenges` is prepared;
-no production migration, deployment, push, merge, native sync/build, or App Store/
-TestFlight upload is authorized by this feature request. Prior notification/review
-rollout notes describe the earlier release, not deployment of Weekly Challenges.
+The app and server share migration `0123_weekly_challenges`. Release-round
+configuration and publishing remain server-side; the native bundle never
+selects a season or week.
 
 ## Product and integration
 
@@ -251,3 +250,18 @@ Logs are local `/private/tmp/cff-weekly-challenges-*.log` artifacts, not deploym
 evidence. Initial sandbox/import-path failures were resolved by using the repo
 import path and permitted localhost access; the final suite passes without code
 changes to runtime health checks or network protections.
+
+
+## Public release round
+
+Challenges, slates, entries, cutoff validation and scoring live on the server.
+`WEEKLY_CHALLENGES_LAUNCH_SEASON=2026` and
+`WEEKLY_CHALLENGES_LAUNCH_WEEK=8` select Week 8 as the first public app-release
+round. Both API and lifecycle worker use the same server setting. The shared
+calendar advances to later weeks automatically; it is not pinned to Week 8,
+and the floor does not affect a later season. Default launch week is 1 for
+existing environments. Published Week 7 entries and results remain preserved
+in history; no entry is moved into Week 8. Publish the five verified Week 8
+slates through the existing configure/validate/publish service before enabling
+the release setting. Future weekly slates are administered on the server and
+do not require an iOS update.

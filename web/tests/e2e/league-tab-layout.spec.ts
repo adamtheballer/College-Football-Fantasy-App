@@ -292,3 +292,253 @@ for (const width of [390, 1280]) {
     });
   });
 }
+
+for (const width of [320, 390, 1280]) {
+  test(`compact league pages and single-line settings labels at ${width}px`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ width, height: 844 });
+    await leagueShell(page);
+    await page.goto("/league/42/waivers");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Waiver Wire", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByText(/Players are instant adds before their own kickoff/),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: "Available Players", exact: true }),
+    ).toHaveCount(0);
+    await page.screenshot({
+      path: info.outputPath(`compact-waivers-${width}.png`),
+    });
+    await page.goto("/league/42/watchlist");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Watchlist", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Saved Targets", exact: true }),
+    ).toHaveCount(0);
+    await page.screenshot({
+      path: info.outputPath(`compact-watchlist-${width}.png`),
+    });
+    await page.goto("/league/42/settings");
+    const sections = page.locator('[aria-label="League settings sections"]');
+    await expect(sections).toBeVisible();
+    await expect(sections.getByRole("button")).toHaveCount(7);
+    const labels = await sections
+      .locator("button span")
+      .evaluateAll((elements) =>
+        elements.map((el) => {
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          return {
+            text: el.textContent,
+            lines: range.getClientRects().length,
+            clipped: el.scrollWidth > el.clientWidth,
+          };
+        }),
+      );
+    expect(labels).toHaveLength(7);
+    expect(labels.every((l) => l.lines === 1 && !l.clipped)).toBe(true);
+    for (const label of [
+      "Standings",
+      "Schedules",
+      "Manager Rosters",
+      "Draft Results",
+    ]) {
+      const button = sections.getByRole("button", { name: label, exact: true });
+      await button.scrollIntoViewIfNeeded();
+      await expect(button).toBeInViewport();
+      await button.click();
+    }
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await page.screenshot({
+      path: info.outputPath(`single-line-settings-${width}.png`),
+    });
+  });
+}
+
+for (const path of ["/league/42/chat", "/chats?leagueId=42"]) {
+  test(`chat opens newest first and appends older pages at ${path}`, async ({
+    page,
+  }, info) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await leagueShell(page);
+    const receipts: number[] = [];
+    const message = (id: number) => ({
+      id,
+      thread_id: 420,
+      league_id: 42,
+      sender_user_id: 2,
+      message_type: "user",
+      body: `Message ${id}`,
+      metadata: {},
+      client_message_id: null,
+      reply_to_message_id: null,
+      edited_at: null,
+      deleted_at: null,
+      created_at: new Date(Date.UTC(2026, 9, 16, 0, id)).toISOString(),
+      updated_at: new Date(Date.UTC(2026, 9, 16, 0, id)).toISOString(),
+      sender_display_name: "Other manager",
+      sender_fantasy_team_name: null,
+      reply_to_message: null,
+    });
+    await page.route("**/api/leagues**", async (route) => {
+      const url = new URL(route.request().url());
+      const p = url.pathname.replace(/^\/api/, "");
+      if (p === "/leagues")
+        return route.fulfill({
+          json: {
+            data: [{ id: 42, name: "Chat QA", status: "post_draft" }],
+            total: 1,
+          },
+        });
+      if (p === "/leagues/42/chats")
+        return route.fulfill({
+          json: {
+            data: [
+              {
+                id: 420,
+                league_id: 42,
+                thread_type: "league",
+                title: "General",
+                participants: [],
+                unread_count: 20,
+                last_message_at: "2026-10-16T01:40:00Z",
+              },
+            ],
+            total: 1,
+          },
+        });
+      if (p === "/leagues/42/chats/420/messages") {
+        const before = Number(url.searchParams.get("before_message_id"));
+        const after = Number(url.searchParams.get("after_message_id"));
+        return route.fulfill({
+          json: {
+            data: after
+              ? []
+              : Array.from({ length: 50 }, (_, i) =>
+                  message((before ? 1 : 51) + i),
+                ),
+            next_before_message_id: before || after ? null : 51,
+            next_after_message_id: null,
+          },
+        });
+      }
+      if (p === "/leagues/42/chats/420/read") {
+        receipts.push(route.request().postDataJSON().last_read_message_id);
+        return route.fulfill({
+          json: { thread_id: 420, last_read_message_id: 100 },
+        });
+      }
+      await route.fallback();
+    });
+    await page.goto(path);
+    const messages = page.getByLabel("Messages, newest first");
+    await expect(messages.locator("[data-message-id]").first()).toHaveAttribute(
+      "data-message-id",
+      "100",
+    );
+    await expect.poll(() => receipts).toContain(100);
+    await expect(messages.locator("[data-message-id]")).toHaveCount(50);
+    await messages.getByRole("button", { name: "Load older messages" }).click();
+    await expect(messages.locator("[data-message-id]")).toHaveCount(100);
+    await expect(messages.locator("[data-message-id]").first()).toHaveAttribute(
+      "data-message-id",
+      "100",
+    );
+    await expect(messages.locator("[data-message-id]").last()).toHaveAttribute(
+      "data-message-id",
+      "1",
+    );
+    await expect(
+      messages.getByRole("button", { name: "Load older messages" }),
+    ).toHaveCount(0);
+    expect(
+      await messages
+        .locator("[data-message-id]")
+        .evaluateAll((els) =>
+          els.map((el) => Number(el.getAttribute("data-message-id"))),
+        ),
+    ).toEqual(Array.from({ length: 100 }, (_, i) => 100 - i));
+    await page.screenshot({ path: info.outputPath("newest-first-chat.png") });
+  });
+}
+
+test("weekly leaderboard refresh changes the round and shows current names and points for the top 10", async ({
+  page,
+}, info) => {
+  await leagueShell(page);
+  await page.clock.install();
+  let week = 7;
+  await page.route("**/api/weekly-challenges/**", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname.endsWith("/history")) return route.fulfill({ json: [] });
+    if (url.pathname.endsWith("/current"))
+      return route.fulfill({
+        json: {
+          id: week,
+          season: 2026,
+          week,
+          state: "Open",
+          challenges: [],
+          next_rollover_at: "2026-10-21T04:00:00Z",
+          server_now: "2026-10-16T17:00:00Z",
+        },
+      });
+    if (url.pathname.endsWith("/leaderboard")) {
+      const round = Number(url.searchParams.get("round_id"));
+      return route.fulfill({
+        json: {
+          season: 2026,
+          week: round,
+          round_id: round,
+          provisional: false,
+          your_rank: null,
+          data: Array.from({ length: 10 }, (_, i) => ({
+            user_id: i + 1,
+            rank: i + 1,
+            display_name: `Week ${round} manager ${i + 1}`,
+            username: null,
+            avatar_url: null,
+            profile_url: `/managers/${i + 1}`,
+            points: 100 - i - round,
+          })),
+        },
+      });
+    }
+    await route.fallback();
+  });
+  await page.goto("/weekly-challenges");
+  await page
+    .getByRole("link", { name: "View Leaderboard", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/weekly-challenges\/leaderboard$/);
+  await expect(
+    page.getByText("Week 7 manager 1", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /Week 7 manager \d/ }),
+  ).toHaveCount(10);
+  week = 8;
+  await page.clock.fastForward(31_000);
+  await expect(
+    page.getByText("Week 8 manager 1", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /Week 8 manager \d/ }),
+  ).toHaveCount(10);
+  await expect(
+    page.getByRole("link", { name: /Week 8 manager 1 92 points/ }),
+  ).toBeVisible();
+  await expect(page.getByText("Week 7 manager 1", { exact: true })).toHaveCount(
+    0,
+  );
+  await expect(page.getByText(/2026 · Week 8/)).toBeVisible();
+  await page.screenshot({ path: info.outputPath("week-8-top-10.png") });
+});

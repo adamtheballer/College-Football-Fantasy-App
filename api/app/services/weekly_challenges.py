@@ -53,6 +53,11 @@ def utcnow():
     return datetime.now(timezone.utc)
 
 
+def competition_week(season, now=None):
+    week = calendar_matchup_display_week(season, now)
+    return max(week, settings.weekly_challenges_launch_week) if season == settings.weekly_challenges_launch_season else week
+
+
 def aware(dt):
     return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
 
@@ -132,10 +137,12 @@ def reconcile_lock(db, c, games, now):
 
 def challenge_state(c, round_, games, now):
     if c.status == "canceled": return "Canceled"
-    if c.status == "draft" or (round_.season, round_.week) > (settings.current_season_year, calendar_matchup_display_week(settings.current_season_year, now)):
+    if c.status == "draft" or (round_.season, round_.week) > (settings.current_season_year, competition_week(settings.current_season_year, now)):
         return "Upcoming"
     if c.status in {"final", "no_contest"}: return "Closed — Final"
     deadline = effective_lock(c, games)
+    if deadline and now < deadline and (round_.season, round_.week) < (settings.current_season_year, competition_week(settings.current_season_year, now)):
+        return "Closed — Entries ended"
     if c.locked_at is None and deadline and now < deadline and all((g.schedule_status or "").lower() in UNSTARTED and g.start_date and aware(g.start_date) > now for g in games):
         return "Open"
     return "Closed — Results Processing" if all(result_state(g, round_, now) in {"final", "void"} for g in games) else "Closed — Live"
@@ -150,7 +157,7 @@ def assert_open(db, c):
         fail("TEMPORARY_DATA_FAILURE", "The published schedule needs verification. Please try again later.", 503, c)
     reconcile_lock(db, c, games, now)
     if c.status == "draft": fail("NOT_PUBLISHED", "This challenge is not published yet.", challenge=c)
-    if (round_.season, round_.week) != (settings.current_season_year, calendar_matchup_display_week(settings.current_season_year, now)):
+    if (round_.season, round_.week) != (settings.current_season_year, competition_week(settings.current_season_year, now)):
         fail("CHALLENGE_CLOSED", "This round is not the current competition week.", challenge=c)
     if challenge_state(c, round_, games, now) != "Open":
         # A rejected mutation must not save partially edited selections. Persist
@@ -277,7 +284,7 @@ def publish(db, c, expected_version, actor):
     issues, games = validate_config(db, c, c.config)
     if issues: fail("INVALID_CONFIGURATION", " ".join(issues), 422, c)
     r = db.get(ChallengeRound, c.round_id)
-    if (r.season, r.week) < (settings.current_season_year, calendar_matchup_display_week(settings.current_season_year, utcnow())):
+    if (r.season, r.week) < (settings.current_season_year, competition_week(settings.current_season_year, utcnow())):
         fail("CHALLENGE_CLOSED", "Cannot publish a historical round.", challenge=c)
     config = dict(c.config)
     if c.kind == "fantasy5": config.update(scoring_rules=get_scoring_rules(), scoring_version=CALCULATION_VERSION)
@@ -575,7 +582,7 @@ def leaderboard(db, user, *, season, round_id=None):
     mine = query.filter(User.id == user.id).first()
     unsettled = db.query(WeeklyChallenge.id).join(ChallengeRound).filter(ChallengeRound.season == season, WeeklyChallenge.status.notin_(("final", "no_contest", "canceled")))
     if round_id is not None: unsettled = unsettled.filter(ChallengeRound.id == round_id)
-    return {"season": season, "round_id": round_id, "provisional": unsettled.first() is not None if round_id else False, "data": top, "your_rank": row_read(mine) if mine and user.id not in [x["user_id"] for x in top] else None}
+    return {"season": season, "week": db.get(ChallengeRound, round_id).week if round_id else None, "round_id": round_id, "provisional": unsettled.first() is not None if round_id else False, "data": top, "your_rank": row_read(mine) if mine and user.id not in [x["user_id"] for x in top] else None}
 
 
 def results(db, c, user, limit, offset):
@@ -597,7 +604,7 @@ def results(db, c, user, limit, offset):
 
 
 def process_weekly_challenges_once(db):
-    current = ensure_round(db, settings.current_season_year, calendar_matchup_display_week(settings.current_season_year, utcnow()))
+    current = ensure_round(db, settings.current_season_year, competition_week(settings.current_season_year, utcnow()))
     db.commit()
     now = utcnow()
     candidates = db.query(WeeklyChallenge.id).filter(WeeklyChallenge.status.notin_(("draft", "canceled")), or_(WeeklyChallenge.last_scored_at.is_(None), WeeklyChallenge.last_scored_at < now-timedelta(seconds=60))).order_by(WeeklyChallenge.last_scored_at.asc().nullsfirst(), WeeklyChallenge.id).limit(20).all()

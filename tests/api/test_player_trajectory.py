@@ -169,3 +169,32 @@ def test_current_published_week_is_visible_while_earlier_chart_history_is_pendin
     body = client.get(f'/players/{player.id}/trajectory?season=2026').json()
     assert [(p['week'], p['points'], p['is_finalized']) for p in body['projection']] == [(7, 17.1, False)]
     assert body['projection'][0]['actual_points'] is None
+
+
+def test_final_game_history_is_visible_before_unrelated_leagues_finalize(client, db_session):
+    from collegefootballfantasy_api.app.models.game import Game
+    from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
+    from tests.api.scoring_helpers import create_scoring_fixture
+    _, _, _, _, unrelated = create_scoring_fixture(db_session)
+    unrelated.status = 'projected'
+    player = Player(name='Final Game Runner',school='Miami',position='RB')
+    league = League(name='Custom chart rules',season_year=2026)
+    db_session.add_all([player,league]);db_session.flush()
+    db_session.add(LeagueSettings(league_id=league.id,scoring_json={'rush_yards':0.2,'rush_tds':6}))
+    for week, yards in [(1,40),(2,105),(3,85)]:
+        game=Game(external_id=f'chart-final-{week}',season=2026,week=week,season_type='regular',home_team='Miami',away_team=f'Opponent {week}',schedule_status='final',start_date=datetime(2026,9,week*7,18,tzinfo=timezone.utc))
+        db_session.add(game);db_session.flush()
+        db_session.add(PlayerGameStat(player_id=player.id,game_id=game.id,season=2026,week=week,source='espn_final_boxscore',stats={'rush_yards':yards,'rush_tds':1}))
+    live=Game(external_id='chart-not-final',season=2026,week=4,season_type='regular',home_team='Miami',away_team='Live Opponent',schedule_status='in_progress',start_date=datetime(2026,9,28,18,tzinfo=timezone.utc))
+    db_session.add(live);db_session.flush()
+    db_session.add(PlayerGameStat(player_id=player.id,game_id=live.id,season=2026,week=4,source='espn_final_boxscore',stats={'rush_yards':999}))
+    db_session.commit()
+    public=client.get(f'/players/{player.id}/trajectory?season=2026').json()
+    custom=client.get(f'/players/{player.id}/trajectory?season=2026&league_id={league.id}').json()
+    assert [(p['week'],p['actual_points']) for p in public['projection'] if p['actual_points'] is not None] == [(1,10),(2,16.5),(3,14.5)]
+    assert [(p['week'],p['actual_points']) for p in custom['projection'] if p['actual_points'] is not None] == [(1,14),(2,27),(3,23)]
+    assert all(p['is_finalized'] for p in public['projection'] if p['actual_points'] is not None)
+    db_session.refresh(unrelated)
+    assert unrelated.status=='projected'
+    from collegefootballfantasy_api.app.models.player_chart_week import PlayerChartWeek
+    assert db_session.query(PlayerChartWeek).count()==0, 'Card reads must not publish or rewrite history'

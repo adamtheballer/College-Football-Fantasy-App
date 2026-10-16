@@ -70,7 +70,7 @@ export default function WeeklyChallengeLeaderboard() {
     <div className="mx-auto max-w-3xl space-y-5 pb-24 pt-3">
       <PageHeader
         title={view === "season" ? "Season Championship" : "Weekly Leaderboard"}
-        eyebrow={`${season ?? "Competition"} · Recognition only`}
+        eyebrow={`${season ?? "Competition"}${view === "week" && query.data?.week ? ` · Week ${query.data.week}` : ""} · Recognition only`}
         description="Combined challenge points across all five competitions. Equal totals share rank."
       />
       <Button asChild variant="outline">

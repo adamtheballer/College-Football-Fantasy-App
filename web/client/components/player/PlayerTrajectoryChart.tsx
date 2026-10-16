@@ -170,7 +170,7 @@ export function PlayerTrajectoryChart({
               </text>
             </g>
           ))}
-          {weeks.filter(week => chartWidth >= 500 || week % 2 === 0 || week === 13).map((week) => (
+          {weeks.filter(week => chartWidth >= 500 || [0, 3, 6, 9, 13].includes(week)).map((week) => (
             <text key={`label-${week}`} x={x(week)} y={CHART_HEIGHT - 16} textAnchor="middle" fill="rgba(226,232,240,0.62)" fontSize="10" fontWeight="700">
               {week === 0 ? (isProjection ? "Preweek" : "Preseason") : `W${week}`}
             </text>

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-import { ArrowDown, ArrowUp, Pencil, Search, Sparkles, UserPlus, Zap } from "lucide-react";
+import { ArrowDown, ArrowUp, Pencil, Search, Bookmark, UserPlus, Zap } from "lucide-react";
 
 import { PlayerPopularityMetrics } from "@/components/league/PlayerPopularityMetrics";
 import { PlayerCardModal } from "@/components/player/PlayerCardModal";
@@ -348,22 +348,11 @@ export default function LeagueWaivers() {
     return sortMode === "positional-rank" ? sortWaiverPlayersByPositionRank(searched) : searched;
   }, [players, position, search, sortMode]);
 
-  const topProjection = players.reduce<number | null>((top, player) => {
-    const projection = player.weekly_projected_fantasy_points;
-    if (typeof projection !== "number" || !Number.isFinite(projection)) return top;
-    return top === null ? projection : Math.max(top, projection);
-  }, null);
   const positionCounts = players.reduce<Record<string, number>>((counts, player) => {
     const key = (player.position ?? "UNK").toUpperCase();
     counts[key] = (counts[key] ?? 0) + 1;
     return counts;
   }, {});
-  const boardTitle = playerBoardScope === "hot" ? "Hot Pickups" : playerBoardScope === "all" ? "All Players" : "Available Players";
-  const boardDescription = playerBoardScope === "hot"
-    ? `Most added players in completed leagues over the last ${hotWindowHours === 24 ? "24 hours" : "7 days"}.`
-    : playerBoardScope === "all"
-      ? `Every eligible player, ordered by Week ${displayWeek} projection. Rostered players remain view-only for player research and watchlists.`
-      : `Players are instant adds before their own kickoff. After kickoff, claims process at ${formatProcessTime(nextWaiverProcessAt, waiverData?.waiver_rules.timezone)}.`;
 
   const handleWatchPlayer = async (playerId: number) => {
     if (watchlistsQuery.isError) {
@@ -652,48 +641,16 @@ export default function LeagueWaivers() {
           </div>
         </DialogContent>
       </Dialog>
-      <div className="space-y-3 sm:space-y-4">
-        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-cfb-brand">
-          Waiver Wire
+      <header className="flex items-center justify-between gap-3">
+        <h1 className="cfb-section-title text-xl text-cfb-text-primary sm:text-2xl">Waiver Wire</h1>
+        <p className="text-xs font-semibold text-cfb-text-secondary">
+          {waiverQuery.isLoading ? "Loading players…" : `${players.length} players · ${waiverData?.claims.length ?? 0} claims`}
         </p>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="cfb-display-title text-3xl text-cfb-text-primary sm:text-4xl">{boardTitle}</h1>
-            <p className="mt-1.5 max-w-2xl text-sm text-cfb-text-secondary sm:mt-2">
-              {boardDescription}
-            </p>
-          </div>
-          <p className="text-xs font-semibold text-cfb-text-secondary sm:hidden">
-            {players.length} {playerBoardScope === "all" ? "players" : playerBoardScope === "hot" ? "hot" : "available"} · Top proj {topProjection?.toFixed(1) ?? "—"} · {waiverData?.claims.length ?? 0} claims
-          </p>
-          <div className="hidden overflow-hidden rounded-lg border border-cfb-border-subtle bg-cfb-surface-raised sm:grid sm:min-w-[390px] sm:grid-cols-3">
-            <div className="px-4 py-3">
-              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">{playerBoardScope === "all" ? "Players" : playerBoardScope === "hot" ? "Hot" : "Available"}</p>
-              <p className="mt-1 text-xl font-semibold tabular-nums text-cfb-text-primary">{players.length}</p>
-            </div>
-            <div className="border-x border-cfb-border-subtle px-4 py-3">
-              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">Top proj</p>
-              <p className="mt-1 text-xl font-semibold tabular-nums text-cfb-text-primary">{topProjection?.toFixed(1) ?? "—"}</p>
-            </div>
-            <div className="px-4 py-3">
-              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">Claims</p>
-              <p className="mt-1 text-xl font-semibold tabular-nums text-cfb-text-primary">{waiverData?.claims.length ?? 0}</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      </header>
 
       <section data-testid="league-player-board" className="overflow-hidden rounded-lg border border-cfb-border-subtle bg-cfb-surface">
         <div className="border-b border-cfb-border-subtle px-4 py-4 sm:px-5">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-            <div>
-              <h2 className="text-[11px] font-black uppercase tracking-[0.18em] text-cfb-brand">
-                {boardTitle}
-              </h2>
-              <p className="mt-1.5 text-xs font-semibold leading-5 text-cfb-text-secondary sm:mt-2">
-                {boardDescription}
-              </p>
-            </div>
             <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center 2xl:flex-nowrap">
               <div className="grid w-full shrink-0 grid-cols-3 rounded-md border border-cfb-border-subtle bg-cfb-canvas p-1 sm:w-[360px]" role="tablist" aria-label="Player board">
                 {([
@@ -873,6 +830,7 @@ export default function LeagueWaivers() {
                       type="button"
                       variant="outline"
                       aria-label={watching ? `Remove ${player.name} from watchlist` : "Watch"}
+                      aria-pressed={watching}
                       onClick={(event) => {
                         event.stopPropagation();
                         void handleWatchPlayer(player.id);
@@ -880,7 +838,7 @@ export default function LeagueWaivers() {
                       disabled={createWatchlist.isPending || toggleWatchlistPlayer.isPending || watchlistsQuery.isError}
                       className="h-9 w-9 rounded-md border-cfb-border-subtle bg-cfb-surface-raised p-0 text-cfb-text-secondary hover:border-cfb-border-strong hover:bg-cfb-surface-hover hover:text-cfb-text-primary"
                     >
-                      <Sparkles className="h-4 w-4" />
+                      <Bookmark className="h-4 w-4" fill={watching ? "currentColor" : "none"} />
                     </Button>
                     <Button
                       type="button"
@@ -1006,9 +964,10 @@ export default function LeagueWaivers() {
                               watchlistsQuery.isError
                             }
                             aria-label={watchedPlayerIds.has(player.id) ? "Watching" : "Watch"}
+                            aria-pressed={watchedPlayerIds.has(player.id)}
                             className="h-9 w-9 shrink-0 rounded-md border-cfb-border-subtle bg-cfb-surface-raised p-0 text-cfb-text-secondary transition-colors hover:border-cfb-border-strong hover:bg-cfb-surface-hover hover:text-cfb-text-primary"
                           >
-                            <Sparkles className="h-3.5 w-3.5" />
+                            <Bookmark className="h-3.5 w-3.5" fill={watchedPlayerIds.has(player.id) ? "currentColor" : "none"} />
                           </Button>
                           <Button
                             type="button"

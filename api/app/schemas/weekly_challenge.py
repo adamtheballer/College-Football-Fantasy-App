@@ -133,6 +133,7 @@ class LeaderRow(Participant):
 
 
 class LeaderboardRead(BaseModel):
+    week: int | None
     season: int
     round_id: int | None
     provisional: bool

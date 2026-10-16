@@ -15,6 +15,7 @@ const state = vi.hoisted(() => ({
   readMutate: vi.fn(),
   setActiveLeagueId: vi.fn(),
   failedMessage: false,
+  history: false,
 }));
 
 vi.mock("@/hooks/use-auth", () => ({
@@ -117,16 +118,16 @@ vi.mock("@/hooks/use-chat", () => ({
     isFetching: false,
     isError: false,
   }),
-  useChatMessages: (leagueId?: number, threadId?: number) => ({
+  useChatMessages: (leagueId?: number, threadId?: number, before?: number) => ({
     data: {
-      data: leagueId === 2
+      data: state.history ? (before ? [chatMessage(100,"Older history",{id:1}),chatMessage(100,"Oldest in latest page",{id:51})] : [chatMessage(100,"Oldest in latest page",{id:51}),chatMessage(100,"Newest message",{id:100})]) : leagueId === 2
         ? [chatMessage(threadId ?? 200, "League two only")]
         : state.failedMessage
           ? [chatMessage(threadId ?? 100, "Failed message", { delivery_status: "failed", client_message_id: "failed-1", sender_user_id: 1 })]
           : threadId === 101
             ? [chatMessage(101, "Private note")]
           : [chatMessage(100, "League one only")],
-      next_before_message_id: null,
+      next_before_message_id: state.history && !before ? 51 : null,
       next_after_message_id: null,
     },
     isLoading: false,
@@ -145,6 +146,7 @@ afterEach(() => {
   cleanup();
   state.activeLeagueId = 1;
   state.failedMessage = false;
+  state.history = false;
   state.sendMutate.mockReset();
   state.directMutate.mockReset();
   state.voteMutate.mockReset();
@@ -153,6 +155,16 @@ afterEach(() => {
 });
 
 describe("Chats", () => {
+  it("shows newest first, appends older history without duplicates, and stops at the last page", () => {
+    state.history = true;
+    render(<Chats leagueId={1} embedded />);
+    const messages=screen.getByLabelText("Messages, newest first");
+    expect([...messages.querySelectorAll('[data-message-id]')].map(el=>el.getAttribute('data-message-id'))).toEqual(['100','51']);
+    expect(state.readMutate).toHaveBeenCalledWith(100,expect.any(Object));
+    fireEvent.click(screen.getByRole('button',{name:'Load older messages'}));
+    expect([...messages.querySelectorAll('[data-message-id]')].map(el=>el.getAttribute('data-message-id'))).toEqual(['100','51','1']);
+    expect(screen.queryByRole('button',{name:'Load older messages'})).toBeNull();
+  });
   it("expands embedded league chat to the shared league-tab content width", () => {
     render(<Chats leagueId={1} embedded />);
 

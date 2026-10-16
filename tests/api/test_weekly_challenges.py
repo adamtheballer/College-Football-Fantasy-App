@@ -326,6 +326,16 @@ def test_rank_entire_population_before_top10_and_own_rank(world):
     assert r.status_code==200,r.text
     value=r.json();assert len(value['data'])==10 and value['your_rank']['rank']==15
     assert value['your_rank']['points']==1 and value['provisional']
+    assert value['week']==1
+    assert [(row['display_name'],row['points']) for row in value['data']]==[(f'Leader {i}',15-i) for i in range(10)]
+    top_user=w['db'].get(User,value['data'][0]['user_id']);top_user.first_name='Updated Leader';w['db'].commit()
+    refreshed=w['client'].get(f'{BASE}/leaderboard?season=2026&round_id={w["round"]["id"]}',headers=w['accounts'][1][1]).json()
+    assert refreshed['data'][0]['display_name']=='Updated Leader'
+    w['clock'][0]=datetime(2026,9,9,4,tzinfo=timezone.utc)
+    current=w['client'].get(f'{BASE}/current',headers=w['accounts'][1][1]).json()
+    fresh=w['client'].get(f'{BASE}/leaderboard?season=2026&round_id={current["id"]}',headers=w['accounts'][1][1]).json()
+    assert fresh['week']==2 and fresh['data']==[] and fresh['your_rank'] is None
+    assert w['client'].get(f'{BASE}/leaderboard?season=2026',headers=w['accounts'][1][1]).json()['data'][0]['points']==15
     assert 'email' not in str(value)
 
 
@@ -456,6 +466,8 @@ def test_next_week_may_be_published_but_remains_upcoming_until_rollover(world):
     assert detail['state']=='Upcoming'
     w['clock'][0]=datetime(2026,9,9,4,tzinfo=timezone.utc)
     assert w['client'].get(f'{BASE}/challenges/{c.id}',headers=w['accounts'][1][1]).json()['state']=='Open'
+    submitted=w['client'].put(f'{BASE}/challenges/{c.id}/entry',headers=w['accounts'][1][1],json={'expected_revision':0,'submit':True,'selections':[{'game_id':game.id,'team':game.home_team}]})
+    assert submitted.status_code==200,submitted.text
 
 
 def test_expired_future_slate_never_opens_at_rollover(world):
@@ -559,3 +571,23 @@ def test_every_format_rejects_wrong_count_without_mutating_an_official_entry(wor
     rejected = submit(w, kind, user=2, expected_revision=1, selections=selected[:-1])
     assert rejected.status_code == 422, rejected.text
     assert w['db'].query(ChallengeEntry).filter_by(user_id=w['accounts'][2][0]).one().status == 'draft'
+
+
+def test_public_launch_round_is_server_controlled_and_advances_after_launch(world, monkeypatch):
+    w=world
+    monkeypatch.setattr(svc.settings,'weekly_challenges_launch_season',2026)
+    monkeypatch.setattr(svc.settings,'weekly_challenges_launch_week',2)
+    r=svc.ensure_round(w['db'],2026,2);w['db'].commit()
+    c=w['db'].query(WeeklyChallenge).filter_by(round_id=r.id,kind='lock').one()
+    game=Game(external_id='launch-round-fixture',season=2026,week=2,season_type='regular',schedule_status='scheduled',start_date=KICKOFF+timedelta(days=7),home_team='Launch Home',away_team='Launch Away')
+    w['db'].add(game);w['db'].commit()
+    from collegefootballfantasy_api.app.schemas.weekly_challenge import ChallengeConfig
+    svc.configure(w['db'],c,ChallengeConfig(expected_version=0,game_ids=[game.id]),w['accounts'][0][0]);svc.publish(w['db'],c,1,w['accounts'][0][0])
+    current=w['client'].get(f'{BASE}/current',headers=w['accounts'][1][1]).json()
+    assert current['week']==2 and current['state']=='Open'
+    assert w['client'].get(f'{BASE}/challenges/{c.id}',headers=w['accounts'][1][1]).json()['state']=='Open'
+    submitted=w['client'].put(f'{BASE}/challenges/{c.id}/entry',headers=w['accounts'][1][1],json={'expected_revision':0,'submit':True,'selections':[{'game_id':game.id,'team':game.home_team}]})
+    assert submitted.status_code==200,submitted.text
+    w['clock'][0]=datetime(2026,9,16,4,tzinfo=timezone.utc)
+    assert w['client'].get(f'{BASE}/current',headers=w['accounts'][1][1]).json()['week']==3
+    assert svc.competition_week(2027,datetime(2027,9,1,tzinfo=timezone.utc))==1

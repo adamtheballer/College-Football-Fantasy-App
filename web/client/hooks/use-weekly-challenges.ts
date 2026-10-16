@@ -93,6 +93,7 @@ export type Duel = {
 };
 export type LeaderRow = Participant & { rank: number; points: number };
 export type Leaderboard = {
+  week: number | null;
   season: number;
   round_id: number | null;
   provisional: boolean;

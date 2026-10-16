@@ -1,6 +1,6 @@
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRightLeft, ChevronUp, CircleAlert, LoaderCircle, MessageCircleMore, MessageSquare, Plus, RefreshCw, RotateCcw, Send, Users } from "lucide-react";
+import { ArrowRightLeft, ChevronDown, CircleAlert, LoaderCircle, MessageCircleMore, MessageSquare, Plus, RefreshCw, RotateCcw, Send, Users } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -452,12 +452,12 @@ export default function Chats({ leagueId: lockedLeagueId, embedded = false }: Ch
 
   const allMessages = useMemo(() => {
     const byId = new Map<number, ChatMessage>();
-    [...olderMessages, ...messageRows].forEach((message) => byId.set(message.id, message));
+    [...olderMessages, ...messageRows].filter((message) => message.thread_id === selectedThreadId).forEach((message) => byId.set(message.id, message));
     return [...byId.values()].sort((left, right) => {
-      const timeDifference = new Date(left.created_at).getTime() - new Date(right.created_at).getTime();
-      return timeDifference || left.id - right.id;
+      const timeDifference = new Date(right.created_at).getTime() - new Date(left.created_at).getTime();
+      return timeDifference || right.id - left.id;
     });
-  }, [messageRows, olderMessages]);
+  }, [messageRows, olderMessages, selectedThreadId]);
 
   const lastKnownMessageId = allMessages.reduce(
     (latestId, message) => message.id > latestId ? message.id : latestId,
@@ -471,14 +471,13 @@ export default function Chats({ leagueId: lockedLeagueId, embedded = false }: Ch
   );
 
   useEffect(() => {
-    const latestMessage = [...allMessages].reverse().find((message) => message.id > 0);
-    if (!latestMessage || latestMessage.id === lastMarkedMessageId.current || markThreadRead.isPending) return;
-    markThreadRead.mutate(latestMessage.id, {
+    if (!lastKnownMessageId || lastKnownMessageId === lastMarkedMessageId.current || markThreadRead.isPending) return;
+    markThreadRead.mutate(lastKnownMessageId, {
       onSuccess: () => {
-        lastMarkedMessageId.current = latestMessage.id;
+        lastMarkedMessageId.current = lastKnownMessageId;
       },
     });
-  }, [allMessages, markThreadRead]);
+  }, [lastKnownMessageId, markThreadRead]);
 
   const masterThread = threads.find((thread) => thread.thread_type === "league");
   const managerOptions = (masterThread?.participants ?? []).filter((member) => member.user_id !== user?.id);
@@ -529,10 +528,11 @@ export default function Chats({ leagueId: lockedLeagueId, embedded = false }: Ch
     });
   };
 
-  const oldestMessageId = allMessages.find((message) => message.id > 0)?.id ?? null;
-  const canLoadOlder = Boolean(messages.data?.next_before_message_id || olderMessagePage.data?.next_before_message_id);
+  const nextOlderCursor = olderCursor ? olderMessagePage.data?.next_before_message_id : messages.data?.next_before_message_id;
+  const canLoadOlder = Boolean(nextOlderCursor || (olderCursor && (olderMessagePage.isPending || olderMessagePage.isError)));
   const handleLoadOlder = () => {
-    if (oldestMessageId && !olderMessagePage.isFetching) setOlderCursor(oldestMessageId);
+    if (olderMessagePage.isError) { void olderMessagePage.refetch(); return; }
+    if (nextOlderCursor && !olderMessagePage.isFetching) setOlderCursor(nextOlderCursor);
   };
 
   return (
@@ -617,12 +617,11 @@ export default function Chats({ leagueId: lockedLeagueId, embedded = false }: Ch
               </div>
             </CardHeader>
             <CardContent className="flex min-h-0 flex-1 flex-col p-0">
-              <div className="flex-1 space-y-3 overflow-y-auto p-5">
-                {canLoadOlder ? <div className="flex justify-center"><button type="button" onClick={handleLoadOlder} disabled={olderMessagePage.isFetching} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground disabled:opacity-50">{olderMessagePage.isFetching ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <ChevronUp className="h-3.5 w-3.5" />}Load older messages</button></div> : null}
+              <div aria-label="Messages, newest first" className="flex-1 space-y-3 overflow-y-auto p-5">
                 {messages.isLoading ? <p className="py-12 text-center text-xs text-muted-foreground">Loading messages…</p> : null}
                 {messages.isError ? <p className="rounded-xl border border-red-400/40 bg-red-950/20 p-4 text-sm text-red-100">{errorMessage(messages.error)}</p> : null}
                 {!messages.isLoading && !messages.isError && allMessages.length === 0 ? <div className="py-20 text-center"><MessageSquare className="mx-auto h-8 w-8 text-primary/60" /><p className="mt-3 text-sm font-semibold text-foreground">No messages yet</p><p className="mt-1 text-xs text-muted-foreground">Start the conversation with your league.</p></div> : null}
-                {allMessages.map((message, index) => <div key={message.id} className="space-y-3">
+                {allMessages.map((message, index) => <div key={message.id} data-message-id={message.id} className="space-y-3">
                   {index === 0 || !sameDay(allMessages[index - 1].created_at, message.created_at) ? <div className="flex items-center gap-3 py-2"><span className="h-px flex-1 bg-white/10" /><span className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">{dateLabel(message.created_at)}</span><span className="h-px flex-1 bg-white/10" /></div> : null}
                   <div className={cn("max-w-[88%] rounded-2xl border px-4 py-3", isSystemMessage(message.message_type) ? "mx-auto max-w-[96%] border-cfb-gold/30 bg-cfb-gold/10" : message.sender_user_id === user?.id ? "ml-auto border-primary/40 bg-primary/15" : "border-white/10 bg-white/[0.04]")}>
                     <div className="flex items-center justify-between gap-4 text-[9px] font-black uppercase tracking-[0.13em] text-muted-foreground/70"><span className="flex min-w-0 items-center gap-2">{!isSystemMessage(message.message_type) ? <ManagerAvatar avatarUrl={message.sender_avatar_url} managerName={message.sender_display_name} size="xs" /> : null}<span className="truncate">{isSystemMessage(message.message_type) ? message.message_type.replace("_", " ") : message.sender_user_id === user?.id ? "You" : message.sender_display_name ?? `Manager #${message.sender_user_id}`}{message.sender_fantasy_team_name ? ` · ${message.sender_fantasy_team_name}` : ""}</span></span><span>{formatTime(message.created_at)}</span></div>
@@ -631,6 +630,8 @@ export default function Chats({ leagueId: lockedLeagueId, embedded = false }: Ch
                     {message.delivery_status === "failed" ? <div className="mt-2 flex items-center justify-between gap-2 text-[9px] font-black uppercase tracking-[0.12em] text-red-200"><span className="flex items-center gap-1"><CircleAlert className="h-3 w-3" />Failed to send</span><button type="button" onClick={() => handleRetry(message)} className="inline-flex items-center gap-1 rounded-md border border-red-300/40 px-2 py-1 hover:bg-red-500/10"><RotateCcw className="h-3 w-3" />Retry</button></div> : null}
                   </div>
                 </div>)}
+                {olderMessagePage.isError ? <p role="alert" className="text-center text-sm text-red-200">Older messages could not be loaded. Try again below.</p> : null}
+                {canLoadOlder ? <div className="flex justify-center"><button type="button" onClick={handleLoadOlder} disabled={olderMessagePage.isFetching} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground disabled:opacity-50">{olderMessagePage.isFetching ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <ChevronDown className="h-3.5 w-3.5" />}Load older messages</button></div> : null}
               </div>
               <form onSubmit={handleSend} className="border-t border-white/10 bg-black/10 p-4">
                 {sendMessage.isError ? <p className="mb-3 rounded-xl border border-red-400/40 bg-red-950/20 px-3 py-2 text-xs text-red-100">{errorMessage(sendMessage.error)}</p> : null}

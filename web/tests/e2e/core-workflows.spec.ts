@@ -3217,17 +3217,20 @@ test.describe("critical browser workflows", () => {
     });
 
     await page.goto("/league/1/waivers");
-    await expect(page.getByRole("heading", { level: 1, name: /^Available Players$/i })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /^Waiver Wire$/i })).toBeVisible();
 
+    await expect(page.getByRole("heading", {name: "Available Players", exact:true})).toHaveCount(0);
+    await expect(page.getByText(/Players are instant adds before their own kickoff/)).toHaveCount(0);
     const archManningRow = page.getByText("Arch Manning").locator("xpath=ancestor::tr");
     await expect(page.getByTestId("waiver-week-points-801")).toHaveText("26.4");
     await expect(page.getByTestId("waiver-week-points-801")).toHaveClass(/text-cfb-brand/);
+    await expect(archManningRow.getByRole("button", { name: /^Watch$/i }).locator("svg.lucide-bookmark")).toBeVisible();
     await archManningRow.getByRole("button", { name: /^Watch$/i }).click();
     await expect(archManningRow.getByRole("button", { name: /^Watching$/i })).toBeVisible();
 
     await page.setViewportSize({ width: 1440, height: 960 });
     await page.getByRole("tab", { name: "All Players", exact: true }).click();
-    await expect(page.getByRole("heading", { level: 1, name: /^All Players$/i })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /^Waiver Wire$/i })).toBeVisible();
     const allPlayersScoreLayout = await page.getByTestId("waiver-week-points-801").evaluate((score) => {
       const cell = score.closest("td");
       return cell ? { textAlign: getComputedStyle(cell).textAlign, width: cell.getBoundingClientRect().width } : null;
@@ -3264,7 +3267,8 @@ test.describe("critical browser workflows", () => {
     await expect(mobileRow.getByText("Arch Manning")).toBeVisible();
     await expect(page.getByTestId("waiver-mobile-week-points-801")).toHaveText("26.4");
     await expect(page.getByTestId("waiver-mobile-week-points-801")).toHaveClass(/text-cfb-brand/);
-    await expect(mobileRow.getByRole("button", { name: /Remove Arch Manning from watchlist/i })).toBeVisible();
+    await expect(mobileRow.getByRole("button", { name: /Remove Arch Manning from watchlist/i })).toHaveAttribute("aria-pressed","true");
+    await expect(mobileRow.locator("svg.lucide-bookmark")).toHaveAttribute("fill","currentColor");
     const mobileScoreLayout = await page.getByTestId("waiver-mobile-week-points-801").evaluate((score) => {
       const scoreBox = score.getBoundingClientRect();
       const rowBox = score.closest("[data-testid^='waiver-mobile-player-row-']")?.getBoundingClientRect();
@@ -3284,6 +3288,8 @@ test.describe("critical browser workflows", () => {
     await page.goto("/league/1/watchlist");
     await expect(page.getByRole("heading", { name: /^Watchlist$/i })).toBeVisible();
     await expect(page.getByText("Arch Manning").first()).toBeVisible();
+    await expect(page.getByRole("heading",{name:"Saved Targets",exact:true})).toHaveCount(0);
+    await expect(page.getByText(/Your saved league-specific available-player targets/)).toHaveCount(0);
     const watchlistBoardBox = await page.getByTestId("league-watchlist-board").boundingBox();
     expect(watchlistBoardBox).not.toBeNull();
     expect(watchlistBoardBox?.x).toBeLessThanOrEqual(17);
@@ -3404,7 +3410,7 @@ test.describe("critical browser workflows", () => {
     });
 
     await page.goto("/league/1/waivers");
-    await expect(page.getByRole("heading", { level: 1, name: /^Available Players$/i })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /^Waiver Wire$/i })).toBeVisible();
     await expect(page.getByText(/No active or recent waiver claims/i)).toBeVisible();
     const archManningRow = page.getByRole("button", { name: "1 Arch Manning Available" });
     await expect(archManningRow).toBeVisible();
