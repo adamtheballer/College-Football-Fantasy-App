@@ -22,6 +22,17 @@ afterEach(() => { controllers.forEach((controller) => controller.dispose()); vi.
 const wait = (ms = 3000) => vi.advanceTimersByTimeAsync(ms);
 
 describe("account lifetime review coordinator", () => {
+  it("supports immediate presentation after Home becomes usable without a three-second wait", async () => {
+    const { controller, adapter, dependencies } = fixture({ presentationDelayMs: 0 });
+    controller.update({ ...ready, safe: false }); await wait(0);
+    expect(dependencies.claim).not.toHaveBeenCalled();
+    controller.update(ready);
+    expect(adapter.request).not.toHaveBeenCalled();
+    await wait(0);
+    expect(adapter.request).toHaveBeenCalledTimes(1);
+    controller.update(ready); controller.interrupt(); await wait(10_000);
+    expect(adapter.request).toHaveBeenCalledTimes(1);
+  });
   it.each(["existing authenticated visit", "new successful login after onboarding", "restored session without manual login"])("qualifies %s after three safe seconds", async () => {
     const { controller, dependencies, adapter } = fixture();
     controller.update({ ...ready, safe: false }); await wait();
