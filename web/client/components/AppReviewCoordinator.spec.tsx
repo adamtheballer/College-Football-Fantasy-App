@@ -12,7 +12,7 @@ vi.mock("@/lib/native-app-review", () => ({ isNativeIosReviewRuntime: () => mock
   readReviewState: mocks.state, claimReview: mocks.claim, rememberReviewClaim: mocks.remember, reviewConsumed: mocks.consumed }));
 
 const props = { accountId: 11, sessionReady: true, onboarding: false, pathname: "/", screenKey: "home" };
-const tick = async (ms = 3000) => { await act(() => vi.advanceTimersByTimeAsync(ms)); };
+const tick = async (ms = 0) => { await act(() => vi.advanceTimersByTimeAsync(ms)); };
 beforeEach(() => {
   vi.useFakeTimers(); vi.clearAllMocks(); localStorage.clear(); mocks.native = true; mocks.enabled = true;
   mocks.state.mockResolvedValue({ account_id: 11, enabled: true, review_request_claimed_at: null });
@@ -47,16 +47,16 @@ describe("Layout review integration", () => {
   it("deep-link modal defers without navigation and resumes after DOM removal", async () => {
     const modal = document.createElement("div"); modal.setAttribute("role", "dialog"); modal.textContent = "Player card"; document.body.append(modal);
     render(<AppReviewCoordinator {...props} pathname="/league/13/matchup" />); await tick(); expect(mocks.state).not.toHaveBeenCalled();
-    await act(async () => { modal.remove(); }); await tick(2999); expect(mocks.request).not.toHaveBeenCalled();
-    await tick(1); expect(mocks.request).toHaveBeenCalledTimes(1);
+    await act(async () => { modal.remove(); }); await tick();
+    expect(mocks.request).toHaveBeenCalledTimes(1);
   });
   it("opening a modal cancels an already scheduled timer", async () => {
-    render(<AppReviewCoordinator {...props} />); await tick(2000);
+    render(<AppReviewCoordinator {...props} />);
     await act(async () => { const modal = document.createElement("div"); modal.setAttribute("aria-modal", "true"); document.body.append(modal); });
     await tick(6000); expect(mocks.claim).not.toHaveBeenCalled();
   });
   it("permission request blocks before native UI appears", async () => {
-    render(<AppReviewCoordinator {...props} />); await tick(2000);
+    render(<AppReviewCoordinator {...props} />);
     let resolve!: () => void;
     const permission = new Promise<void>((done) => { resolve = done; });
     let work!: Promise<void>;
@@ -65,14 +65,14 @@ describe("Layout review integration", () => {
     await act(async () => { resolve(); await work; }); await tick(); expect(mocks.request).toHaveBeenCalledTimes(1);
   });
   it("native foreground lifecycle cancels and safely reschedules", async () => {
-    render(<AppReviewCoordinator {...props} />); await tick(2000);
+    render(<AppReviewCoordinator {...props} />);
     const listener = mocks.observe.mock.calls[0][0]; await act(async () => { listener({ active: false }); });
     await tick(5000); expect(mocks.claim).not.toHaveBeenCalled();
     await act(async () => { listener({ active: true }); listener({ active: true }); }); await tick();
     expect(mocks.request).toHaveBeenCalledTimes(1);
   });
   it("turning off runtime capability cancels a pending timer", async () => {
-    const view = render(<AppReviewCoordinator {...props} />); await tick(2000);
+    const view = render(<AppReviewCoordinator {...props} />);
     mocks.enabled = false; view.rerender(<AppReviewCoordinator {...props} />); await tick(); expect(mocks.claim).not.toHaveBeenCalled();
   });
   it("loading, pending guide and focused forms are not usable opportunities", async () => {

@@ -818,3 +818,54 @@ and dedicated PostgreSQL notification, review, name-change and challenge checks.
 Production backup, migration rehearsal, exact-source CI, deployed readiness and
 the installed version must be verified during this rollout. No production review
 claims or update receipts may be reset to manufacture repeat prompts.
+
+### Installed test release — October 15
+
+- PR #394 merged as `842c070b342222ac17861f3952a4c319363501fc` after all
+  exact-head checks passed, including both real-stack workflows. The sign-up
+  browser regression now completes the genuine ten-step walkthrough before
+  signing out and checks that it stays dismissed after reload/login. Its isolated
+  local run passed; no production UI behavior was disabled to satisfy the test.
+- Owner-only production backups remain outside Git. The initial backup was
+  restored into a separate localhost PostgreSQL 18 database; 0122 → 0124 and ORM
+  parity passed with identical counts/digests for all nine audited core tables,
+  no pre-consumed update receipts and no challenge entries. A fresh backup was
+  also taken immediately during rollout after the earlier session's delay.
+- API deployment `09997fe0-7308-4c9a-b1df-b9e88aec6aa1`, notification worker
+  `542d6e35-557e-4a7e-b455-ebb7c1d73688`, lifecycle worker
+  `4dbe26fb-9b10-4db3-bd6d-59ea6c8f1cfe`, and scoring worker
+  `835f0ce7-f8f8-4fe4-9530-d1e8a1e7590b` all succeeded on the merged source.
+  Live readiness reports 0124, all public runtime SHA fields match the release,
+  the existing database identity is unchanged, and all continuous worker
+  heartbeats are healthy. The new challenge/update endpoints are in live OpenAPI.
+- The development-signed app and notification extension are **1.0.3 (39)**.
+  Signature verification passed; all 144 canonical production-targeted web files
+  match the installed package, with only generated Cordova resources added.
+  APNs development and shared notification-group entitlements are present.
+- CoreDevice installed over the existing CFFB app without uninstalling, confirmed
+  version/build 1.0.3 (39), and successfully launched it on the physical iPhone.
+  The updated Home/Weekly Challenges surface loaded against the matching API.
+- Real weekly slates still require administrator configuration/validation and
+  publication; the current round correctly remains Upcoming. Physical APNs
+  banner/background/tap delivery and actual StoreKit display/submission are not
+  certified by installation, server health or screenshots. Leave the owner's
+  once-only receipts intact while testing.
+- No App Store/TestFlight upload, distribution archive or submission occurred.
+  Await the owner's phone-test result before proceeding to distribution.
+
+## Home popup timing and open challenges — October 16
+
+The owner confirmed having dismissed the automatic popup(s), explaining why the
+Home screenshot showed neither. The lifetime/per-release suppression was correct.
+For eligible accounts the native host now uses zero artificial presentation delay,
+while authentication, onboarding, update walkthrough, modal, permission, foreground
+and native scene guards remain in force. Apple still controls StoreKit display.
+The owner separately authorized exactly one replay for their own test account;
+this exception must be audited and must not change anyone else's eligibility.
+
+All 650 frontend tests, application/test/Vite type checks and local Vite build
+passed. Native test package increments the app and extension to 1.0.3 (40).
+Week 7's five real slates were independently provider-verified, server-validated
+and published through existing audited services. All five report Open; publication
+scope and deadlines are in `docs/operations/week-7-challenge-publication.md`.
+No App Store/TestFlight submission is authorized before the owner's test result.

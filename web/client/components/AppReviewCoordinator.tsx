@@ -34,7 +34,7 @@ export function AppReviewCoordinator({ accountId, sessionReady, onboarding, scre
   useLayoutEffect(() => {
     if (!isNativeIosReviewRuntime()) return;
     const controller = new Coordinator({ adapter: nativeReviewAdapter, state: readReviewState, claim: claimReview,
-      consumed: reviewConsumed, remember: rememberReviewClaim, now: Date.now });
+      consumed: reviewConsumed, remember: rememberReviewClaim, now: Date.now, presentationDelayMs: 0 });
     coordinator.current = controller;
     let active = true;
     let nativeActive = true; // Native synchronize also checks the actual scene.

@@ -47,7 +47,8 @@ no receipt was committed.
 
 The combined build retains the existing automatic native review flow: the next
 confirmed iOS login or restored session for an unclaimed account requests Apple's
-rating sheet after the walkthrough closes and three unobstructed seconds elapse.
+rating sheet as soon as the walkthrough closes and the screen/native scene are usable, without
+an artificial three-second wait.
 Apple's sheet provides the tappable 1–5 stars and App Store submission. There is
 no custom star selector, rating-dependent routing, or recurring reminder. The
 account's atomic lifetime review claim is preserved across versions, dismissal,

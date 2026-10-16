@@ -15,6 +15,8 @@ export interface ReviewDependencies {
   consumed(accountId: number): boolean;
   remember(accountId: number): void;
   now(): number;
+  /** Hosts may request presentation immediately once their screen is safe. */
+  presentationDelayMs?: number;
 }
 
 const inactive: ReviewContext = { accountId: null, enabled: false, native: false, foreground: false, safe: false, screenKey: "" };
@@ -81,7 +83,7 @@ export class AppReviewCoordinator {
     this.timer = setTimeout(() => {
       this.timer = undefined;
       void this.attempt(id, generation);
-    }, 3_000);
+    }, this.dependencies.presentationDelayMs ?? 3_000);
   }
 
   private current(id: number, generation: number): boolean {
