@@ -6,6 +6,7 @@ import {
   isAuthFlowRoute,
   isCreateLeagueRoute,
   isDraftRoomRoute,
+  isLeagueSectionRoute,
   isSaturdayPick6Route,
   navDomId,
 } from "./navigation";
@@ -20,6 +21,15 @@ const user: User = {
 };
 
 describe("app shell navigation helpers", () => {
+  it("shares the league section frame across every tab and the roster alias", () => {
+    for (const section of ["", "/roster", "/matchup", "/waivers", "/watchlist", "/chat", "/settings"]) {
+      expect(isLeagueSectionRoute(`/league/42${section}`)).toBe(true);
+      expect(isLeagueSectionRoute(`/league/42${section}/`)).toBe(true);
+    }
+    for (const path of ["/leagues", "/league/42/lobby", "/league/42/draft", "/league/42/playoffs", "/league/0/roster", "/league/nope/matchup"]) {
+      expect(isLeagueSectionRoute(path)).toBe(false);
+    }
+  });
   it("detects routes that need draft-room chrome removed", () => {
     expect(isDraftRoomRoute("/draft/mock/single-player")).toBe(true);
     expect(isDraftRoomRoute("/league/abc-123/draft")).toBe(true);

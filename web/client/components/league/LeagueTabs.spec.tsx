@@ -9,6 +9,19 @@ import { LeagueTabs } from "./LeagueTabs";
 afterEach(cleanup);
 
 describe("LeagueTabs", () => {
+  it.each(["/league/42", "/league/42/roster/"])("marks the roster active for %s", (path) => {
+    render(<MemoryRouter initialEntries={[path]}><LeagueTabs leagueId={42} /></MemoryRouter>);
+    expect(screen.getByRole("link", { name: "Roster" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getAllByRole("link").filter((link) => link.hasAttribute("aria-current"))).toHaveLength(1);
+  });
+
+  it("preserves the draft-only restriction before the league draft completes", () => {
+    render(<MemoryRouter initialEntries={["/league/42/draft"]}><LeagueTabs leagueId={42} draftStatus="live" /></MemoryRouter>);
+    expect(screen.getAllByRole("link")).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Draft" }).getAttribute("aria-current")).toBe("page");
+    expect(screen.getByRole("link", { name: "Draft" }).getAttribute("href")).toBe("/league/42/lobby");
+  });
+
   it("uses one scroll-contained league rail on every league screen", () => {
     render(
       <MemoryRouter initialEntries={["/league/42/roster"]}>

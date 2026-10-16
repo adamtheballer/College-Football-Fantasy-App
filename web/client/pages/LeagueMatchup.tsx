@@ -1,10 +1,9 @@
-import { Bell, ChevronLeft, ChevronRight, Clock3, MessageCircle, ShieldAlert } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock3, ShieldAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { focusManager } from "@tanstack/react-query";
 import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { MatchupRecord, currentRecordHighlight } from "@/components/league/MatchupRecord";
-import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { SideBySideMatchup } from "@/components/league/SideBySideMatchup";
 import { WinChanceBar, validProbability } from "@/components/league/WinChanceMeter";
 import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
@@ -75,17 +74,6 @@ function leadingTeam(myTeam: LeagueMatchupTeam | null, opponentTeam: LeagueMatch
   return myProbability > opponentProbability
     ? myTeam?.fantasy_team_name ?? "Your Team"
     : opponentTeam?.fantasy_team_name ?? "Opponent";
-}
-
-function teamInitials(name: string | null | undefined) {
-  const letters = (name ?? "Team")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0]?.toUpperCase() ?? "")
-    .join("");
-  return letters || "TM";
 }
 
 function probabilityPair(
@@ -415,15 +403,7 @@ export default function LeagueMatchup() {
   }
 
   return (
-    <main data-testid="league-matchup-page" className="flex w-full max-w-none flex-col gap-0 pb-24 pt-1 sm:pt-4">
-      <header className="flex min-h-16 items-center gap-3 border-b border-cfb-border-subtle px-3 sm:px-5">
-        <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-cfb-brand/50 bg-cfb-brand/[0.1] text-[10px] font-black text-cfb-brand">{teamInitials(leagueQuery.data?.name)}</span>
-        <div className="min-w-0 flex-1 text-left text-base font-black italic tracking-tight text-cfb-text-primary">
-          <span className="block truncate">{leagueQuery.data?.name ?? "League"}</span>
-        </div>
-        <button type="button" aria-label="Notifications" onClick={() => navigate("/alerts")} className="cfb-icon-button"><Bell className="h-4 w-4" aria-hidden="true" /></button>
-        <button type="button" aria-label="Messages" onClick={() => navigate("/chats")} className="cfb-icon-button"><MessageCircle className="h-4 w-4" aria-hidden="true" /></button>
-      </header>
+    <main data-testid="league-matchup-page" className="flex w-full max-w-none flex-col gap-0 pb-24">
       {rosteredPlayerIsLive && refreshCountdownSeconds !== null ? (
         <div className="flex items-center justify-center gap-2 border-b border-cfb-brand/20 bg-cfb-brand/[0.06] px-3 py-2" data-testid="live-score-refresh-countdown">
           <Clock3 className="h-3.5 w-3.5 text-cfb-brand" aria-hidden="true" />
@@ -433,9 +413,6 @@ export default function LeagueMatchup() {
           </span>
         </div>
       ) : null}
-      <div className="px-3 sm:px-5">
-        <LeagueTabs leagueId={parsedLeagueId} draftStatus={leagueQuery.data?.draft?.status} leagueStatus={leagueQuery.data?.status} />
-      </div>
 
       {scheduledMatchups.length > 1 ? (
         <nav

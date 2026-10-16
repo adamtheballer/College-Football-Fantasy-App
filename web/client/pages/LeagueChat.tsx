@@ -1,6 +1,5 @@
 import { Navigate, useParams } from "react-router-dom";
 
-import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { ErrorState } from "@/components/states";
 import { useLeagueDetail } from "@/hooks/use-leagues";
 import { isLeaguePostDraft } from "@/lib/leagueLifecycle";
@@ -67,11 +66,6 @@ export default function LeagueChat() {
             activity.
           </p>
         </div>
-        <LeagueTabs
-          leagueId={parsedLeagueId}
-          draftStatus={leagueQuery.data?.draft?.status}
-          leagueStatus={leagueQuery.data?.status}
-        />
       </div>
       <Chats leagueId={parsedLeagueId} embedded />
     </main>

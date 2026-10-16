@@ -15,7 +15,6 @@ import {
   Users,
 } from "lucide-react";
 
-import { LeagueTabs } from "@/components/league/LeagueTabs";
 import { PostseasonBracketPanel } from "@/components/league/PostseasonBracketPanel";
 import { RosterSlotTable } from "@/components/league/RosterSlotTable";
 import { ErrorState } from "@/components/states";
@@ -275,11 +274,6 @@ export default function LeagueSettings() {
             </div>
           </div>
         </div>
-        <LeagueTabs
-          leagueId={parsedLeagueId}
-          draftStatus={leagueQuery.data?.draft?.status}
-          leagueStatus={leagueQuery.data?.status}
-        />
       </div>
 
       {data?.invite ? (
