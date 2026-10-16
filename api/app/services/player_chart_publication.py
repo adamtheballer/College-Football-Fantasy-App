@@ -30,9 +30,12 @@ class ChartStatInput:
     stats: dict
 
 
-def verified_fantasy_week_stats(db: Session, *, season: int, week: int, players: list[Player]) -> dict[int,ChartStatInput]:
+def verified_fantasy_week_stats(db: Session, *, season: int, week: int, players: list[Player], final_games_only: bool = False) -> dict[int,ChartStatInput]:
     source_weeks = fantasy_stat_weeks(db,season=season,week=week,player_ids={p.id for p in players},player_schools={p.id:p.school for p in players})
-    result={row.player_id:ChartStatInput(row.player_id,row.id,row.week,row.source,row.stats) for row in db.query(PlayerStat).filter(PlayerStat.player_id.in_(source_weeks),PlayerStat.season==season,PlayerStat.week.in_(set(source_weeks.values())),PlayerStat.verified.is_(True)).all() if row.week==source_weeks[row.player_id]}
+    # Player history can become final before unrelated leagues/weeks do.
+    # Strict reads accept only the exact game's final box score, never a
+    # verified weekly/live aggregate alone.
+    result = {} if final_games_only else {row.player_id:ChartStatInput(row.player_id,row.id,row.week,row.source,row.stats) for row in db.query(PlayerStat).filter(PlayerStat.player_id.in_(source_weeks),PlayerStat.season==season,PlayerStat.week.in_(set(source_weeks.values())),PlayerStat.verified.is_(True)).all() if row.week==source_weeks[row.player_id]}
     from collegefootballfantasy_api.app.services.fantasy_game_selection import fantasy_games_by_school,school_key
     from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
     selected=fantasy_games_by_school(db,season=season,week=week)

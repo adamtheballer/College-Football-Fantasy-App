@@ -28,6 +28,10 @@ TRUSTED_NATIVE_CORS_ORIGINS = frozenset({"capacitor://localhost"})
 class Settings(BaseSettings):
     # Combined New Build release only. Never resets an account's consumed claim.
     ios_app_review_enabled: bool = False
+    # Server-controlled first public challenge round. Later weeks continue to
+    # follow the shared calendar; a launch setting must not pin future seasons.
+    weekly_challenges_launch_season: int = Field(default=2026, ge=2000, le=2100)
+    weekly_challenges_launch_week: int = Field(default=1, ge=1, le=13)
     environment: str = "development"
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5433/collegefootballfantasy"
     api_host: str = "0.0.0.0"

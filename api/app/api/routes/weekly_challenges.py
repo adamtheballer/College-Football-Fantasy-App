@@ -32,7 +32,7 @@ admin_router = APIRouter(dependencies=[Depends(mutation_limit)])
 
 @router.get("/current", response_model=RoundRead)
 def current(db: Session = Depends(get_db), user: User = Depends(require_verified_user)):
-    r = service.ensure_round(db, service.settings.current_season_year, service.calendar_matchup_display_week(service.settings.current_season_year, service.utcnow()))
+    r = service.ensure_round(db, service.settings.current_season_year, service.competition_week(service.settings.current_season_year, service.utcnow()))
     result = service.read_round(db, r, user)
     db.commit()
     return result
@@ -41,7 +41,7 @@ def current(db: Session = Depends(get_db), user: User = Depends(require_verified
 @router.get("/history", response_model=list[RoundRead])
 def history(limit: int = Query(15, ge=1, le=30), offset: int = Query(0, ge=0), db: Session = Depends(get_db), user: User = Depends(require_verified_user)):
     year = service.settings.current_season_year
-    week = service.calendar_matchup_display_week(year, service.utcnow())
+    week = service.competition_week(year, service.utcnow())
     published = select(WeeklyChallenge.round_id).where(WeeklyChallenge.published_at.is_not(None))
     rows = db.query(ChallengeRound).filter(
         or_(ChallengeRound.season < year, and_(ChallengeRound.season == year, ChallengeRound.week <= week)),

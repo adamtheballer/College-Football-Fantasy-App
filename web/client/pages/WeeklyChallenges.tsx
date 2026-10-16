@@ -94,7 +94,7 @@ export default function WeeklyChallenges() {
         </Button>
         <Button asChild>
           <Link
-            to={`/weekly-challenges/leaderboard${round ? `?round=${round.id}&season=${round.season}` : ""}`}
+            to={`/weekly-challenges/leaderboard${historyId && round ? `?round=${round.id}&season=${round.season}` : ""}`}
           >
             View Leaderboard
           </Link>

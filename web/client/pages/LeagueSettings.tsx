@@ -285,7 +285,7 @@ export default function LeagueSettings() {
       ) : null}
 
       <section className="overflow-x-auto rounded-xl border border-cfb-border-subtle bg-cfb-surface p-1.5">
-        <div className="grid min-w-[680px] grid-cols-7 gap-1" aria-label="League settings sections">
+        <div className="flex w-max min-w-full gap-1" aria-label="League settings sections">
           {panels.map((panel) => {
             const Icon = panel.icon;
             const active = activePanel === panel.id;
@@ -296,14 +296,14 @@ export default function LeagueSettings() {
                 aria-pressed={active}
                 onClick={() => selectPanel(panel.id)}
                 className={[
-                  "flex h-10 items-center justify-center gap-1.5 rounded-lg px-2 text-center text-[9px] font-black uppercase tracking-[0.12em] transition-colors",
+                  "flex h-10 shrink-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-center text-[10px] font-black uppercase tracking-[0.04em] transition-colors",
                   active
                     ? "bg-cfb-surface-raised text-cfb-text-primary"
                     : "text-cfb-text-muted hover:bg-cfb-surface-hover hover:text-cfb-text-primary",
                 ].join(" ")}
               >
                 <Icon className="h-4 w-4 shrink-0" />
-                <span>{panel.label}</span>
+                <span className="whitespace-nowrap">{panel.label}</span>
               </button>
             );
           })}

@@ -67,13 +67,19 @@ def _actual_points_by_week(db: Session, *, player_id: int, season: int, league_i
         for row in db.query(PlayerWeekScore).filter_by(player_id=player_id, season=season, league_id=league_id).all():
             if row.status in {"final", "stat_corrected"} and row.week in finalized_weeks:
                 points[row.week] = round(float(row.fantasy_points), 1)
-    else:
-        for week in WEEKS:
-            row = verified_fantasy_week_stats(db,season=season,week=week,players=[player]).get(player_id) if week not in points and week in finalized_weeks else None
-            if row is not None:
-                value = points_from_verified_stats(row.stats, position=player.position)
-                if value is not None:
-                    points[week] = round(value, 1)
+    # Final box scores belong to the player's selected game, independently
+    # of projected historical matchups in other leagues. Rescore the same raw
+    # facts for each league; never substitute a standard total for custom rules.
+    for week in WEEKS:
+        if week in points:
+            continue
+        row = verified_fantasy_week_stats(db, season=season, week=week, players=[player], final_games_only=True).get(player_id)
+        if row is None and league_id is None and week in finalized_weeks:
+            row = verified_fantasy_week_stats(db, season=season, week=week, players=[player]).get(player_id)
+        if row is not None:
+            value = points_from_verified_stats(row.stats, position=player.position, rules=scoring_rules)
+            if value is not None:
+                points[week] = round(value, 1)
     return points
 
 

@@ -91,33 +91,12 @@ export default function LeagueWatchlist() {
 
   return (
     <main className="relative mx-auto flex w-full max-w-none flex-col gap-6 px-0 py-4 sm:px-0 sm:py-8">
-      <div className="space-y-4">
-        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-cfb-brand">
-          League Watchlist
-        </p>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 className="cfb-display-title text-3xl text-cfb-text-primary sm:text-4xl">Watchlist</h1>
-            <p className="mt-1.5 max-w-2xl text-sm text-cfb-text-secondary">
-              Your saved league-specific available-player targets. Players stay available only if they are not rostered in this league.
-            </p>
-          </div>
-          <div className="rounded-lg border border-cfb-border-subtle bg-cfb-surface-raised px-4 py-3">
-            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-cfb-text-muted">Watched</p>
-            <p className="mt-1 text-xl font-semibold tabular-nums text-cfb-text-primary">{watchedPlayers.length}</p>
-          </div>
-        </div>
-      </div>
+      <header className="flex items-center justify-between gap-3">
+        <h1 className="cfb-section-title text-xl text-cfb-text-primary sm:text-2xl">Watchlist</h1>
+        <p className="text-xs font-semibold text-cfb-text-secondary">{watchedPlayers.length} saved</p>
+      </header>
 
       <section data-testid="league-watchlist-board" className="overflow-hidden rounded-lg border border-cfb-border-subtle bg-cfb-surface">
-        <div className="border-b border-cfb-border-subtle px-4 py-4 sm:px-5">
-          <h2 className="text-[11px] font-black uppercase tracking-[0.18em] text-cfb-brand">
-            Saved Targets
-          </h2>
-          <p className="mt-1.5 text-xs font-semibold text-cfb-text-secondary">
-            Add players from league player cards or supported waiver actions.
-          </p>
-        </div>
 
         {watchlistsQuery.isLoading ? (
           <div className="px-5 py-10 text-center text-[10px] font-black uppercase tracking-[0.16em] text-cfb-text-muted">
