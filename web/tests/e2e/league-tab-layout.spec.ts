@@ -150,6 +150,8 @@ for (const width of [320, 390, 440, 1280]) {
       await rail.getByRole("link", { name: label, exact: true }).click();
       await expect(page).toHaveURL(new RegExp(`/league/42/${path}$`));
       await expect(rail).toBeVisible();
+      await expect(page.getByRole("button", { name: "Notifications", exact: true })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Messages", exact: true })).toBeVisible();
       await expect(
         rail.getByRole("link", { name: label, exact: true }),
       ).toHaveAttribute("aria-current", "page");

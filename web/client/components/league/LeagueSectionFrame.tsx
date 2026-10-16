@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Bell, MessageCircle } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 import { useLeagueDetail } from "@/hooks/use-leagues";
 import { LeagueTabs } from "./LeagueTabs";
@@ -17,6 +17,7 @@ export function LeagueSectionFrame({
   fullWidth: boolean;
   children: ReactNode;
 }) {
+  const navigate = useNavigate();
   // Uses the pages' existing query key/cache; no second league data source.
   const { data: league } = useLeagueDetail(leagueId, sessionReady);
   const initials =
@@ -42,16 +43,17 @@ export function LeagueSectionFrame({
             <div className="min-w-0 flex-1 text-base font-black italic tracking-tight text-cfb-text-primary">
               <span className="block truncate">{league?.name ?? "League"}</span>
             </div>
-            <Link
-              to="/alerts"
+            <button
+              type="button"
+              onClick={() => navigate("/alerts")}
               aria-label="Notifications"
               className="cfb-icon-button"
             >
               <Bell className="h-4 w-4" aria-hidden="true" />
-            </Link>
-            <Link to="/chats" aria-label="Messages" className="cfb-icon-button">
+            </button>
+            <button type="button" onClick={() => navigate("/chats")} aria-label="Messages" className="cfb-icon-button">
               <MessageCircle className="h-4 w-4" aria-hidden="true" />
-            </Link>
+            </button>
           </header>
           <div className="px-3 sm:px-5">
             {league ? (
