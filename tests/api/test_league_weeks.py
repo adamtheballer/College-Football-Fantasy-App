@@ -182,3 +182,37 @@ def test_current_week_keeps_using_status_priority_when_no_calendar_week_matchup_
         league,
         now=datetime(2026, 8, 29, 19, 0, tzinfo=timezone.utc),
     ) == 3
+
+
+def test_matchup_display_preserves_status_fallback_when_calendar_matchup_is_missing(db_session):
+    from collegefootballfantasy_api.app.services.league_weeks import resolve_matchup_display_week
+    league, home, away, _players, week_one = create_scoring_fixture(db_session)
+    db_session.delete(week_one)
+    db_session.add_all([
+        Matchup(league_id=league.id,season=2026,week=3,home_team_id=home.id,away_team_id=away.id,status='final'),
+        Matchup(league_id=league.id,season=2026,week=4,home_team_id=home.id,away_team_id=away.id,status='live'),
+    ])
+    db_session.commit()
+    # The app-wide calendar is Week 2, but this incomplete league's existing
+    # status fallback chooses operational Week 4 and reviews Week 3 on Tuesday.
+    assert resolve_matchup_display_week(db_session,league,now=datetime(2026,9,8,16,tzinfo=timezone.utc))==3
+
+
+def test_display_week_never_moves_back_before_tuesday_operational_reset(db_session):
+    from collegefootballfantasy_api.app.services.league_weeks import calendar_matchup_display_week, resolve_matchup_display_week
+    league, home, away, _players, first = create_scoring_fixture(db_session)
+    first.status = 'final'
+    for week in (2, 3):
+        db_session.add(Matchup(league_id=league.id, season=2026, week=week,
+            home_team_id=home.id, away_team_id=away.id, status='scheduled'))
+    db_session.commit()
+    for instant in (
+        datetime(2026,9,15,3,59,tzinfo=timezone.utc),
+        datetime(2026,9,15,4,tzinfo=timezone.utc),
+        datetime(2026,9,15,11,59,tzinfo=timezone.utc),
+        datetime(2026,9,15,12,tzinfo=timezone.utc),
+        datetime(2026,9,16,3,59,tzinfo=timezone.utc),
+    ):
+        assert resolve_matchup_display_week(db_session,league,now=instant)==2
+        assert calendar_matchup_display_week(2026,instant)==2
+    assert resolve_matchup_display_week(db_session,league,now=datetime(2026,9,16,4,tzinfo=timezone.utc))==3

@@ -3,6 +3,26 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.models.injury import Injury
+from collegefootballfantasy_api.app.models.player_availability_event import PlayerAvailabilityEvent
+
+
+def confirmed_nonparticipant_ids(db: Session, *, season: int, week: int, player_ids: set[int], reviewed_only: bool = True) -> set[int]:
+    """Batch the existing effective-absence rule; a newer FULL clears an old OUT.
+
+    Challenge settlement uses reviewed source assertions only, after game finality.
+    An absent box-score row alone never establishes a nonparticipant.
+    """
+    query = db.query(PlayerAvailabilityEvent).filter(
+        PlayerAvailabilityEvent.player_id.in_(player_ids), PlayerAvailabilityEvent.season == season,
+        PlayerAvailabilityEvent.effective_from_week <= week,
+        (PlayerAvailabilityEvent.effective_until_week.is_(None)) | (PlayerAvailabilityEvent.effective_until_week >= week),
+    )
+    if reviewed_only:
+        query = query.filter(PlayerAvailabilityEvent.reviewed.is_(True))
+    latest: dict[int, PlayerAvailabilityEvent] = {}
+    for row in query.order_by(PlayerAvailabilityEvent.created_at.desc(), PlayerAvailabilityEvent.id.desc()):
+        latest.setdefault(row.player_id, row)
+    return {pid for pid, row in latest.items() if row.status.upper() in {"OUT", "SUSPENDED", "INELIGIBLE", "OUT_FOR_SEASON"} and bool(row.source)}
 
 
 def reviewed_injuries_for_week(

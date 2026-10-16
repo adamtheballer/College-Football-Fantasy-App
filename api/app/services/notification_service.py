@@ -1452,7 +1452,7 @@ def record_delivery_attempt(
 
 def create_test_alert(db: Session, current_user_id: int) -> NotificationRead:
     """Development/admin diagnostic event; the route controls production access."""
-    league_id = db.query(LeagueMember.league_id).filter(LeagueMember.user_id == current_user_id).scalar()
+    league_id = db.query(LeagueMember.league_id).filter(LeagueMember.user_id == current_user_id).order_by(LeagueMember.league_id).limit(1).scalar()
     if league_id is None:
         raise ValueError("join a league before creating a test notification")
     event = queue_notification_event(

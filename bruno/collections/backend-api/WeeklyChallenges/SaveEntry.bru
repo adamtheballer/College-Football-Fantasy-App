@@ -1,0 +1,20 @@
+meta {
+  name: Save one official entry
+  type: http
+  seq: 3
+}
+put {
+  url: {{base_url}}/weekly-challenges/challenges/{{weekly_challenge_id}}/entry
+  body: json
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+body:json {
+  {"expected_revision": {{entry_revision}}, "submit": true, "selections": [{"game_id": {{challenge_game_id}}, "team": "{{challenge_team}}"}], "tiebreaker": null}
+}
+docs {
+  Combined-release feature: run only against the isolated local preview until release approval.
+  Read current IDs, publication version and entry revision from API responses.
+  SaveEntry and Configure examples are for Lock of the Week; other formats need their complete published selections.
+}

@@ -638,6 +638,183 @@ those actions. No App Store/TestFlight upload is included in this authorization.
   PostgreSQL 18 matching production. Core data counts and row digests preserved:
   users 105, leagues 52, teams 94, roster entries 494, players 818, player stats
   3,156, standings 314, matchups 225 and draft picks 494. ORM parity passed.
-- [ ] Publish one reviewed source revision, configure API to reference the
-  worker's existing OneSignal key, migrate/promote matching API and workers,
-  install build 38 and verify real scoped iPhone delivery.
+- [x] PR #393 merged as `a7f2fcda51cd61b4d8346378723b87419cc00a1d` after
+  all exact-head checks passed. API, notification, lifecycle and scoring workers
+  successfully rolled to this revision.
+- [x] Existing official injury scheduler updated to the same merged revision;
+  deployment `222a5bdf-1e90-4cbb-9c76-315a6e893117` succeeded. Its production
+  cadence remains daily at 10 AM America/New_York, rather than the unapplied
+  repository Wednesday/Sunday cron configuration.
+- [x] API references the worker's existing OneSignal key without copying or
+  exposing it. Presence-only checks confirm enabled push, OneSignal provider,
+  matching App ID and resolved server credentials on API and notification worker.
+- [x] Production migrations reached 0122. Public readiness, migration-head check
+  and Alembic ORM parity passed. All nine audited core table counts match the
+  protected backup. Notification processor heartbeat is healthy, with zero retries
+  and dead letters after migration recovery.
+- [x] Native registration fields and `delivery_configured` acknowledgement are
+  live, along with the owned-event tap endpoint.
+- [x] Final signed development package 1.0.3 (38) passes signature verification;
+  all 143 canonical UI files match the package, plus only two Cordova resources.
+- [ ] Install build 38 and verify real scoped iPhone delivery. The device became
+  unavailable before installation; reconnection and unlock requested. No physical
+  delivery, distribution APNs or App Store/TestFlight release is claimed.
+
+Railway initially stalled the API build waiting for a build slot. Retrying from
+the same merged source succeeded while the old API continued serving traffic.
+The new notification worker briefly reported missing `expires_at` before the API
+startup migration completed; its subsequent healthy heartbeat verifies recovery.
+Automatic approval review rejected stopping the previous worker before its
+replacement was verified. That action did not execute; rolling replacement was
+used instead.
+
+## App Review activation — October 14
+
+The owner requested one automatic native App Store review opportunity on each
+account's next login, with no later repeat. The existing implementation already
+matches this contract; its disabled production feature switch was the blocker.
+`IOS_APP_REVIEW_ENABLED=true` was applied to the API, and the verified merged
+source was rolled as deployment `5d7c831e-bf71-4996-a018-4847f7a985e7`. The public
+runtime endpoint now reports the switch enabled and readiness at revision 0122.
+No implementation changes, additional native build or eligibility reset was needed.
+
+The next confirmed native iOS login or restored session becomes eligible after
+onboarding and roughly three unobstructed seconds on a usable safe screen.
+StoreKit is invoked only after the authenticated atomic database claim commits.
+Dismissal, Apple suppression, reinstall, another device and later logins do not
+reset the immutable account's lifetime consumed state. Browsers do not consume it.
+Apple controls actual display; a native request cannot guarantee a visible popup,
+and TestFlight does not display this review request.
+
+Reverification: all 17 review backend tests passed on an isolated PostgreSQL 18
+database, including simultaneous devices receiving exactly one authorization;
+all 56 coordinator/frontend tests passed; all 12 Swift native policy assertions
+passed. Disposable data and the local PostgreSQL process were cleaned up.
+The production pre-activation read found 105 accounts and zero consumed review
+authorizations; no test claimed or reset any production account.
+
+Build 1.0.3 (38) already contains the native coordinator/plugin. Physical iPhone
+installation and review display remain unverified because the device is
+unavailable. No App Store/TestFlight upload occurred.
+
+## Weekly Challenges — local combined-release hold (October 15)
+
+This section is separate from the earlier notification/review production rollout.
+Weekly Challenges remains an uncommitted local implementation on
+`codex/weekly-challenges`, based on merged revision `a7f2fcd`. No push, merge,
+production migration/deployment, native sync/build, or TestFlight/App Store upload
+was performed for it. All new feature files are staged for the eventual combined
+release; generated `config 2.xml` remains excluded.
+
+- [x] All five free formats: Slate 12, Upset Hunter, Fantasy Five, Lock of the Week,
+  Rivalry Duels. Home entry and leaderboard actions, exactly five hub cards,
+  account-scoped entry recovery, history, results, public profiles and recognition.
+  Sidebar/bottom navigation and unrelated membership behavior are preserved.
+- [x] Server-enforced shared five-minute cutoff, sticky closure, started-game guard,
+  one revisioned official entry, atomic cross-role duel seats, authorization,
+  hidden opponent choices and persisted mutation limits.
+- [x] Existing canonical games/approved player pool, fantasy engine, JWT auth,
+  SQLAlchemy database and lifecycle worker reused. Published rules/slates frozen;
+  source/version fingerprints, correction audit ledger and idempotent awards.
+- [x] Shared Matchup display rollover is Wednesday 00:00 America/New_York,
+  following the existing Tuesday 08:00 operational reset. Fixed the early-Tuesday
+  double-offset edge case. DST-safe tests preserve league fallback behavior.
+  Every new round starts with fresh entry slots; it never relabels the old slate.
+  Published future rounds remain Upcoming until the canonical week reaches them.
+- [x] Migration `0123_weekly_challenges` follows `0122_matchup_record_application`.
+  Local PostgreSQL 18 upgrade/check/downgrade/re-upgrade/check passed. A second
+  nonempty-history downgrade check correctly refused destructive rollback;
+  schema head and all six controlled preview entries remained intact. Local
+  `/health/ready` reports database/migrations ready at 0123.
+- [x] Full frontend: 98 files, 636 tests passed. App/test/Vite type checks and
+  local Vite build passed. No standalone lint command is configured.
+- [x] Final full backend: 1,218 passed, five skipped (environment-specific tests),
+  with existing deprecation warnings. PostgreSQL 18 challenge/calendar suite:
+  all 64 passed, including simultaneous entry submissions and cross-role duel
+  accepts; no skips. The two concurrency cases skipped by SQLite run on
+  PostgreSQL. Final working-tree and staged `git diff --check` passed.
+- [x] Real local browser checks at desktop 1280×720 and mobile 390×844: Home links,
+  five-card hub, administrator configuration/validation/publication, draft save,
+  official submit/edit/reload, every format's selections, duel invitation/
+  acceptance/privacy, rejected empty entry, expired stale-screen write,
+  missing-stat Processing, final results, provisional/final standings and profile
+  badges. Mobile document width matched its viewport, with no horizontal overflow.
+  Temporary viewport override was reset.
+- [x] Controlled correction repeated twice: standings changed from 23/15 to 21/10
+  points while the six existing award rows remained six. Preview outcomes,
+  players and users are local fixtures, never production participants/winners.
+- [x] Nineteen Bruno requests prepared. Bruno CLI is unavailable here; those files
+  were not executed as a Bruno collection. The corresponding API routes were
+  exercised by automated tests and the real local browser.
+- [ ] Publish actual weekly slates during the approved combined release. The
+  admin catalog updates from canonical weekly games and eligible players;
+  administrators must choose/validate/publish the curated slate, explicit
+  underdogs/difficulty values, featured game and Fantasy Five pool. Incomplete
+  or expired configuration stays Upcoming rather than opening last week's picks.
+- [ ] Apply 0123 in production and deliver the matching bundle in the approved
+  combined native release. Physical iPhone/production challenge verification
+  remains pending that release. No new native package contains this feature yet.
+
+Evidence and operation/API details: `docs/operations/weekly-challenges.md`.
+Local preview: `http://127.0.0.1:18458/weekly-challenges` with API port 18457.
+Screenshots are in `/private/tmp/cff-weekly-challenges-evidence/`:
+`desktop-final-hub.png`, `mobile-provisional-leaderboard.png`, and
+`mobile-final-leaderboard.png`. These are controlled local test data.
+
+## 1.03 update walkthrough and final feature checks — October 15
+
+- [x] Centered ten-screen update walkthrough, personalized greeting, Next/Back,
+  progress, Skip/Close/Got it. Once per authenticated account/release across
+  reinstall and other devices; no repeat after dismissal or unfinished viewing.
+- [x] Onboarding → update walkthrough → native App Review ordering. No collision
+  with existing dialogs, stale-account responses, or native permission requests.
+  App Review's lifetime claim remains independent.
+- [x] Next confirmed iOS login or restored session requests Apple's native rating
+  sheet for each account that has never consumed its review opportunity. The
+  system sheet supplies the tappable 1–5 stars and App Store submission; no custom
+  rating gate or duplicate prompt. Dismissal consumes the opportunity, and the
+  combined build must preserve existing claims across versions and devices.
+  Apple decides whether to display the sheet; TestFlight cannot verify display.
+- [x] Additive migration `0124_release_notice` after Weekly Challenges 0123,
+  locally upgraded/checked/empty-downgraded/re-upgraded/checked. Once-only receipts
+  block nonempty downgrade; existing users/entries preserved. Production remains
+  at 0122 and is untouched.
+- [x] Real local Settings name change confirmed and persisted after reload;
+  seven-day lock shown. Direct API cooldown rejection did not restart the clock.
+  Notification category changes persisted; Big Play controls/API keys absent.
+- [x] Real local API → worker → Alerts history/unread → Mark All Read verified
+  using isolated fixtures and fake external providers; no phone/email contacted.
+  Fixed diagnostic-only no-league 500 and multiple-league scalar ambiguity, with
+  regression coverage. No normal event rules or production admin gate changed.
+- [x] CoreDevice read confirms the connected iPhone still has **1.0.2 (36)**.
+  It has not received the newer combined UI/push implementation. No app was
+  installed/uninstalled, and no native build or distribution upload occurred.
+- [ ] Physical APNs banner/background/tap and updated native UI verification await
+  installation of the matching combined package. Do not present server/mocked
+  delivery as proof of iPhone display. Prior signed build 38 predates the newly
+  staged Weekly Challenges and update walkthrough.
+
+Operation/contracts/evidence: `docs/operations/update-103-walkthrough.md`.
+
+Final regression results: **1,225 backend passed / 6 skipped**, **649 frontend
+passed**; dedicated PostgreSQL **86 notification tests** and **43 update/App
+Review/name-change tests** passed without skips. Type checks, local Vite build,
+migration parity/history guard and diff checks passed. Standalone Swift policy
+checks passed 12 App Review and nine notification-privacy assertions; no native
+app package was built. Actual local browser evidence also confirms the WR header
+gradient, full-height sidebar, persisted Settings state and in-app badge clearing.
+
+## Combined iPhone test rollout authorized — October 15
+
+The owner requested installation on the connected iPhone and explicitly approved
+deploying the combined backend for testing. This supersedes the local-only hold
+for the combined source push/merge, migrations 0123/0124, API/worker deployment,
+and native build/install. App Store/TestFlight upload and submission remain held
+until the owner completes phone testing. The new test package is 1.0.3 (39),
+including the matching notification extension; build 38 is superseded.
+
+The prepared release has 1,225 passing backend tests, 649 passing frontend tests,
+and dedicated PostgreSQL notification, review, name-change and challenge checks.
+Production backup, migration rehearsal, exact-source CI, deployed readiness and
+the installed version must be verified during this rollout. No production review
+claims or update receipts may be reset to manufacture repeat prompts.

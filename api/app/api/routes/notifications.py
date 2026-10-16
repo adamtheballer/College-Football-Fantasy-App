@@ -147,7 +147,10 @@ def create_test_alert(
 ) -> NotificationRead:
     if current_user.is_admin is False and settings.is_production:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="notification test endpoint not found")
-    return create_test_alert_record(db=db, current_user_id=current_user.id)
+    try:
+        return create_test_alert_record(db=db, current_user_id=current_user.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
 
 
 @router.get("/league-preferences", response_model=LeagueNotificationPreferences)

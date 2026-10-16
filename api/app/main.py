@@ -13,6 +13,7 @@ ensure_models_registered()
 from collegefootballfantasy_api.app.api.routes import (
     auth,
     app_review,
+    release_notice,
     beta_access,
     admin_trades,
     admin_scoring,
@@ -30,6 +31,7 @@ from collegefootballfantasy_api.app.api.routes import (
     provider_identity,
     rosters,
     saturday_pick,
+    weekly_challenges,
     schedule,
     stats,
     teams,
@@ -82,6 +84,7 @@ def log_runtime_identity_on_startup() -> None:
 app.include_router(health.router)
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(app_review.router, prefix="/app-review", tags=["app-review"])
+app.include_router(release_notice.router, prefix="/release-notes", tags=["release-notes"])
 app.include_router(beta_access.router, prefix="/beta-access", tags=["beta-access"])
 app.include_router(admin_scoring.router, prefix="/admin/scoring", tags=["admin-scoring"])
 app.include_router(admin_schedule.router, prefix="/admin/schedules", tags=["admin-schedules"])
@@ -107,3 +110,6 @@ app.include_router(waivers.router, tags=["waivers"])
 app.include_router(trades.router, prefix="/trade", tags=["trade"])
 app.include_router(trades.league_router, tags=["trade"])
 app.include_router(insights.router, prefix="/insights", tags=["insights"])
+
+app.include_router(weekly_challenges.router, prefix="/weekly-challenges", tags=["weekly-challenges"])
+app.include_router(weekly_challenges.admin_router, prefix="/admin/weekly-challenges", tags=["admin-weekly-challenges"])

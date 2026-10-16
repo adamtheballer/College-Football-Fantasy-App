@@ -1,0 +1,16 @@
+meta {
+  name: Current competition week
+  type: http
+  seq: 1
+}
+get {
+  url: {{base_url}}/weekly-challenges/current
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+docs {
+  Combined-release feature: run only against the isolated local preview until release approval.
+  Read current IDs, publication version and entry revision from API responses.
+  SaveEntry and Configure examples are for Lock of the Week; other formats need their complete published selections.
+}
