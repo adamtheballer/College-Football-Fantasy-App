@@ -81,3 +81,37 @@ def test_availability_schedule_is_limited_to_wednesday_and_sunday_mornings():
         hour=10,
         weekday=[2, 6],
     )
+
+
+def test_conference_refresh_commits_healthy_sources_and_records_partial_failure(db_session, monkeypatch):
+    from scripts import sync_official_availability_reports as job
+    from conftest import TestingSessionLocal
+    from collegefootballfantasy_api.app.models.player import Player
+    from collegefootballfantasy_api.app.models.provider_sync_state import ProviderSyncState
+    monkeypatch.setattr(job, 'SessionLocal', TestingSessionLocal)
+    def sync(session, *, season, week, conference):
+        session.add(Player(name=f'Isolated source {conference}', school='Texas', position='QB'))
+        session.flush()
+        if conference == 'ACC':
+            raise RuntimeError('Unreadable official ACC report')
+        return {'created':1,'updated':0,'rows_seen':1,'source':'official_conference_reports'}
+    monkeypatch.setattr(job, 'sync_power4_injuries', sync)
+    results = job.refresh_conferences(season=2026, week=7)
+    assert results['SEC']['created'] == 1 and results['BIG12']['created'] == 1 and results['BIG10']['created'] == 1
+    assert 'Unreadable' in results['ACC']['error']
+    assert db_session.query(Player).count() == 3
+    states = db_session.query(ProviderSyncState).all()
+    assert len(states) == 4
+    assert sorted(s.status for s in states) == ['failed','ready','ready','ready']
+    failed = next(s for s in states if s.status == 'failed')
+    assert failed.last_success_at is None and failed.consecutive_failures == 1
+
+
+def test_deployed_schedule_refreshes_throughout_the_week():
+    from pathlib import Path
+    import tomllib
+    root = Path(__file__).resolve().parents[2]
+    config = tomllib.loads((root/'railway.availability-scheduler.toml').read_text())['deploy']
+    assert config['cronSchedule'] == '*/30 * * * *'
+    assert '--only-local-weekday' not in config['startCommand']
+    assert '--only-local-hour' not in config['startCommand']

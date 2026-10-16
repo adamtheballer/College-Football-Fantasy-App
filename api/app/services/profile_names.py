@@ -1,11 +1,13 @@
 from datetime import datetime
 from math import ceil
+import re
 
 from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.core.name_change import next_name_change_at
+from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.auth import UserProfileUpdate
@@ -50,14 +52,28 @@ def update_profile(db: Session, account: User, payload: UserProfileUpdate) -> Us
                     "message": "Your manager name is still in its seven-day change window. Unsuccessful attempts do not restart the wait.",
                     "retry_at": timing.next_eligible_at.isoformat(),
                 }, headers={"Retry-After": str(timing.remaining_wait_seconds)})
+            previous_name = user.first_name
             user.first_name = next_name
             user.manager_name_changed_at = now
             # Preserve established generated-team label synchronization and
             # custom league/team names exactly as before.
-            for team in db.scalars(select(Team).where(Team.owner_user_id == user.id)):
+            teams = list(db.scalars(select(Team).where(Team.owner_user_id == user.id).order_by(Team.id)))
+            league_ids = sorted({team.league_id for team in teams})
+            # Different managers may choose the same display name. Serialize
+            # generated labels per league; an unrelated team's unique name
+            # must never roll back an otherwise valid account-name change.
+            if league_ids:
+                list(db.scalars(select(League.id).where(League.id.in_(league_ids)).order_by(League.id).with_for_update()))
+            for team in teams:
                 team.owner_name = next_name
-                if team.name.endswith("'s Team"):
-                    team.name = f"{next_name}'s Team"
+                if team.name.endswith("'s Team") or re.fullmatch(re.escape(f"{previous_name}'s Team") + r" \([0-9]+\)", team.name):
+                    existing_names = set(db.scalars(select(Team.name).where(Team.league_id == team.league_id, Team.id != team.id)))
+                    base = f"{next_name}'s Team"
+                    candidate, suffix = base, 2
+                    while candidate in existing_names:
+                        candidate = f"{base} ({suffix})"
+                        suffix += 1
+                    team.name = candidate
     if "avatar_url" in payload.model_fields_set:
         user.avatar_url = payload.avatar_url
     db.add(user)

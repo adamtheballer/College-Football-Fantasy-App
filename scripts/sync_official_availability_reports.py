@@ -14,7 +14,7 @@ if ROOT_DIR not in sys.path:
 
 from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.services.league_weeks import calendar_cfb_week
-from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_fresh
+from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_fresh, get_or_create_sync_state, mark_sync_attempt, scope_dict_to_key
 from collegefootballfantasy_api.app.services.sportsdata_sync import sync_power4_injuries
 
 
@@ -103,26 +103,38 @@ def main() -> None:
         return
 
     week = args.week or calendar_cfb_week(args.season, now_utc)
-    session = SessionLocal()
-    try:
-        refreshed, _state = ensure_feed_fresh(
-            session,
-            provider="official_conference_reports",
-            feed="injuries_week",
-            scope={"season": args.season, "week": week},
-            refresh_fn=lambda: sync_power4_injuries(session, season=args.season, week=week),
-            ttl_days=1,
-            # A cron run must obtain the latest report even if the previous
-            # run succeeded earlier that day. Manual callers can opt in too.
-            force_refresh=True,
-        )
-        session.commit()
-        print(f"official availability reports refreshed={refreshed} season={args.season} week={week}")
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.close()
+    results = refresh_conferences(season=args.season, week=week)
+    print(f"official availability reports season={args.season} week={week} results={results}")
+    failed = [conference for conference, result in results.items() if result.get("error")]
+    if failed:
+        raise RuntimeError(f"Availability refresh partial: failed conferences: {', '.join(failed)}; successful conferences were committed independently")
+
+
+def refresh_conferences(*, season: int, week: int) -> dict:
+    """Commit each source separately and retain truthful per-source failures."""
+    results = {}
+    for conference in ("SEC", "ACC", "BIG12", "BIG10"):
+        scope = {"season": season, "week": week, "conference": conference}
+        with SessionLocal() as session:
+            try:
+                counts = {}
+                def refresh():
+                    counts.update(sync_power4_injuries(session, season=season, week=week, conference=conference))
+                    if counts.get("provider_error"):
+                        raise RuntimeError(counts["provider_error"])
+                refreshed, state = ensure_feed_fresh(session, provider="official_conference_reports", feed="injuries_week",
+                    scope=scope, refresh_fn=refresh, ttl_days=1, force_refresh=True)
+                state.meta = dict(counts)
+                session.commit()
+                results[conference] = {"refreshed": refreshed, **counts}
+            except Exception as exc:
+                session.rollback()
+                # The failed import transaction must not erase its health record.
+                state = get_or_create_sync_state(session, "official_conference_reports", "injuries_week", scope_dict_to_key(scope))
+                mark_sync_attempt(session, state=state, status="failed", error_message=str(exc)[:500])
+                session.commit()
+                results[conference] = {"error": str(exc)}
+    return results
 
 
 if __name__ == "__main__":

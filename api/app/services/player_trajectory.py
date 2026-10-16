@@ -4,7 +4,7 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.services.projection_scoring import points_for_projection as _points_for_projection
-from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
+from collegefootballfantasy_api.app.crud.projection import current_published_projections_for_weeks_query
 from collegefootballfantasy_api.app.models.league import League
 from collegefootballfantasy_api.app.models.league_settings import LeagueSettings
 from collegefootballfantasy_api.app.models.player import Player
@@ -20,6 +20,7 @@ from collegefootballfantasy_api.app.services.player_trade_value import value_sna
 from collegefootballfantasy_api.app.services.chart_forecasts import school_key, pregame_forecast, forecast_points
 from datetime import datetime
 from collegefootballfantasy_api.app.core.config import settings
+from collegefootballfantasy_api.app.services.league_weeks import calendar_matchup_display_week
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.schemas.player_trajectory import (
     PlayerProjectionTrajectoryPointRead,
@@ -52,7 +53,7 @@ def _league_scoring_rules(db: Session, league_id: int | None) -> dict | None:
     return settings.scoring_json if settings and settings.scoring_json else None
 
 
-def _actual_points_by_week(db: Session, *, player_id: int, season: int, league_id: int | None, scoring_rules: dict | None) -> dict[int, float]:
+def _actual_points_by_week(db: Session, *, player_id: int, season: int, league_id: int | None, scoring_rules: dict | None, finalized_weeks: set[int]) -> dict[int, float]:
     player = db.get(Player, player_id)
     snapshots = db.query(PlayerChartWeek).filter_by(player_id=player_id, season=season).all()
     points = {}
@@ -64,11 +65,11 @@ def _actual_points_by_week(db: Session, *, player_id: int, season: int, league_i
     # A live/stale score never becomes a historical actual on a card read.
     if league_id is not None:
         for row in db.query(PlayerWeekScore).filter_by(player_id=player_id, season=season, league_id=league_id).all():
-            if row.status in {"final", "stat_corrected"} and week_is_authoritatively_finalized(db, season=season, week=row.week):
+            if row.status in {"final", "stat_corrected"} and row.week in finalized_weeks:
                 points[row.week] = round(float(row.fantasy_points), 1)
     else:
         for week in WEEKS:
-            row = verified_fantasy_week_stats(db,season=season,week=week,players=[player]).get(player_id) if week not in points and week_is_authoritatively_finalized(db,season=season,week=week) else None
+            row = verified_fantasy_week_stats(db,season=season,week=week,players=[player]).get(player_id) if week not in points and week in finalized_weeks else None
             if row is not None:
                 value = points_from_verified_stats(row.stats, position=player.position)
                 if value is not None:
@@ -97,34 +98,35 @@ def build_player_trajectory(
         schedule_by_week[1]=schedule_by_week.get(0)
     frozen_forecasts = {r.week:r.snapshot_json for r in db.query(PlayerChartForecast).filter_by(player_id=player.id,season=season).all()}
     published_by_week = {
-        week: db.scalar(
-            current_published_projections_query(
-                season=season,
-                week=week,
-                player_ids=(player.id,),
-            )
-        )
-        for week in WEEKS
+        row.week: row for row in db.scalars(current_published_projections_for_weeks_query(
+            season=season, weeks=WEEKS, player_ids=(player.id,),
+        ))
     }
-    published_by_week = {week: row for week, row in published_by_week.items() if row is not None}
+    certified_weeks = {week for week in WEEKS if week_is_authoritatively_finalized(db, season=season, week=week)}
     actual_by_week = _actual_points_by_week(
         db,
         player_id=player.id,
         season=season,
         league_id=league_id,
         scoring_rules=scoring_rules,
+        finalized_weeks=certified_weeks,
     )
     stored_by_week = {row.week: row for row in db.query(PlayerChartWeek).filter_by(player_id=player.id,season=season).all()}
     season_projection = _season_projection(player,season=season)
     # A season total is metadata only. It is never divided, repeated, or
     # emitted as a weekly graph point; this series is canonical weekly data.
     projection: list[PlayerProjectionTrajectoryPointRead] = []
-    finalized_weeks = {week for week in WEEKS if week_is_authoritatively_finalized(db, season=season, week=week)} | set(actual_by_week) | published_finalized_weeks(db,season=season)
+    finalized_weeks = certified_weeks | set(actual_by_week) | published_finalized_weeks(db,season=season)
     # Durable publication remains authoritative when another league is added
     # later with projected historical matchups. Do not move the forecast back
     # over already finalized player history.
     last_finalized_week = max(finalized_weeks,default=0)
     upcoming_week = last_finalized_week+1
+    # Missing older publications must not hide a real current-week forecast.
+    # The app calendar chooses only the forecast; it never certifies actuals.
+    display_week = max(upcoming_week, calendar_matchup_display_week(season)) if season == settings.current_season_year else upcoming_week
+    if display_week in published_by_week or display_week in frozen_forecasts:
+        upcoming_week = display_week
     for week in WEEKS:
         if week>last_finalized_week and week != upcoming_week:
             continue

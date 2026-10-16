@@ -157,3 +157,15 @@ def test_player_trajectory_rejects_unknown_league_context(client, db_session):
 
     assert response.status_code == 404
     assert response.json()["detail"] == "league not found"
+
+
+def test_current_published_week_is_visible_while_earlier_chart_history_is_pending(client, db_session, monkeypatch):
+    from collegefootballfantasy_api.app.services import player_trajectory
+    monkeypatch.setattr(player_trajectory, 'calendar_matchup_display_week', lambda season: 7, raising=False)
+    player = Player(name='Current Week Receiver', school='Illinois', position='WR')
+    db_session.add(player); db_session.flush()
+    db_session.add(WeeklyProjection(player_id=player.id, season=2026, week=7, is_published=True, fantasy_points=17.1))
+    db_session.commit()
+    body = client.get(f'/players/{player.id}/trajectory?season=2026').json()
+    assert [(p['week'], p['points'], p['is_finalized']) for p in body['projection']] == [(7, 17.1, False)]
+    assert body['projection'][0]['actual_points'] is None

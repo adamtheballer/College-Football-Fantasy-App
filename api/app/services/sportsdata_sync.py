@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from hashlib import sha256
 import re
 from typing import Any
@@ -540,6 +541,18 @@ def _upsert_official_availability_rows(
         if conference_for_school(player.school or ""):
             key = (normalize_school(player.name), normalize_school(resolve_power4_school(player.school) or player.school))
             players_by_identity.setdefault(key, []).append(player)
+    # Dated card reports must match a real game in this requested football
+    # week; an old archive or a future slate cannot overwrite current status.
+    game_dates_by_school: dict[str, set[str]] = {}
+    if any(row.get("game_date") for row in rows):
+        for game in db.query(Game).filter(Game.season == season, Game.week.in_((0, 1) if week == 1 else (week,)), Game.season_type == "regular"):
+            if game.start_date is None:
+                continue
+            start = game.start_date if game.start_date.tzinfo else game.start_date.replace(tzinfo=timezone.utc)
+            day = start.astimezone(ZoneInfo("America/New_York")).date().isoformat()
+            for team in (game.home_team, game.away_team):
+                key = normalize_school(resolve_power4_school(team) or team)
+                game_dates_by_school.setdefault(key, set()).add(day)
     current_injuries = {
         injury.player_id: injury
         for injury in db.query(Injury).filter(Injury.season == season, Injury.week == week).all()
@@ -550,14 +563,27 @@ def _upsert_official_availability_rows(
     for row in rows:
         school = resolve_power4_school(row.get("team_name") or "")
         source_position = (row.get("position") or "").upper().strip()
-        if not school or (source_position and source_position not in _OFFENSE_POSITIONS):
+        if source_position and source_position not in _OFFENSE_POSITIONS:
             skipped += 1
             continue
-        matches = players_by_identity.get((normalize_school(row.get("player_name") or ""), normalize_school(school)), [])
+        if school:
+            matches = players_by_identity.get((normalize_school(row.get("player_name") or ""), normalize_school(school)), [])
+        elif not row.get("team_name") and row.get("conference") == "BIG12" and row.get("game_date") and source_position:
+            # Public Big 12 cards use generic logo alt text. Require a unique
+            # exact catalog identity across the conference, including position
+            # and a dated game. Ambiguity is never resolved by guessing a team.
+            matches = [player for player in eligible_players
+                if conference_for_school(player.school or "") == "BIG12"
+                and normalize_school(player.name) == normalize_school(row.get("player_name") or "")
+                and player.position.upper() == source_position
+                and row["game_date"] in game_dates_by_school.get(normalize_school(resolve_power4_school(player.school) or player.school), set())]
+        else:
+            matches = []
         if len(matches) != 1:
             skipped += 1
             continue
         player = matches[0]
+        school = resolve_power4_school(player.school) or player.school
         if row.get("conference") and row["conference"] != conference_for_school(player.school):
             skipped += 1
             continue
@@ -565,6 +591,9 @@ def _upsert_official_availability_rows(
             skipped += 1
             continue
 
+        if row.get("game_date") and row["game_date"] not in game_dates_by_school.get(normalize_school(school), set()):
+            skipped += 1
+            continue
         status = _official_availability_status(row.get("status"), row.get("return_timeline"))
         content_hash = _availability_hash(row, status)
         probability_active, multiplier = _availability_multiplier(status)

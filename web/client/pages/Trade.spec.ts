@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { ApiError } from "@/lib/api";
 import type { RosterEntry } from "@/types/roster";
-import { formatTradeError, getTradeOfferSentToast, toTradeRows } from "./Trade";
+import { canSendTradeOffer, formatTradeError, getTradeOfferSentToast, toTradeRows } from "./Trade";
 
 describe("formatTradeError", () => {
   it("shows a permission detail returned by a trade mutation", () => {
@@ -64,5 +64,15 @@ describe("getTradeOfferSentToast", () => {
       description: "Your offer is ready for The Tigers to review.",
       className: expect.stringContaining("bg-emerald-500"),
     });
+  });
+});
+
+
+describe("reviewed trade selections", () => {
+  it("requires the exact reviewed selections and blocks duplicate sends without valuation", () => {
+    expect(canSendTradeOffer(null, "players-a", false)).toBe(false);
+    expect(canSendTradeOffer("players-a", "players-a", false)).toBe(true);
+    expect(canSendTradeOffer("players-a", "players-b", false)).toBe(false);
+    expect(canSendTradeOffer("players-a", "players-a", true)).toBe(false);
   });
 });

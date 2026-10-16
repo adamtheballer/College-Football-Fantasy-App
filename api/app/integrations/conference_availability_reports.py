@@ -10,9 +10,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 import os
+import re
 from collections.abc import Callable
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse, parse_qs
 
 import httpx
 from bs4 import BeautifulSoup
@@ -137,7 +138,12 @@ def _embedded_report_url(soup: BeautifulSoup, document_url: str) -> str | None:
     ]
     if not candidates:
         return None
-    return urljoin(document_url, str(candidates[0]["src"]))
+    target = urljoin(document_url, str(candidates[0]["src"]))
+    if urlparse(target).hostname and urlparse(target).hostname.endswith(".safelinks.protection.outlook.com"):
+        linked = parse_qs(urlparse(target).query).get("url", [None])[0]
+        if linked and urlparse(linked).hostname == "app.hdintelligence.com":
+            target = linked
+    return target
 
 
 def _rendered_report_frame(page: Any) -> Any:
@@ -156,6 +162,97 @@ def _rendered_report_frame(page: Any) -> Any:
         "iframe[src*='availability'], iframe[src*='injury'], "
         "iframe[src*='report'], iframe[src*='confinj']"
     ).first
+
+
+def _parse_grouped_report_cards(soup: BeautifulSoup, *, conference: str, source_url: str) -> list[dict[str, str | None]]:
+    """Read the public HDI card layout by team/status headings, not CSS colors.
+
+    Each card needs a dated Games heading, exactly one team heading, an explicit
+    status group and jersey-labelled athletes. Unrelated articles are not data.
+    """
+    athlete = re.compile(r"^([A-Z]{1,5})\s+#\d+\s+(.+)$")
+    statuses = {"OUT", "DOUBTFUL", "QUESTIONABLE", "PROBABLE", "AVAILABLE", "FULL", "TBD", "OUT FOR SEASON", "SUSPENDED", "INACTIVE", "NOT AVAILABLE"}
+    rows = []
+    ignored_logos = {"", "team logo", "conference logo", "conference", "sec logo", "acc football", "b1g football", "network", "football"}
+
+    def players_in(element):
+        # Vendors split position, jersey and name into separate elements. Only
+        # the smallest complete row is an athlete; never combine adjacent rows.
+        result = []
+        for child in element.find_all(["div", "li", "p"]):
+            match = athlete.fullmatch(child.get_text(" ", strip=True))
+            if match and not any(athlete.fullmatch(nested.get_text(" ", strip=True)) for nested in child.find_all(["div", "li", "p"])):
+                result.append(match)
+        return result
+
+    def report_date(element):
+        heading = element.find_previous("h1")
+        text = heading.get_text(" ", strip=True) if heading else ""
+        match = re.fullmatch(r"Games (?:on|of) (.+)", text)
+        if not match:
+            return None
+        try:
+            return datetime.strptime(match.group(1), "%B %d, %Y").date().isoformat()
+        except ValueError:
+            # Big Ten groups Friday and Saturday under one range heading.
+            year = re.search(r", (\d{4})$", text)
+            parent = element.parent
+            while parent and parent.name not in {"body", "html"}:
+                footer = re.search(r"(?:Friday|Saturday|Thursday|Sunday), ([A-Z][a-z]+ \d{1,2}) \|", parent.get_text(" ", strip=True))
+                if footer and year:
+                    try:
+                        return datetime.strptime(f"{footer.group(1)}, {year.group(1)}", "%B %d, %Y").date().isoformat()
+                    except ValueError:
+                        return None
+                parent = parent.parent
+            return None
+
+    def team_marker(element):
+        if element.name == "h3":
+            return element.get_text(" ", strip=True).upper() not in statuses
+        return element.name == "img" and element.get("alt", "").strip().lower() not in ignored_logos
+
+    def append_groups(card, team_name, game_date):
+        for label in card.find_all(string=lambda text: text.strip().upper() in statuses):
+            status = label.strip().upper()
+            group = label.parent
+            while group is not card and group is not None:
+                texts = list(group.stripped_strings)
+                if sum(text.upper() in statuses for text in texts) != 1:
+                    break
+                players = players_in(group)
+                if players:
+                    for player in players:
+                        rows.append({"player_name": player.group(2), "team_name": team_name,
+                            "position": player.group(1), "status": status, "injury": None, "return_timeline": None,
+                            "practice_level": None, "notes": None, "conference": conference,
+                            "source_url": source_url, "game_date": game_date})
+                    break
+                group = group.parent
+
+    markers = [element for element in soup.find_all(["h3", "img"]) if team_marker(element)]
+    for heading in markers:
+        game_date = report_date(heading)
+        if not game_date:
+            continue
+        team_name = heading.get("alt", "").strip() if heading.name == "img" else heading.get_text(" ", strip=True)
+        card = heading.parent
+        while card and sum(team_marker(child) for child in card.find_all(["h3", "img"])) == 1:
+            if players_in(card):
+                break
+            card = card.parent
+        if card and sum(team_marker(child) for child in card.find_all(["h3", "img"])) == 1:
+            append_groups(card, team_name, game_date)
+    if not rows and conference == "BIG12":
+        # Big 12 exposes generic team-logo labels, so there is no textual team
+        # identity to parse. The importer must resolve a UNIQUE exact name +
+        # position in this conference with a real game on this explicit date.
+        for heading in soup.find_all("h1"):
+            card = heading.parent
+            game_date = report_date(heading.find_next())
+            if game_date:
+                append_groups(card, None, game_date)
+    return rows
 
 
 def parse_report_document(
@@ -205,6 +302,8 @@ def parse_report_document(
                     "source_url": source_url,
                 }
             )
+    if not rows:
+        rows = _parse_grouped_report_cards(soup, conference=conference, source_url=source_url)
     report_text = soup.get_text(" ", strip=True).lower()
     no_report_markers = ("no games until", "no games scheduled", "no reports available")
     if not rows and not any(marker in report_text for marker in no_report_markers):
@@ -252,17 +351,23 @@ class ConferenceAvailabilityReportClient:
                 try:
                     page = browser.new_page()
                     page.goto(source.url, wait_until="domcontentloaded", timeout=int(self.timeout_seconds * 1000))
+                    embedded_url = _embedded_report_url(BeautifulSoup(page.content(), "html.parser"), source.url)
+                    if embedded_url and urlparse(embedded_url).hostname == "app.hdintelligence.com":
+                        # Read the exact public document linked by the official
+                        # page, avoiding wrapper redirects and archive frames.
+                        page.goto(embedded_url, wait_until="domcontentloaded", timeout=int(self.timeout_seconds * 1000))
                     iframe = _rendered_report_frame(page)
-                    if iframe.count() == 0:
-                        raise ConferenceReportUnavailable("official page did not expose its report frame")
+                    has_frame = iframe.count() > 0
                     # Playwright 1.56+ exposes ``content_frame`` as a
                     # FrameLocator property (not a callable Frame).  Calling
                     # it caused every JS-hosted conference report to fail
                     # before parsing, silently reducing the daily audit to
                     # zero usable sources.
-                    frame = iframe.content_frame
+                    frame = iframe.content_frame if has_frame else page
                     try:
-                        frame.locator("table").first.wait_for(
+                        frame.locator("table").or_(frame.get_by_text(re.compile(r"^(?:[A-Z]{1,5}\s+#\d+\s+|#\d+$)"))).or_(
+                            frame.get_by_text(re.compile(r"no games until|no games scheduled|no reports available", re.I))
+                        ).first.wait_for(
                             state="attached", timeout=int(self.timeout_seconds * 1000)
                         )
                     except PlaywrightTimeoutError:
@@ -272,8 +377,8 @@ class ConferenceAvailabilityReportClient:
                         # broken page without inventing availability statuses.
                         pass
                     # FrameLocator has no ``content`` method.  Reading the
-                    # public frame's rendered HTML preserves the same
-                    # table-only parser and source-provenance safeguards.
+                    # public frame's rendered HTML preserves explicit team,
+                    # status and date semantics across table/card layouts.
                     return frame.locator("html").inner_html()
                 finally:
                     browser.close()

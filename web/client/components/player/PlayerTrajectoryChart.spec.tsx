@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PlayerTrajectoryChart } from "./PlayerTrajectoryChart";
 
@@ -168,4 +168,19 @@ describe("Unfinished historical gaps",()=>{
     expect(chart.querySelector("title")?.textContent).toContain("awaiting weekly finalization");
     expect(chart.querySelectorAll("circle")).toHaveLength(0);
   });
+});
+
+
+it("fits a late-week forecast inside a narrow phone canvas before any scrolling", () => {
+  const measure = vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({ width: 300, height: 312, x: 0, y: 0, top: 0, left: 0, right: 300, bottom: 312, toJSON: () => ({}) });
+  try {
+    renderChart([{ week: 7, value: 21.2, source: "published" }]);
+    const svg = screen.getByRole("img");
+    expect(svg.getAttribute("viewBox")).toBe("0 0 300 312");
+    expect(svg.getAttribute("class")).not.toContain("min-w");
+    const point = screen.getByTestId("trajectory-point-week-7");
+    expect(Number(point.getAttribute("cx"))).toBeGreaterThan(54);
+    expect(Number(point.getAttribute("cx"))).toBeLessThan(274);
+    expect(screen.getByText("W13")).toBeTruthy();
+  } finally { cleanup(); measure.mockRestore(); }
 });

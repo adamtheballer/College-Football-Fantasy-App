@@ -407,3 +407,105 @@ def test_ambiguous_same_school_identity_never_assigns_an_injury(db_session):
     assert result["skipped"] == 1
     assert db_session.query(Injury).count() == 0
     assert db_session.query(PlayerAvailabilityEvent).count() == 0
+
+
+def test_current_grouped_report_cards_preserve_team_status_and_game_date():
+    html = '''<h1>Games on October 17, 2026</h1><h2>Thursday Report</h2>
+      <p>posted 7:10pm CT on Thursday, Oct. 15</p>
+      <div><div><h3>Missouri</h3></div><div>
+        <div><div>OUT</div><div><div>RB #29 Ahmad Hardy</div><div>TE #88 Gavin Hoffman</div></div></div>
+        <div><div>DOUBTFUL</div><div><div>TE #87 Brett Norfleet</div></div></div>
+        <div><div>PROBABLE</div><div><div>QB #13 Austin Simmons</div></div></div>
+      </div></div>
+      <div><div><h3>Ole Miss</h3></div><div><div>QUESTIONABLE</div><div>TE #80 Hayden Bradley</div></div></div>'''
+    rows = parse_report_document(html, conference='SEC', source_url='https://www.secsports.com/fbreports')
+    assert [(r['player_name'], r['team_name'], r['status']) for r in rows] == [
+        ('Ahmad Hardy', 'Missouri', 'OUT'), ('Gavin Hoffman', 'Missouri', 'OUT'),
+        ('Brett Norfleet', 'Missouri', 'DOUBTFUL'), ('Austin Simmons', 'Missouri', 'PROBABLE'),
+        ('Hayden Bradley', 'Ole Miss', 'QUESTIONABLE'),
+    ]
+    assert all(r['game_date'] == '2026-10-17' for r in rows)
+    assert rows[0]['position'] == 'RB'
+
+
+def test_unscoped_cards_are_not_mistaken_for_an_official_report():
+    import pytest
+    html = '<h3>Missouri</h3><div>OUT<div>RB #29 Ahmad Hardy</div></div>'
+    with pytest.raises(ConferenceReportUnavailable):
+        parse_report_document(html, conference='SEC', source_url='https://www.secsports.com/fbreports')
+
+
+def test_dated_report_only_updates_its_actual_game_week(db_session):
+    from collegefootballfantasy_api.app.models.game import Game
+    p = Player(name='Ahmad Hardy', school='Missouri', position='RB')
+    db_session.add(p); db_session.flush()
+    db_session.add(Game(season=2026, week=7, season_type='regular', external_id='official-date-fixture', home_team='Ole Miss', away_team='Missouri', start_date=datetime(2026,10,17,19,30,tzinfo=timezone.utc), schedule_status='scheduled'))
+    db_session.flush()
+    row = {'player_name':'Ahmad Hardy','team_name':'Missouri','position':'RB','status':'OUT','conference':'SEC','source_url':'https://www.secsports.com/fbreports','game_date':'2026-10-17'}
+    result = _upsert_official_availability_rows(db_session, season=2026, week=7, rows=[row])
+    assert result['created'] == 1
+    assert db_session.query(Injury).filter_by(player_id=p.id,week=7).one().status == 'OUT'
+    stale = {**row, 'status':'AVAILABLE', 'game_date':'2026-10-10'}
+    result = _upsert_official_availability_rows(db_session, season=2026, week=7, rows=[stale])
+    assert result['skipped'] == 1
+    assert db_session.query(Injury).filter_by(player_id=p.id,week=7).one().status == 'OUT'
+
+
+def test_acc_logo_identified_cards_do_not_mix_opposing_teams_or_statuses():
+    html = '''<h1>Games of October 17, 2026</h1><img alt="ACC Football" />
+      <div><div><img alt="Virginia" /></div><div>
+        <div><div>OUT</div><div>RB #2 Peyton Lewis</div></div>
+        <div><div>QUESTIONABLE</div><div>WR #5 Kameron Courtney</div></div>
+      </div></div>
+      <div><div><img alt="SMU" /></div><div><div>OUT</div><div>RB #4 Dramekco Green</div></div></div>
+      <img alt="Network" />'''
+    rows = parse_report_document(html, conference='ACC', source_url='https://theacc.com/sports/2025/8/28/availability-reporting-football.aspx')
+    assert [(r['team_name'],r['player_name'],r['status']) for r in rows] == [
+        ('Virginia','Peyton Lewis','OUT'), ('Virginia','Kameron Courtney','QUESTIONABLE'), ('SMU','Dramekco Green','OUT')]
+
+
+def test_big_ten_split_rows_use_each_games_date_under_range_heading():
+    html = '''<h1>Games of October 16 - October 17, 2026</h1>
+    <section><img alt="B1G Football" /><div><img alt="Washington" />
+      <div><div>Out</div><div><div>RB</div><div>#17</div><div>Jayden Limar</div></div></div>
+    </div><div><img alt="Purdue" /><div><div>Questionable</div><div><div>TE</div><div>#16</div><div>Kylan Fox</div></div></div></div>
+    <p>Friday, October 16 | 8:00 PM ET | West Lafayette, IN</p><img alt="Network" /></section>
+    <section><div><img alt="Ohio State" /><div><div>Out</div><div><div>WR</div><div>#30</div><div>Amari Valerio-Hudson</div></div></div></div>
+    <p>Saturday, October 17 | 12:00 PM ET | Bloomington, IN</p></section>'''
+    rows = parse_report_document(html, conference='BIG10', source_url='https://bigten.org/fb/availability-reports/')
+    assert [(r['team_name'], r['player_name'], r['status'], r['game_date']) for r in rows] == [
+        ('Washington','Jayden Limar','OUT','2026-10-16'), ('Purdue','Kylan Fox','QUESTIONABLE','2026-10-16'),
+        ('Ohio State','Amari Valerio-Hudson','OUT','2026-10-17')]
+
+
+def test_big12_split_rows_keep_explicit_conference_date_without_guessing_logo_identity():
+    html = '''<main><h1>Games on October 17, 2026</h1><img alt="Conference Logo" />
+      <img alt="Team Logo" /><img alt="Team Logo" /><div><div>OUT</div>
+      <div><div>WR</div><div>#22</div><div>Fletcher Fierro</div></div></div>
+      <div><div>QUESTIONABLE</div><div><div>RB</div><div>#28</div><div>Jahiem White</div></div></div></main>'''
+    rows = parse_report_document(html, conference='BIG12', source_url='https://big12sports.com/sports/2025/8/14/FBreporting.aspx')
+    assert [(r['player_name'],r['position'],r['status'],r['team_name']) for r in rows] == [
+        ('Fletcher Fierro','WR','OUT',None), ('Jahiem White','RB','QUESTIONABLE',None)]
+    assert all(r['game_date']=='2026-10-17' for r in rows)
+
+
+def test_big12_unlabelled_team_requires_unique_exact_conference_position_and_game_date(db_session):
+    from collegefootballfantasy_api.app.models.game import Game
+    players = [Player(name='Unique Receiver',school='TCU',position='WR'),
+        Player(name='Same Receiver',school='TCU',position='WR'), Player(name='Same Receiver',school='Baylor',position='WR'),
+        Player(name='Unique Receiver',school='Missouri',position='WR')]
+    db_session.add_all(players)
+    db_session.add(Game(season=2026,week=7,season_type='regular',external_id='b12-date-fixture',home_team='TCU',away_team='Baylor',start_date=datetime(2026,10,17,19,30,tzinfo=timezone.utc)))
+    db_session.flush()
+    row = {'player_name':'Unique Receiver','team_name':None,'position':'WR','status':'OUT','conference':'BIG12','game_date':'2026-10-17'}
+    result = _upsert_official_availability_rows(db_session, season=2026,week=7,rows=[row])
+    assert result['created']==1
+    assert db_session.query(Injury).one().player_id==players[0].id
+    for bad in ({**row,'player_name':'Same Receiver'}, {**row,'game_date':'2026-10-10'}, {**row,'position':'RB'}, {**row,'conference':'SEC'}, {**row,'game_date':None}):
+        assert _upsert_official_availability_rows(db_session,season=2026,week=7,rows=[bad])['skipped']==1
+    assert db_session.query(Injury).count()==1
+
+
+def test_big_ten_embedded_link_unwraps_only_the_explicit_public_report_destination():
+    html = '<iframe id="embedded-app" src="https://nam04.safelinks.protection.outlook.com/?url=https%3A%2F%2Fapp.hdintelligence.com%2F%3Fsource%3DB10%26sport%3DFootball%26conf%3DB10%26type%3Dreport"></iframe>'
+    assert _embedded_report_url(BeautifulSoup(html,'html.parser'),'https://bigten.org/fb/availability-reports/') == 'https://app.hdintelligence.com/?source=B10&sport=Football&conf=B10&type=report'
