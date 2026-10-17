@@ -65,7 +65,8 @@ for(const width of [390,1280]) {
   }
   await page.screenshot({path:info.outputPath('week8-sponsor-detail.png')});
   // Follow the actual external anchor without navigating away from the entry.
-  await page.route(youtube,route=>route.fulfill({status:200,body:'Channel destination verification'}));
+  // Initial popup navigation bypasses page.route; intercept at context level so CI needs no network.
+  await page.context().route(youtube,route=>route.fulfill({status:200,body:'Channel destination verification'}));
   const popupPromise=page.waitForEvent('popup');await page.getByRole('link',{name:'Watch on YouTube'}).click();const popup=await popupPromise;
   await expect(popup).toHaveURL(youtube);await popup.close();
   for(const week of [7,9]) {await page.goto(`/weekly-challenges?round=${week}`);await expect(page.getByRole('heading',{name:'Weekly Challenges',exact:true})).toBeVisible();await expect(page.getByRole('complementary',{name:/sponsor/i})).toHaveCount(0);}
