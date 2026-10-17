@@ -333,6 +333,7 @@ export default function LeagueRoster() {
 
       <RosterSlotTable
         title="Starters"
+        showStartRate={false}
         players={starters}
         emptyText="No starters set yet."
         pointMode={rosterPointMode}
@@ -343,6 +344,7 @@ export default function LeagueRoster() {
       />
       <RosterSlotTable
         title="Bench"
+        showStartRate={false}
         players={bench}
         emptyText="Bench is empty."
         tone="bench"
@@ -354,6 +356,7 @@ export default function LeagueRoster() {
       />
       <RosterSlotTable
         title={`IR (${rosterData?.ir_slots ?? 0})`}
+        showStartRate={false}
         players={ir}
         emptyText="IR spot empty."
         pointMode={rosterPointMode}

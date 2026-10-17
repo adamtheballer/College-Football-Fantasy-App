@@ -135,6 +135,30 @@ async function leagueShell(page: Page) {
   return state;
 }
 
+for (const width of [320, 390, 1280]) {
+  test(`roster hides Start metadata for starters bench and IR only at ${width}px`, async ({ page }, info) => {
+    await page.setViewportSize({ width, height: 844 });
+    await leagueShell(page);
+    await page.route("**/api/leagues/42/roster**", async (route) => {
+      const slots = ["WR", "BENCH", "IR"].map((slot, index) => ({
+        id: index + 1, player_id: index + 1, player_name: `Roster ${slot} Player`,
+        league_id: 42, team_id: 1, fantasy_team_id: 1, fantasy_team_name: "QA Team",
+        position: "WR", slot, slot_index: 1, slot_id: `team-1-${slot}-1`, status: "ACTIVE",
+        school: "USC", opponent: "UCLA", projected_points: 18.4, weekly_projected_fantasy_points: 18.4,
+        popularity: { start_percent: 72.5, rostered_percent: 90 },
+      }));
+      await route.fulfill({ json: { league_id: 42, season: 2026, week: 7, owned_team: { id: 1, name: "QA Team" }, slots, team_rosters: [], ir_slots: 1 } });
+    });
+    await page.goto("/league/42/roster");
+    for (const slot of ["WR", "BENCH", "IR"]) await expect(page.getByText(`Roster ${slot} Player`, { exact: true })).toBeVisible();
+    await expect(page.locator("[data-player-popularity]")).toHaveCount(0);
+    await expect(page.getByText(/^Start (?:—|[0-9.]+%)$/)).toHaveCount(0);
+    await expect(page.getByText("Starters", { exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: info.outputPath(`roster-without-start-${width}.png`), fullPage: true });
+  });
+}
+
 for (const width of [320, 390, 440, 1280]) {
   test(`league navigation keeps its geometry across every tab at ${width}px`, async ({
     page,

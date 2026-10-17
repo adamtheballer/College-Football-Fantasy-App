@@ -69,6 +69,16 @@ const projectedReceiver: LeagueRosterPlayer = {
 };
 
 describe("RosterSlotTable", () => {
+  it("lets the roster page omit start-rate metadata without removing it from other uses", () => {
+    const player = { ...projectedReceiver, popularity: { start_percent: 72.5 } };
+    const view = render(<RosterSlotTable title="Starters" players={[player]} />);
+    expect(screen.getByText("Start 72.5%")).toBeTruthy();
+    view.rerender(<RosterSlotTable title="Starters" players={[player]} showStartRate={false} />);
+    expect(view.container.querySelector("[data-player-popularity]")).toBeNull();
+    expect(screen.getByText(player.player_name!)).toBeTruthy();
+    expect(screen.getByText("18.4")).toBeTruthy();
+  });
+
   it("renders an empty configured slot instead of removing its roster row", () => {
     render(<RosterSlotTable title="Starters" players={[emptyQuarterbackSlot]} />);
 
