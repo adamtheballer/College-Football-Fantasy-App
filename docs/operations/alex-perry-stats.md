@@ -53,3 +53,32 @@ still has seven identity gaps and an unfinished kicker-role fallback validation;
 its existing partial test results are not reported as full completion. Do not
 mark the complete player catalog, push/APNs, installed-phone UI or charts done
 based on the Alex Perry checks.
+
+## Production follow-up — October 17, 2026
+
+The combined release deployed the reader but omitted the per-game history
+import: production contained zero `player_historical_game_stats` rows. A legacy
+2026 Week 1 `backfill_zero_stat` row contained only event/player metadata. The
+reader calculated 0 points for it, which prevented the default-season fallback
+from selecting recorded 2025 production even after an import.
+
+The follow-up rejects metadata-only backfill placeholders at the game-log read
+boundary, falls through to accepted game/weekly facts, and preserves explicit
+recorded zero counts. Explicit season requests remain honored. The read path
+does not change source rows, league points or historical season identities.
+
+Production import used the existing strict `store_player_game_history` service
+and trusted ESPN identity 5084133. All 13 source events were validated before
+commit, including the five reported lines and totals of 56 receptions, 840
+receiving yards and 9 touchdowns. The prior table state for this player/season
+was empty. An immediate second import reported 13 unchanged rows; Alex's live
+`PlayerGameStat` records were unchanged. An import-run audit records the repair.
+ESPN returned no 2026 per-game production; 2025 facts must not be relabeled 2026.
+
+The live weekly waiver audit covered Weeks 0–7 and every position for Week 4.
+Week 4 returned 704 scored available players out of 763, sorted before
+pagination; leaders were Wayshawn Parker (46.9), Mason Heintschel (43.42) and
+Keelon Russell (40.1). The reported screenshot was taken before the weekly-sort
+API deployment. The native client already refetches this query on mount, focus
+and every 30 seconds. These server checks do not claim that every absent score
+is a verified zero or that the old screenshot proves the current phone state.

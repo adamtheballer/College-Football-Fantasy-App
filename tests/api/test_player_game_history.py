@@ -156,3 +156,28 @@ def test_kicking_fallback_uses_historical_teams_and_only_completed_schedule_even
     live=deepcopy(good);live['id']='102';live['competitions'][0]['status']['type']['completed']=False
     assert completed_schedule_event_ids([good,future,live],team_id='30')=={'100'}
     assert completed_schedule_event_ids([good],team_id='999')==set()
+
+@pytest.mark.parametrize('counts,expected_season', [(None, 2025), ({'receptions': 0, 'rec_yards': 0, 'rec_tds': 0}, 2026)])
+def test_default_history_ignores_metadata_placeholder_but_preserves_recorded_zero(client, db_session, counts, expected_season):
+    from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
+    p = player(db_session)
+    store_player_game_history(db_session, p, provider_player_id='5084133', season=2025, payload=fixture())
+    game = Game(external_id='401858424', season=2026, week=1, home_team='Illinois', away_team='UAB', home_points=42, away_points=23, neutral_site=False)
+    db_session.add(game)
+    db_session.flush()
+    db_session.add(TeamSchedule(team_name='Illinois', season=2026, week=1, game_id=game.id, opponent_name='UAB', location='home', is_bye=False, neutral_site=False, conference_game=False, date_confirmed=True))
+    stored = PlayerGameStat(player_id=p.id, game_id=game.id, season=2026, week=1, source='espn_final_boxscore', stats={'backfill_zero_stat': True, 'EventID': game.external_id, **(counts or {})})
+    db_session.add(stored)
+    db_session.commit()
+    body = client.get(f'/players/{p.id}/game-log').json()
+    assert body['season'] == expected_season
+    assert len(body['games']) == (13 if expected_season == 2025 else 1)
+    current = client.get(f'/players/{p.id}/game-log?season=2026').json()
+    if counts is None:
+        assert current['games'][0]['stats'] is None
+        assert current['games'][0]['stat_status'] == 'missing'
+    else:
+        assert current['games'][0]['stats']['fantasy_points'] == 0
+    # Retrieval must never rewrite the legacy source or live league scores.
+    db_session.refresh(stored)
+    assert stored.stats == {'backfill_zero_stat': True, 'EventID': game.external_id, **(counts or {})}
