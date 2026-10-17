@@ -3,6 +3,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
@@ -1456,6 +1457,9 @@ def build_waivers_view(
     selected_week: int | None = None,
     scope: str = "waiver",
     hot_window_hours: int = 168,
+    sort_by: str = "projection",
+    performance_week: int | None = None,
+    position: str | None = None,
 ) -> LeagueWaiversRead:
     scope = scope.lower()
     if scope not in {"waiver", "all", "hot"}:
@@ -1465,6 +1469,16 @@ def build_waivers_view(
     # managers should see a single consistent set of player projections when
     # the workspace advances on Wednesday.
     week = resolve_matchup_display_week(db, league, selected_week)
+    if sort_by not in {"projection", "weekly_points"}:
+        raise ValueError("Unknown waiver sort order.")
+    if sort_by == "weekly_points" and scope == "hot":
+        raise HTTPException(status_code=422, detail="Weekly performance is available on Waiver Wire and All Players.")
+    if sort_by == "weekly_points":
+        performance_week = max(0, week - 1) if performance_week is None else performance_week
+    else:
+        performance_week = None
+    if performance_week is not None and not 0 <= performance_week <= week:
+        raise HTTPException(status_code=422, detail="Select a performance week up to the current week.")
     team = _owned_team(db, league, user)
     roster_rows = (
         db.query(RosterEntry.player_id, Team.name, Team.owner_name)
@@ -1486,6 +1500,8 @@ def build_waivers_view(
         canonical_fantasy_player_filter(league.season_year),
         league_conference_player_filter(settings.conference_codes if settings else None),
     )
+    if position:
+        player_query = player_query.filter(func.upper(Player.position) == position.upper())
     if scope == "waiver":
         # The normal Waiver Wire remains the complete league-scoped free-agent
         # pool.  All Players is a separate, read-only discovery mode.
@@ -1572,6 +1588,18 @@ def build_waivers_view(
         if week > 1
         else {}
     )
+    performance_scores: dict[int, float] = {}
+    if performance_week == week:
+        performance_scores = final_score_by_player
+    elif week > 1 and performance_week == week - 1:
+        performance_scores = previous_final_score_by_player
+    elif performance_week is not None:
+        performance_scores = _final_waiver_score_map(
+            db, season=league.season_year, week=performance_week,
+            player_ids=player_ids, player_positions=player_positions,
+            player_schools=player_schools,
+            scoring_rules=settings.scoring_json if settings else {},
+        )
     now = datetime.now(timezone.utc)
     waiver_state = waiver_window_state(db, league, settings, now=now) if settings else None
     availability_states = waiver_player_availability_states(
@@ -1686,6 +1714,14 @@ def build_waivers_view(
         return (state, -(projected or 0.0), canonical_rank, player.name.casefold(), player.id)
 
     ordered_players = sorted(eligible_players, key=waiver_sort_key)
+    if sort_by == "weekly_points":
+        # Rank the full league/position pool before pagination. Unknown scores
+        # follow every verified result, including zero and negative totals.
+        ordered_players.sort(key=lambda player: (
+            player.id not in performance_scores,
+            -performance_scores.get(player.id, 0.0),
+            player.name.casefold(), player.id,
+        ))
     if scope == "hot":
         # A hot-pickup board is ranked by the observed, published pickup count;
         # projection remains the deterministic tie-breaker.
@@ -1698,6 +1734,7 @@ def build_waivers_view(
     return LeagueWaiversRead(
         league_id=league.id,
         week=week,
+        performance_week=performance_week,
         fantasy_team_id=team.id if team else None,
         waiver_priority=waiver_priority,
         faab_remaining=faab_remaining,
@@ -1710,6 +1747,7 @@ def build_waivers_view(
                 position=player.position,
                 weekly_projected_fantasy_points=projection_for_player(player.id)[0],
                 final_fantasy_points=final_score_by_player.get(player.id),
+                performance_fantasy_points=performance_scores.get(player.id),
                 latest_final_fantasy_points=(
                     final_score_by_player.get(player.id)
                     if player.id in final_score_by_player

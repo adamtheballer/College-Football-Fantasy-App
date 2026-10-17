@@ -551,3 +551,78 @@ test("weekly leaderboard refresh changes the round and shows current names and p
   await expect(page.getByText(/2026 · Week 8/)).toBeVisible();
   await page.screenshot({ path: info.outputPath("week-8-top-10.png") });
 });
+
+for (const width of [320, 390, 1280]) {
+  test(`weekly waiver performance and position filters at ${width}px`, async ({ page }, info) => {
+    await page.setViewportSize({ width, height: 844 });
+    await leagueShell(page);
+    const requests: URL[] = [];
+    let fail = false;
+    await page.route("**/api/leagues/42/waivers**", async (route) => {
+      const url = new URL(route.request().url());
+      requests.push(url);
+      if (fail) { await route.fulfill({ status: 503, json: { detail: "QA unavailable" } }); return; }
+      const performance = url.searchParams.get("sort_by") === "weekly_points";
+      const week = Number(url.searchParams.get("performance_week") ?? 6);
+      const pos = url.searchParams.get("position");
+      const pool = [
+        { id: 1, name: "Top Receiver", position: "WR", points: week === 6 ? 30 : 5 },
+        { id: 2, name: "Second Receiver", position: "WR", points: week === 6 ? 12 : 35 },
+        { id: 3, name: "Zero Receiver", position: "WR", points: 0 },
+        { id: 4, name: "Missing Receiver", position: "WR", points: null },
+        ...["QB", "RB", "TE", "K"].map((position, index) => ({ id: index + 5, name: `${position} Leader`, position, points: 22 })),
+      ].filter((p) => !pos || p.position === pos);
+      if (performance) pool.sort((a, b) => (a.points === null ? 1 : 0) - (b.points === null ? 1 : 0) || (b.points ?? 0) - (a.points ?? 0));
+      await route.fulfill({ json: {
+        league_id: 42, week: 7, performance_week: performance ? week : null,
+        fantasy_team_id: 1, claims: [], results: [], roster: [], total_available: pool.length,
+        waiver_rules: { waiver_type: "rolling" },
+        available_players: pool.map((p) => ({ ...p, school: "USC", opponent: "Current opponent", weekly_projected_fantasy_points: 20,
+          final_fantasy_points: null, latest_final_fantasy_points: 99, latest_final_week: 4,
+          performance_fantasy_points: performance ? p.points : null, projection_status: "ACTIVE",
+          injury_status: null, season_positional_rank: 1, season_rank_through_week: 5,
+          rostered_by_team_name: null, availability_state: "free_agent", available_at: null,
+        })),
+      }});
+    });
+    await page.goto("/league/42/waivers");
+    const rowPrefix = width < 1024 ? "waiver-mobile-player-row-" : "waiver-rank-";
+    const pointsPrefix = width < 1024 ? "waiver-mobile-week-points-" : "waiver-week-points-";
+    const visibleIds = async () => page.locator(`[data-testid^="${rowPrefix}"]:visible`).evaluateAll((els) => els.map((el) => Number(el.getAttribute("data-testid")!.split("-").at(-1))));
+    await page.getByRole("combobox", { name: "Waiver player sort" }).click();
+    await page.getByRole("option", { name: "Weekly performance", exact: true }).click();
+    await expect(page.getByRole("combobox", { name: "Performance week" })).toHaveText("Last week (Week 6)");
+    for (const position of ["QB", "RB", "WR", "TE", "K"]) {
+      await page.getByRole("button", { name: position, exact: true }).click();
+      await expect.poll(() => requests.at(-1)?.searchParams.get("position")).toBe(position);
+      await expect(page.getByTestId(`${pointsPrefix}${position === "WR" ? 1 : ["QB", "RB", "TE", "K"].indexOf(position) + 5}`)).toHaveText(position === "WR" ? "30.0" : "22.0");
+    }
+    await page.getByRole("button", { name: "WR", exact: true }).click();
+    await expect.poll(visibleIds).toEqual([1, 2, 3, 4]);
+    await expect(page.getByTestId(`${pointsPrefix}3`)).toHaveText("0.0");
+    await expect(page.getByTestId(`${pointsPrefix}4`)).toHaveText("—");
+    await page.getByRole("combobox", { name: "Performance week" }).click();
+    await page.getByRole("option", { name: "Week 5", exact: true }).click();
+    await expect.poll(visibleIds).toEqual([2, 1, 3, 4]);
+    await expect(page.getByTestId(`${pointsPrefix}2`)).toHaveText("35.0");
+    expect(requests.at(-1)?.searchParams.get("week")).toBeNull();
+    await page.getByPlaceholder("Search players, schools...").fill("Missing");
+    await expect.poll(visibleIds).toEqual([4]);
+    await expect(page.getByTestId(`${pointsPrefix}4`)).toHaveText("—");
+    await page.getByPlaceholder("Search players, schools...").fill("");
+    await expect.poll(visibleIds).toEqual([2, 1, 3, 4]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: info.outputPath(`weekly-performance-${width}.png`) });
+    fail = true;
+    await page.getByRole("button", { name: "RB", exact: true }).click();
+    await expect(page.getByText("The player board is temporarily unavailable. Try again in a moment.")).toBeVisible({ timeout: 15000 });
+    await expect(page.locator(`[data-testid^="${rowPrefix}"]:visible`)).toHaveCount(0);
+    fail = false;
+    await page.getByRole("button", { name: "Retry", exact: true }).click();
+    await expect.poll(visibleIds).toEqual([6]);
+    await page.getByRole("combobox", { name: "Waiver player sort" }).click();
+    await page.getByRole("option", { name: "Week 7 projection", exact: true }).click();
+    await expect(page.getByRole("combobox", { name: "Performance week" })).toHaveCount(0);
+    await expect(page.getByTestId(`${pointsPrefix}6`)).toHaveText("20.0");
+  });
+}

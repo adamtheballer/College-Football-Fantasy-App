@@ -506,6 +506,8 @@ export interface LeagueWaiverPlayer {
   weekly_projected_fantasy_points: number | null;
   /** Present only when a verified final box score exists for this week. */
   final_fantasy_points: number | null;
+  /** Verified result for performance_week; never a projection or another week's total. */
+  performance_fantasy_points?: number | null;
   /** Most recent verified total, retained for discovery boards after the weekly reset. */
   latest_final_fantasy_points: number | null;
   latest_final_week: number | null;
@@ -577,6 +579,7 @@ export interface LeagueWaiverTabResponse {
   league_id: number;
   /** Public workspace week used for the displayed projections and player board. */
   week: number;
+  performance_week?: number | null;
   fantasy_team_id: number | null;
   waiver_priority: number | null;
   faab_remaining: number | null;

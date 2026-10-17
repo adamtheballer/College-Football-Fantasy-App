@@ -1061,3 +1061,62 @@ def test_untracked_unplayed_player_is_an_instant_add(client, db_session):
     )
 
     assert db_session.get(RosterEntry, result.roster_entry_id).player_id == player.id
+
+
+@pytest.mark.parametrize("position", ["QB", "RB", "WR", "TE", "K"])
+def test_weekly_performance_ranks_the_full_position_pool_without_changing_current_availability(db_session, position):
+    user = User(email=f"performance-{position}@example.com", first_name="Performance", password_hash="test", api_token=f"performance-{position}")
+    db_session.add(user)
+    db_session.flush()
+    league = League(name="Weekly Performance", season_year=2026, commissioner_user_id=user.id, max_teams=1)
+    db_session.add(league)
+    db_session.flush()
+    team = Team(league_id=league.id, name="Performance Team", owner_user_id=user.id, owner_name="Performance")
+    settings = LeagueSettings(league_id=league.id, scoring_json={"offense": {"receptions": 2}, "kicker": {"fg_made_0_30": 2, "fg_missed": -2}}, roster_slots_json={position: 1})
+    high, low, zero, negative, missing, rostered = [canonical_player(name, position, "USC") for name in ["High", "Low", "Zero", "Negative", "Missing", "Rostered"]]
+    other = canonical_player("Other Position", "QB" if position != "QB" else "RB", "USC")
+    old_game = Game(season=2026, week=1, home_team="USC", away_team="Old opponent", schedule_status="final", home_points=31, away_points=10)
+    current_game = Game(season=2026, week=2, home_team="USC", away_team="New opponent", start_date=datetime.now(timezone.utc)+timedelta(days=2))
+    db_session.add_all([team, settings, high, low, zero, negative, missing, rostered, other, old_game, current_game])
+    db_session.flush()
+    db_session.add(RosterEntry(league_id=league.id, team_id=team.id, player_id=rostered.id, slot=position, status="active"))
+    # A final box score is the fact source. Forecasts deliberately have the
+    # opposite order; old season/week results must never leak into this sort.
+    for player, stats in [(high, {"receptions": 4, "fg_made_0_30": 4}), (low, {"receptions": 1, "fg_made_0_30": 1}), (zero, {"receptions": 0}), (negative, {"fumbles_lost": 1, "fg_missed": 1}), (other, {"receptions": 100}), (rostered, {"receptions": 100})]:
+        db_session.add(PlayerGameStat(player_id=player.id, game_id=old_game.id, season=2026, week=1, source="espn_final_boxscore", stats=stats))
+    db_session.add(PlayerGameStat(player_id=missing.id, game_id=old_game.id, season=2025, week=1, source="espn_final_boxscore", stats={"receptions": 200}))
+    db_session.add(PlayerGameStat(player_id=low.id, game_id=current_game.id, season=2026, week=2, source="espn_final_boxscore", stats={"receptions": 10, "fg_made_0_30": 10}))
+    for player, points in [(high, 1), (low, 30), (missing, 40)]:
+        db_session.add(WeeklyProjection(player_id=player.id, season=2026, week=2, is_published=True, fantasy_points=points))
+    db_session.commit()
+    baseline = build_waivers_view(db_session, league, user, selected_week=2, limit=1000)
+    pages = [build_waivers_view(db_session, league, user, selected_week=2, sort_by="weekly_points", performance_week=1, position=position, limit=2, offset=offset) for offset in [0, 2, 4]]
+    rows = [row for page in pages for row in page.available_players]
+    assert [row.id for row in rows] == [high.id, low.id, zero.id, negative.id, missing.id]
+    assert [row.performance_fantasy_points for row in rows] == [8, 2, 0, -2, None]
+    assert all(page.week == 2 and page.performance_week == 1 and page.total_available == 5 for page in pages)
+    current = {row.id: row for row in baseline.available_players}
+    for row in rows:
+        assert row.availability_state == current[row.id].availability_state
+        assert row.available_at == current[row.id].available_at
+        assert row.opponent == "New opponent"
+        assert row.weekly_projected_fantasy_points == current[row.id].weekly_projected_fantasy_points
+    default = build_waivers_view(db_session, league, user, selected_week=2, sort_by="weekly_points", position=position)
+    assert default.performance_week == 1
+    next_results = build_waivers_view(db_session, league, user, selected_week=2, sort_by="weekly_points", performance_week=2, position=position)
+    assert next_results.available_players[0].id == low.id
+    assert next_results.available_players[0].performance_fantasy_points == 20
+    all_players = build_waivers_view(db_session, league, user, selected_week=2, sort_by="weekly_points", performance_week=1, position=position, scope="all")
+    assert any(row.id == rostered.id and row.availability_state == "rostered" for row in all_players.available_players)
+
+
+def test_weekly_performance_rejects_future_stats_week(db_session):
+    user = User(email="future-performance@example.com", first_name="Future", password_hash="test", api_token="future-performance")
+    db_session.add(user)
+    db_session.flush()
+    league = League(name="Future Performance", season_year=2026, commissioner_user_id=user.id, max_teams=1)
+    db_session.add(league)
+    db_session.commit()
+    with pytest.raises(HTTPException) as exc:
+        build_waivers_view(db_session, league, user, selected_week=2, sort_by="weekly_points", performance_week=3)
+    assert exc.value.status_code == 422
