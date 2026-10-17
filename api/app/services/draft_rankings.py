@@ -186,7 +186,7 @@ def _cached_board(serialized_inputs: str, serialized_config: str, source_revisio
     return build_master_draft_board(json.loads(serialized_inputs), json.loads(serialized_config))
 
 
-def build_draft_ranking_snapshot(db, *, season: int, league_id: int | None = None, config: dict | None = None) -> dict:
+def build_draft_ranking_snapshot(db, *, season: int, league_id: int | None = None, config: dict | None = None, conference_codes: list[str] | None = None) -> dict:
     """Rank the full context before search, drafted-player filters or pagination."""
     import hashlib
     import json
@@ -201,7 +201,8 @@ def build_draft_ranking_snapshot(db, *, season: int, league_id: int | None = Non
     from collegefootballfantasy_api.app.services.league_weeks import calendar_cfb_week
     from collegefootballfantasy_api.app.services.player_chart_publication import points_from_verified_stats
     config=config or {'leagueSize':12,'totalRosterSpots':13,'rosterSlots':DEFAULT_SLOTS}
-    conference_codes=None;scoring_rules=None
+    from collegefootballfantasy_api.app.services.player_pool_filters import normalize_league_conference_codes
+    conference_codes=normalize_league_conference_codes(conference_codes);scoring_rules=None
     if league_id is not None:
         league=db.get(League,league_id)
         if league is None:
@@ -212,7 +213,7 @@ def build_draft_ranking_snapshot(db, *, season: int, league_id: int | None = Non
             from collegefootballfantasy_api.app.services.league_flow import FIXED_ROSTER_SLOTS
             raw=settings.roster_slots_json or FIXED_ROSTER_SLOTS
             config={'leagueSize':league.max_teams,'totalRosterSpots':sum(raw.get(key,0) for key in ('QB','RB','WR','TE','K','FLEX','SUPERFLEX','BENCH')),'rosterSlots':{**{key:raw.get(key,0) for key in ('QB','RB','WR','TE','K')},'BE':raw.get('BENCH',0)+raw.get('FLEX',0)+raw.get('SUPERFLEX',0),'IR':0}}
-            conference_codes=settings.conference_codes
+            conference_codes=normalize_league_conference_codes(settings.conference_codes)
             scoring_rules=settings.scoring_json or None
     players=db.scalars(select(Player).where(canonical_fantasy_player_filter(season),season_eligible_player_filter(season),league_conference_player_filter(conference_codes)).order_by(Player.id)).all()
     outlook=build_rest_of_season_draft_board(db,season=season,scoring_rules=scoring_rules)
@@ -226,7 +227,7 @@ def build_draft_ranking_snapshot(db, *, season: int, league_id: int | None = Non
         source=p.sheet_adp if rank(p.sheet_adp) is not None else p.cfb27_rank
         # The source rank is distinct from the raw ROS projection-total rank.
         rows.append({'id':p.id,'name':p.name,'school':p.school,'pos':p.position,'boardRank':None,'adp':p.sheet_adp,'rank':source,'posRank':p.cfb27_position_rank,'status':('HEALTHY' if normalize_injury_status(injuries[p.id].status)=='FULL' else normalize_injury_status(injuries[p.id].status)) if p.id in injuries else 'UNREPORTED','sheetProjectedSeasonPoints':season_points,'sheetProjectionStats':{**(p.sheet_projection_stats or {}),'fpts':season_points},'restOfSeasonProjectedPoints':future.projected_points if future else None,'restOfSeasonRank':future.rank if future else None,'restOfSeasonAsOfWeek':future.completed_week if future else None,'restOfSeasonUpdatedAt':future.updated_at if future and future.updated_at else None,'history':[],'projection':{'floor':projection.floor if projection else 0,'ceiling':projection.ceiling if projection else 0,'expectedPlays':projection.expected_plays if projection else 0}})
-    payload={'policy':POLICY_VERSION,'season':season,'week':week,'config':config,'scoring_rules':scoring_rules,'ratings_source':str(cfb27_player_sync.CFB27_SOURCE_PATH),'ratings_hash':hashlib.sha256(cfb27_player_sync.CFB27_SOURCE_PATH.read_bytes()).hexdigest(),'inputs':rows}
+    payload={'conference_codes':conference_codes,'policy':POLICY_VERSION,'season':season,'week':week,'config':config,'scoring_rules':scoring_rules,'ratings_source':str(cfb27_player_sync.CFB27_SOURCE_PATH),'ratings_hash':hashlib.sha256(cfb27_player_sync.CFB27_SOURCE_PATH.read_bytes()).hexdigest(),'inputs':rows}
     serialized_inputs=json.dumps(rows,sort_keys=True,default=str)
     version=hashlib.sha256(json.dumps(payload,sort_keys=True,default=str).encode()).hexdigest()
     from copy import deepcopy
@@ -234,4 +235,4 @@ def build_draft_ranking_snapshot(db, *, season: int, league_id: int | None = Non
     dates={row['id']:row['restOfSeasonUpdatedAt'] for row in rows}
     for row in board:
         row['restOfSeasonUpdatedAt']=dates[row['id']]
-    return {'season':season,'week':week,'config':config,'version':version,'policy':POLICY_VERSION,'board':{r['id']:r for r in board},'players':{p.id:p for p in players}}
+    return {'season':season,'week':week,'conference_codes':conference_codes,'config':config,'version':version,'policy':POLICY_VERSION,'board':{r['id']:r for r in board},'players':{p.id:p for p in players}}

@@ -44,6 +44,7 @@ type BackendPlayerRead = {
 };
 
 type BackendPlayerListResponse = {
+  draft_conference_codes?: string[] | null;
   ranking_version?: string | null;
   ranking_policy?: string | null;
   ranking_season?: number | null;
@@ -591,6 +592,7 @@ export function useDraftPlayerPool(
     position?: string;
     school?: string;
     league_id?: number;
+    conferenceCodes?: import("@/lib/conference-pool").ConferenceCode[];
     available_only?: boolean;
     sort?: string;
     season?: number;
@@ -609,6 +611,7 @@ export function useDraftPlayerPool(
     position,
     school,
     league_id,
+    conferenceCodes,
     available_only,
     sort,
     season = new Date().getFullYear(),
@@ -634,6 +637,7 @@ export function useDraftPlayerPool(
         position: position || "",
         school: school || "",
         league_id: league_id || 0,
+        conferenceCodes: conferenceCodes?.join(",") ?? "",
         available_only: available_only ? "true" : "false",
         draft_eligible: "true",
         sort: sort || "",
@@ -664,6 +668,7 @@ export function useDraftPlayerPool(
           position: position || undefined,
           school: school || undefined,
           league_id,
+          conference_codes: conferenceCodes?.join(","),
           available_only,
           draft_eligible: true,
           season,
@@ -684,6 +689,9 @@ export function useDraftPlayerPool(
           })
         ),
       ]);
+      if (conferenceCodes && JSON.stringify(firstPayload.draft_conference_codes) !== JSON.stringify(conferenceCodes)) {
+        throw new Error("The selected mock conferences could not be verified. Refresh after the backend update.");
+      }
       if (!firstPayload.ranking_version) throw new Error("Draft rankings are unavailable. Refresh after the backend update.");
       if (!Number.isInteger(firstPayload.ranking_week) || !firstPayload.ranking_season) throw new Error("Draft ranking context is unavailable.");
       if (!league_id && firstPayload.ranking_season !== season) throw new Error("Draft ranking season does not match this board.");

@@ -25,6 +25,8 @@ import { createLeagueScoringToApi } from "@/lib/scoringSettings";
 import { useAuth } from "@/hooks/use-auth";
 import { LeagueCreateResponse } from "@/types/league";
 
+import { CONFERENCE_OPTIONS as conferenceOptions, DEFAULT_CONFERENCE_CODES as defaultConferenceCodes, type ConferenceCode } from "@/lib/conference-pool";
+
 const steps = ["Basics", "Settings", "Draft", "Review"] as const;
 
 export const leagueSizes = [4, 6, 8, 10, 12, 14];
@@ -42,15 +44,6 @@ const waiverOptions = [
     description: "Claims process in waiver order. A successful claim moves the team to the back.",
   },
 ];
-const conferenceOptions = [
-  { code: "SEC", label: "SEC", detail: "16 schools" },
-  { code: "BIG10", label: "Big Ten", detail: "18 schools" },
-  { code: "BIG12", label: "Big 12", detail: "16 schools" },
-  { code: "ACC", label: "ACC", detail: "17 schools" },
-  { code: "INDEPENDENT", label: "Independent", detail: "Notre Dame" },
-] as const;
-type ConferenceCode = (typeof conferenceOptions)[number]["code"];
-const defaultConferenceCodes: ConferenceCode[] = conferenceOptions.map((conference) => conference.code);
 const timezoneOptions = [
   { label: "Eastern Time", value: "America/New_York" },
   { label: "Central Time", value: "America/Chicago" },

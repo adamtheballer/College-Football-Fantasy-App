@@ -1,3 +1,4 @@
+import { WeeklyChallengeSponsor } from "@/components/challenges/WeeklyChallengeSponsor";
 import { Link, useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -123,6 +124,7 @@ export default function WeeklyChallenges() {
             {deadlineText(round.next_rollover_at)}. A new week opens only after
             its slates are published.
           </p>
+          <WeeklyChallengeSponsor sponsor={round.sponsor} />
           <div className="grid gap-4 md:grid-cols-2">
             {round.challenges.map((c) => (
               <ChallengeTile key={c.id} challenge={c} />

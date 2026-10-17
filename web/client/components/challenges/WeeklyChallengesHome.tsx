@@ -1,3 +1,4 @@
+import { WeeklyChallengeSponsor } from "@/components/challenges/WeeklyChallengeSponsor";
 import { Link } from "react-router-dom";
 import { Trophy, ArrowRight } from "lucide-react";
 import { SurfaceCard } from "@/components/fantasy";
@@ -6,7 +7,7 @@ import { useCurrentChallenges } from "@/hooks/use-weekly-challenges";
 
 export function WeeklyChallengesHome() {
   const query = useCurrentChallenges();
-  return (
+  const card = (
     <SurfaceCard className="space-y-4" aria-label="Weekly Challenges">
       <div className="flex items-start gap-3">
         <Trophy
@@ -49,4 +50,10 @@ export function WeeklyChallengesHome() {
       )}
     </SurfaceCard>
   );
+  return query.data?.sponsor ? (
+    <div className="space-y-3">
+      <WeeklyChallengeSponsor sponsor={query.data.sponsor} />
+      {card}
+    </div>
+  ) : card;
 }

@@ -46,6 +46,8 @@ import {
 } from "@/lib/singlePlayerMockDraft";
 import { cn } from "@/lib/utils";
 
+import { DEFAULT_CONFERENCE_CODES, conferencePoolLabel, mockConferenceCodes } from "@/lib/conference-pool";
+
 const STORAGE_KEY = "cfb_single_player_mock_draft";
 const POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K"];
 
@@ -135,6 +137,7 @@ export default function SinglePlayerMockDraftRoom() {
   const { data: playersPayload, isLoading, isError, error: playerPoolError } = useDraftPlayerPool({
     limit: 200,
     fetchAll: true,
+    conferenceCodes: mockSettings.conferenceCodes?.length === DEFAULT_CONFERENCE_CODES.length ? undefined : mockSettings.conferenceCodes,
     sort: "draft_rank",
     draftConfig: {leagueSize:mockSettings.leagueSize,totalRosterSpots:mockSettings.rounds,rosterSlots:{QB:1,RB:2,WR:2,TE:1,K:1,BE:6,IR:0}},
   });
@@ -443,6 +446,7 @@ export default function SinglePlayerMockDraftRoom() {
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.06em] text-amber-200 sm:text-[11px] sm:tracking-[0.06em]">Available Players</p>
             <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground sm:mt-2 sm:block sm:text-[10px] sm:tracking-[0.06em]">
+              <span className="sm:block" aria-label="Mock conference pool">{conferencePoolLabel(mockConferenceCodes(mockSettings.conferenceCodes))}</span>
               <span className="sm:block">Needs: {userDraftBoardTeam?.name ?? "Your Team"}</span>
               <span className="text-emerald-100/80 sm:mt-1 sm:block">Legal: {userLegalPositions.length ? userLegalPositions.join(" · ") : "None"}</span>
             </div>

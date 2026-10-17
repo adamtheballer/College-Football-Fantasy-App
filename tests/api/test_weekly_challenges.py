@@ -591,3 +591,28 @@ def test_public_launch_round_is_server_controlled_and_advances_after_launch(worl
     w['clock'][0]=datetime(2026,9,16,4,tzinfo=timezone.utc)
     assert w['client'].get(f'{BASE}/current',headers=w['accounts'][1][1]).json()['week']==3
     assert svc.competition_week(2027,datetime(2027,9,1,tzinfo=timezone.utc))==1
+
+
+@pytest.mark.parametrize('season,week', [(2026,w) for w in range(1,10)] + [(2027,8)])
+def test_sponsor_tracks_round_on_current_history_and_every_detail(world, season, week):
+    w=world; client=w['client']; headers=w['accounts'][0][1]
+    created=client.post(f'{ADMIN}/rounds/{season}/{week}',headers=headers)
+    assert created.status_code==200,created.text
+    round_=client.get(f'{BASE}/rounds/{created.json()["id"]}',headers=headers).json()
+    expected = season==2026 and week==8
+    assert bool(round_['sponsor']) == expected
+    if expected:
+        assert round_['sponsor']['label']=='Sponsored by Pigskin Dispatch'
+        assert round_['sponsor']['youtube_url']=='https://www.youtube.com/channel/UCQatEELNJL5GWry7eMXh-Qg?utm_source=chatgpt.com'
+        assert round_['sponsor']['logo_url']=='/assets/sponsors/PigskinDispatchLogo.png'
+    for challenge in round_['challenges']:
+        detail=client.get(f'{BASE}/challenges/{challenge["id"]}',headers=headers)
+        assert detail.status_code==200,detail.text
+        assert detail.json()['sponsor']==round_['sponsor']==challenge['sponsor']
+    if expected:
+        # The home card and list use /current. Resolve the round using the
+        # server's week, never the device date or a locally hardcoded week.
+        w['clock'][0]=datetime(2026,10,22,16,tzinfo=timezone.utc)
+        current=client.get(f'{BASE}/current',headers=headers).json()
+        assert current['week']==8 and current['sponsor']==round_['sponsor']
+    assert w['db'].query(ChallengeEntry).count()==0

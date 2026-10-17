@@ -1,0 +1,21 @@
+meta {
+  name: Mock Draft Conference Pool
+  type: http
+  seq: 3
+}
+get {
+  url: {{base_url}}/players?draft_eligible=true&sort=draft_rank&season=2026&conference_codes=SEC,ACC&limit=100
+}
+tests {
+  test("Ranks exactly the requested mock conference pool", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().draft_conference_codes).to.deep.equal(["SEC", "ACC"]);
+    expect(res.getBody().ranking_version).to.be.a("string");
+  });
+}
+docs {
+  Select one or more supported conferences. The ranking context is scoped before
+  pagination, position, and search filters. Empty or unsupported choices return
+  422. Real league requests derive their pool from league settings and reject
+  a conference_codes override.
+}

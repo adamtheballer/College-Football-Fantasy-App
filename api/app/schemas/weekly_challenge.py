@@ -80,7 +80,18 @@ class PoolPlayer(BaseModel):
     image_url: str | None
 
 
+class ChallengeSponsorRead(BaseModel):
+    name: str
+    label: str
+    tagline: str
+    logo_url: str
+    youtube_url: str
+    season: int
+    week: int
+
+
 class ChallengeRead(BaseModel):
+    sponsor: ChallengeSponsorRead | None = None
     id: int
     round_id: int
     kind: ChallengeKind
@@ -105,6 +116,7 @@ class ChallengeRead(BaseModel):
 
 
 class RoundRead(BaseModel):
+    sponsor: ChallengeSponsorRead | None = None
     id: int
     season: int
     week: int

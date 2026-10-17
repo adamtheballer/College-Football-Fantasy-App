@@ -33,6 +33,7 @@ from collegefootballfantasy_api.app.services.player_chart_publication import poi
 from collegefootballfantasy_api.app.services.player_pool_filters import canonical_fantasy_player_filter, season_eligible_player_filter
 from collegefootballfantasy_api.app.services.fantasy_game_selection import school_key, fantasy_games_by_school
 from collegefootballfantasy_api.app.services.injury_status import confirmed_nonparticipant_ids
+from collegefootballfantasy_api.app.services.weekly_challenge_sponsors import weekly_challenge_sponsor
 
 KINDS = {"slate12": "Slate 12", "upset": "Upset Hunter", "fantasy5": "Fantasy Five", "lock": "Lock of the Week", "duels": "Rivalry Duels"}
 RULES = {
@@ -191,7 +192,7 @@ def read_challenge(db, c, user, *, admin=False, now=None, include_details=True):
     display_games = [{**x, "status": current[x["id"]].schedule_status,
         "home_points": current[x["id"]].home_points, "away_points": current[x["id"]].away_points} for x in snapshots]
     config = c.config if public else {}
-    return {"id": c.id, "round_id": r.id, "kind": c.kind, "name": KINDS[c.kind],
+    return {"sponsor": weekly_challenge_sponsor(season=r.season, week=r.week), "id": c.id, "round_id": r.id, "kind": c.kind, "name": KINDS[c.kind],
         "state": challenge_state(c, r, games, now), "settlement_status": c.status, "version": c.version, "rules_version": c.rules_version,
         "rules": RULES[c.kind] + DISRUPTION_RULE, "lock_at": c.lock_at if public else None,
         "server_now": now, "published_at": c.published_at,
@@ -206,7 +207,7 @@ def read_round(db, row, user, *, admin=False):
     now = utcnow()
     challenges = [read_challenge(db, c, user, now=now, admin=admin, include_details=False) for c in db.query(WeeklyChallenge).filter_by(round_id=row.id).order_by(WeeklyChallenge.id)]
     states = [c["state"] for c in challenges]
-    return {"id": row.id, "season": row.season, "week": row.week, "next_rollover_at": row.next_rollover_at, "server_now": now,
+    return {"sponsor": weekly_challenge_sponsor(season=row.season, week=row.week), "id": row.id, "season": row.season, "week": row.week, "next_rollover_at": row.next_rollover_at, "server_now": now,
         "state": "Open" if "Open" in states else "Upcoming" if all(x == "Upcoming" for x in states) else "Closed", "challenges": challenges}
 
 

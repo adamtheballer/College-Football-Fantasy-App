@@ -149,3 +149,38 @@ def test_ratings_content_change_invalidates_talent_even_when_mtime_is_preserved(
     second=build_master_draft_board([row],CONFIG)
     assert first[0]['cfb27Overall']==95
     assert second[0]['cfb27Overall']==90
+
+
+def test_mock_conferences_scope_full_ranking_before_search_and_pagination(client, db_session):
+    schools = ['Texas', 'Ohio State', 'Arizona', 'Miami', 'Notre Dame', 'Alabama']
+    players = [Player(name=f'Mock Pool {i}', school=school, position='WR', sheet_adp=i+1, cfb27_rank=i+1, sheet_projected_season_points=200-i, sheet_source_sheet_id='canonical-preseason:2026:conference-test') for i, school in enumerate(schools)]
+    db_session.add_all(players); db_session.commit()
+    params = {'draft_eligible': True, 'sort': 'draft_rank', 'conference_codes': 'ACC,SEC,SEC', 'season': 2026}
+    full = client.get('/players', params={**params, 'limit': 100}).json()
+    assert full['draft_conference_codes'] == ['SEC', 'ACC']
+    assert {p['school'] for p in full['data']} == {'Texas', 'Alabama', 'Miami'}
+    assert sorted(p['master_draft_rank'] for p in full['data']) == [1, 2, 3]
+    pages = [client.get('/players', params={**params, 'limit': 1, 'offset': offset}).json() for offset in range(3)]
+    assert all(p['total'] == 3 and p['ranking_version'] == full['ranking_version'] and p['draft_conference_codes'] == ['SEC','ACC'] for p in pages)
+    assert [page['data'][0]['id'] for page in pages] == [p['id'] for p in full['data']]
+    one = client.get('/players', params={**params, 'search': 'Mock Pool 3'}).json()['data'][0]
+    assert one['master_draft_rank'] == next(p['master_draft_rank'] for p in full['data'] if p['id'] == one['id'])
+    default = client.get('/players', params={'draft_eligible': True, 'sort':'draft_rank'}).json()
+    assert default['total'] == 6
+    assert default['ranking_version'] != full['ranking_version']
+    independent = client.get('/players', params={**params, 'conference_codes': 'INDEPENDENT'}).json()
+    assert [p['school'] for p in independent['data']] == ['Notre Dame']
+    alias = client.get('/players', params={**params, 'conference_codes': 'Big Ten'}).json()
+    assert [p['school'] for p in alias['data']] == ['Ohio State']
+
+
+@pytest.mark.parametrize('codes', ['', 'AAC', 'SEC,', 'SEC,FAKE'])
+def test_mock_conference_input_never_silently_widens_the_pool(client, codes):
+    r = client.get('/players', params={'draft_eligible': True, 'conference_codes': codes})
+    assert r.status_code == 422
+
+
+@pytest.mark.parametrize('extra', [{'draft_eligible': False}, {'draft_eligible': True, 'league_id': 77}])
+def test_mock_conferences_cannot_override_real_league_settings(client, extra):
+    r = client.get('/players', params={**extra, 'conference_codes': 'SEC'})
+    assert r.status_code == 422
