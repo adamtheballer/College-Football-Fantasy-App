@@ -1,3 +1,4 @@
+import { WeeklyChallengeSponsor } from "@/components/challenges/WeeklyChallengeSponsor";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -665,6 +666,7 @@ export default function WeeklyChallengeDetail() {
       )}
       {c && (
         <>
+          <WeeklyChallengeSponsor sponsor={c.sponsor} />
           <PageHeader
             eyebrow={c.state}
             title={c.name}

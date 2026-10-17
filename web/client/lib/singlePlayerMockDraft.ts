@@ -9,6 +9,8 @@ import {
   type RosterSlotLimits,
 } from "@/lib/rosterLegality";
 
+import { mockConferenceCodes, type ConferenceCode } from "@/lib/conference-pool";
+
 export const MOCK_TEAM_COUNT = 10;
 // Compatibility fixture for deterministic engine tests. New user-facing drafts
 // are always created through createRandomSinglePlayerMockDraft instead.
@@ -17,7 +19,9 @@ export const MOCK_INTERMISSION_SECONDS = 5;
 export const MOCK_BOT_PICK_DELAY_SECONDS = 2;
 export const MOCK_PICK_TIMER_SECONDS = 30;
 
+
 export type MockDraftSettings = {
+  conferenceCodes?: ConferenceCode[];
   leagueSize: number;
   rounds: number;
   pickTimerSeconds: number;
@@ -128,6 +132,7 @@ const clampNumber = (value: number, min: number, max: number, fallback: number) 
 export const parseMockDraftSettings = (search = ""): MockDraftSettings => {
   const params = new URLSearchParams(search.startsWith("?") ? search : `?${search}`);
   return {
+    conferenceCodes: mockConferenceCodes(params.get("conferences")?.split(",")),
     leagueSize: clampNumber(Number(params.get("teams")), 8, 12, DEFAULT_MOCK_DRAFT_SETTINGS.leagueSize),
     rounds: MOCK_ROUNDS,
     pickTimerSeconds: clampNumber(Number(params.get("timer")), 15, 90, DEFAULT_MOCK_DRAFT_SETTINGS.pickTimerSeconds),
@@ -137,6 +142,7 @@ export const parseMockDraftSettings = (search = ""): MockDraftSettings => {
 export const getMockDraftSettings = (state?: Pick<SinglePlayerMockDraftState, "settings"> | null): MockDraftSettings => ({
   ...DEFAULT_MOCK_DRAFT_SETTINGS,
   ...(state?.settings ?? {}),
+  conferenceCodes: mockConferenceCodes(state?.settings?.conferenceCodes),
   rounds: MOCK_ROUNDS,
 });
 

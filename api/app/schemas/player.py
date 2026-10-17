@@ -83,6 +83,7 @@ class PlayerRead(PlayerBase):
 
 
 class PlayerList(BaseModel):
+    draft_conference_codes: list[str] | None = None
     ranking_version: str | None = None
     ranking_policy: str | None = None
     ranking_season: int | None = None

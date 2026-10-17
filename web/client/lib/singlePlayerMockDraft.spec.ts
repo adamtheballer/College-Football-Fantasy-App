@@ -23,6 +23,7 @@ import {
   MOCK_TOTAL_PICKS,
   MOCK_USER_TEAM_ID,
   parseMockDraftSettings,
+  getMockDraftSettings,
   reconcileSinglePlayerMockDraftState,
   resolveInitialSinglePlayerMockDraftState,
 } from "./singlePlayerMockDraft";
@@ -339,6 +340,7 @@ describe("single-player mock draft engine", () => {
       leagueSize: 10,
       rounds: MOCK_ROUNDS,
       pickTimerSeconds: 45,
+      conferenceCodes: ["SEC", "BIG10", "BIG12", "ACC", "INDEPENDENT"],
     });
   });
 
@@ -746,4 +748,14 @@ it("preserves deliberate queue precedence after the board is reordered", () => {
   expect(advanced.picks[0].playerId).toBe(604);
   expect(advanced.queuedPlayerIds).toEqual([601]);
   expect(state.queuedPlayerIds).toEqual([604,601]);
+});
+
+it("persists mock conference choices across a resume, reset, and canonical reconciliation", () => {
+  const settings = parseMockDraftSettings("?new=1&conferences=ACC,SEC,SEC&teams=8&timer=60");
+  expect(settings.conferenceCodes).toEqual(["SEC", "ACC"]);
+  const stored = createSinglePlayerMockDraft(1000, settings);
+  expect(resolveInitialSinglePlayerMockDraftState({storedState: stored}).state.settings?.conferenceCodes).toEqual(["SEC", "ACC"]);
+  expect(createRandomSinglePlayerMockDraft(2000, getMockDraftSettings(stored)).settings?.conferenceCodes).toEqual(["SEC", "ACC"]);
+  const legacy = createSinglePlayerMockDraft(1000, {leagueSize: 10, rounds: MOCK_ROUNDS, pickTimerSeconds: 30});
+  expect(getMockDraftSettings(legacy).conferenceCodes).toEqual(["SEC", "BIG10", "BIG12", "ACC", "INDEPENDENT"]);
 });

@@ -47,6 +47,7 @@ def list_players(
     sort: str | None = None,
     ranking_snapshot: dict | None = None,
     season: int | None = None,
+    conference_codes: list[str] | None = None,
 ) -> tuple[list[Player], int]:
     # Retained legacy-canonical rows are historical records, not discoverable
     # current players.  Keep generic provider/history rows available while
@@ -75,6 +76,8 @@ def list_players(
         conference_codes = db.scalar(
             select(LeagueSettings.conference_codes).where(LeagueSettings.league_id == league_id)
         )
+        stmt = stmt.where(league_conference_player_filter(conference_codes))
+    elif conference_codes is not None:
         stmt = stmt.where(league_conference_player_filter(conference_codes))
     if position:
         requested_positions = [value.strip().upper() for value in position.split(",") if value.strip()]
@@ -108,7 +111,7 @@ def list_players(
 
     if draft_eligible and sort in {"rank", "draft_rank", "adp", "projected_points"}:
         from collegefootballfantasy_api.app.services.draft_rankings import build_draft_ranking_snapshot, rank, number
-        snapshot = ranking_snapshot or build_draft_ranking_snapshot(db, season=season, league_id=league_id)
+        snapshot = ranking_snapshot or build_draft_ranking_snapshot(db, season=season, league_id=league_id, conference_codes=conference_codes)
         candidates = db.scalars(stmt).all()
         board = snapshot["board"]
         def key(player):

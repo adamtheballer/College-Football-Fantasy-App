@@ -274,11 +274,21 @@ def list_players_endpoint(
     sort: str | None = None,
     season: int | None = Query(default=None, ge=2000, le=2100),
     draft_config: str | None = Query(default=None, max_length=1000),
+    conference_codes: str | None = Query(default=None, max_length=100),
     db: Session = Depends(get_db),
 ) -> PlayerList:
     from collegefootballfantasy_api.app.services.draft_rankings import build_draft_ranking_snapshot
     import json
     snapshot = None
+    selected_conferences = None
+    if conference_codes is not None:
+        if not draft_eligible or league_id is not None:
+            raise HTTPException(status_code=422, detail="conference_codes requires a mock draft player pool without league_id")
+        from collegefootballfantasy_api.app.services.player_pool_filters import normalize_league_conference_codes
+        try:
+            selected_conferences = normalize_league_conference_codes(conference_codes.split(","))
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
     if draft_eligible:
         config = None
         if draft_config:
@@ -295,7 +305,7 @@ def list_players_endpoint(
             except (ValueError, TypeError) as exc:
                 raise HTTPException(status_code=422, detail="invalid draft ranking configuration") from exc
         try:
-            snapshot = build_draft_ranking_snapshot(db, season=season or settings.current_season_year, league_id=league_id, config=config)
+            snapshot = build_draft_ranking_snapshot(db, season=season or settings.current_season_year, league_id=league_id, config=config, conference_codes=selected_conferences)
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
     players, total = list_players(
@@ -311,6 +321,7 @@ def list_players_endpoint(
         sort=(sort or "draft_rank") if draft_eligible else sort,
         ranking_snapshot=snapshot,
         season=snapshot["season"] if snapshot else season,
+        conference_codes=selected_conferences,
     )
     if not draft_eligible:
         return PlayerList(data=players, total=total, limit=limit, offset=offset)
@@ -336,7 +347,7 @@ def list_players_endpoint(
                 "draft_ranking_policy": snapshot["policy"],
             })
         data.append(read)
-    return PlayerList(data=data, total=total, limit=limit, offset=offset, ranking_version=snapshot["version"], ranking_policy=snapshot["policy"], ranking_season=snapshot["season"], ranking_week=snapshot["week"])
+    return PlayerList(data=data, total=total, limit=limit, offset=offset, ranking_version=snapshot["version"], ranking_policy=snapshot["policy"], ranking_season=snapshot["season"], ranking_week=snapshot["week"], draft_conference_codes=snapshot["conference_codes"])
 
 
 @router.get("/{player_id}", response_model=PlayerRead)

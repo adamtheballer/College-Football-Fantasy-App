@@ -44,7 +44,17 @@ export type Config = {
   featured_game_id: number | null;
   underdogs: Underdog[];
 };
+export type ChallengeSponsor = {
+  name: string;
+  label: string;
+  tagline: string;
+  logo_url: string;
+  youtube_url: string;
+  season: number;
+  week: number;
+};
 export type Challenge = {
+  sponsor?: ChallengeSponsor | null;
   id: number;
   round_id: number;
   kind: ChallengeKind;
@@ -68,6 +78,7 @@ export type Challenge = {
   draft_config: Config | null;
 };
 export type Round = {
+  sponsor?: ChallengeSponsor | null;
   id: number;
   season: number;
   week: number;
