@@ -370,12 +370,16 @@ export function useLeagueWaiverTab(
   scope: "waiver" | "all" | "hot" = "waiver",
   week?: number,
   hotWindowHours: 24 | 168 = 168,
+  performance: { enabled: boolean; week?: number; position?: string } = { enabled: false },
 ) {
   const normalizedHotWindowHours = normalizeHotWindowHours(hotWindowHours);
   return useQuery({
-    queryKey: ["league", leagueId, "waivers", limit, offset, scope, week ?? "current", normalizedHotWindowHours],
+    queryKey: ["league", leagueId, "waivers", limit, offset, scope, week ?? "current", normalizedHotWindowHours, performance.enabled, performance.enabled ? performance.week : undefined, performance.enabled ? performance.position : undefined],
     enabled: enabled && typeof leagueId === "number" && !Number.isNaN(leagueId),
     ...waiverWeekQueryOptions,
+    // Keep the workspace/week controls stable during a filter request. The
+    // page hides placeholder rows until the selected results arrive.
+    placeholderData: (previous, previousQuery) => previousQuery?.queryKey[1] === leagueId ? previous : undefined,
     // Final box scores and scorer corrections can arrive while this board is
     // open. Refresh the read-only board so a completed game's blue actual
     // total replaces its pregame projection without requiring navigation.
@@ -394,6 +398,11 @@ export function useLeagueWaiverTab(
         scope,
         ...(typeof week === "number" ? { week } : {}),
         ...(scope === "hot" ? { hot_window_hours: normalizedHotWindowHours } : {}),
+        ...(performance.enabled ? {
+          sort_by: "weekly_points",
+          ...(typeof performance.week === "number" ? { performance_week: performance.week } : {}),
+          ...(performance.position && performance.position !== "ALL" ? { position: performance.position } : {}),
+        } : {}),
       }),
   });
 }

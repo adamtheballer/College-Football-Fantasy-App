@@ -1469,3 +1469,40 @@ def test_trade_process_time_never_lands_inside_game_week():
 
     assert next_cfb_trade_process_time(tuesday, "America/New_York") == sunday_open
     assert next_cfb_trade_process_time(saturday, "America/New_York") == sunday_open
+
+
+
+def test_weekly_waiver_performance_contract_and_access(client, db_session):
+    from collegefootballfantasy_api.app.models.game import Game
+    from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
+
+    token = create_user_and_token(client, "weekly-performance-owner")
+    outsider = create_user_and_token(client, "weekly-performance-outsider")
+    league = create_league(client, token, max_teams=2)
+    high = create_player(client, "Weekly Performance Top WR", "WR")
+    low = create_player(client, "Weekly Performance Low WR", "WR")
+    other = create_player(client, "Weekly Performance QB", "QB")
+    db_session.query(Player).filter(Player.id.in_([high, low, other])).update({Player.school: "USC"}, synchronize_session=False)
+    game = Game(season=2026, week=0, home_team="USC", away_team="Opponent", schedule_status="final", home_points=30, away_points=10)
+    db_session.add(game)
+    db_session.flush()
+    for player_id, yards in [(high, 150), (low, 20), (other, 500)]:
+        db_session.add(PlayerGameStat(player_id=player_id, game_id=game.id, season=2026, week=0, source="espn_final_boxscore", stats={"rec_yards": yards}))
+    db_session.commit()
+    url = f"/leagues/{league['id']}/waivers"
+    params = {"week": 1, "sort_by": "weekly_points", "performance_week": 0, "position": "WR", "limit": 1}
+    response = client.get(url, params=params, headers=auth_headers(token))
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["week"] == 1
+    assert body["performance_week"] == 0
+    assert body["total_available"] == 2
+    assert body["available_players"][0]["id"] == high
+    assert body["available_players"][0]["performance_fantasy_points"] == 15.0
+    second = client.get(url, params={**params, "offset": 1}, headers=auth_headers(token)).json()
+    assert second["available_players"][0]["id"] == low
+    for bad in [{"performance_week": -1}, {"performance_week": 26}, {"performance_week": 2}, {"position": "INVALID"}, {"sort_by": "bad"}, {"scope": "hot"}]:
+        assert client.get(url, params={**params, **bad}, headers=auth_headers(token)).status_code == 422
+    assert client.get(url, params=params).status_code == 401
+    assert client.get(url, params=params, headers=auth_headers(outsider)).status_code == 403
+    assert client.get("/leagues/99999999/waivers", params=params, headers=auth_headers(token)).status_code == 404

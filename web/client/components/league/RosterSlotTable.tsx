@@ -238,6 +238,7 @@ const canSwapPlayers = (
 };
 
 export function RosterSlotTable({
+  showStartRate = true,
   title,
   players,
   emptyText = "No roster players yet.",
@@ -250,6 +251,7 @@ export function RosterSlotTable({
   quickSwapPlayer,
   onQuickSwapPlayerChange,
 }: {
+  showStartRate?: boolean;
   title: string;
   players: LeagueRosterPlayer[];
   emptyText?: string;
@@ -536,7 +538,7 @@ export function RosterSlotTable({
                       {gameStatLine}
                     </span>
                   ) : null}
-                  {isRealPlayer ? <PlayerPopularityMetrics popularity={player.popularity} /> : null}
+                  {isRealPlayer && showStartRate ? <PlayerPopularityMetrics popularity={player.popularity} /> : null}
                   {hasRedZone ? (
                     <span className={cn(
                       "w-fit rounded bg-red-300/20 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-[0.1em] text-red-100",

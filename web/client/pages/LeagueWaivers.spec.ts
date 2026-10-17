@@ -12,6 +12,7 @@ import {
   waiverSearchMatches,
   waiverWeekPointsClassName,
   waiverWeekPoints,
+  waiverPerformancePoints,
   sortWaiverPlayersByPositionRank,
 } from "./LeagueWaivers";
 import { playerAvailabilityBadge } from "@/lib/playerAvailability";
@@ -153,5 +154,17 @@ describe("rankWaiverSearchResults", () => {
       "Virginia Tech",
       "West Virginia",
     ]);
+  });
+});
+
+
+describe("weekly performance display", () => {
+  it("preserves verified zero and negative results and keeps missing data as a gap", () => {
+    expect(waiverPerformancePoints(0, 6)).toEqual({ label: "0.0", isFinal: true, finalWeek: 6 });
+    expect(waiverPerformancePoints(-2, 6)).toEqual({ label: "-2.0", isFinal: true, finalWeek: 6 });
+    expect(waiverPerformancePoints(24.56, 5)).toEqual({ label: "24.6", isFinal: true, finalWeek: 5 });
+    for (const missing of [null, undefined, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(waiverPerformancePoints(missing, 6)).toEqual({ label: "—", isFinal: false, finalWeek: 6 });
+    }
   });
 });

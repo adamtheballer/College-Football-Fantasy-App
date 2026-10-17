@@ -1,0 +1,26 @@
+meta {
+  name: Weekly Waiver Performance
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{base_url}}/leagues/{{league_id}}/waivers?sort_by=weekly_points&performance_week=1&position=WR&limit=50
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+docs {
+  Lists the league's available WRs by verified Week 1 fantasy points,
+  descending, using this league's scoring rules. Choose any elapsed/current
+  performance_week and QB/RB/WR/TE/K, or omit position for all positions.
+  Omit performance_week to follow last week automatically. Availability,
+  injuries and projections stay on the current workspace week. Unknown
+  scores stay null, after verified zero and negative totals. Sorting and
+  position filtering happen before pagination. Hot Pickups keeps its own
+  pickup-count order and does not accept weekly_points.
+}

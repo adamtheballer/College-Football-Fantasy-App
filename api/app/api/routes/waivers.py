@@ -57,6 +57,9 @@ def get_league_waiver_tab_endpoint(
     offset: int = 0,
     week: int | None = None,
     scope: Literal["waiver", "all", "hot"] = "waiver",
+    sort_by: Literal["projection", "weekly_points"] = "projection",
+    performance_week: int | None = Query(default=None, ge=0, le=25),
+    position: Literal["QB", "RB", "WR", "TE", "K"] | None = None,
     hot_window_hours: str | int | None = Query(default="168"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -75,6 +78,9 @@ def get_league_waiver_tab_endpoint(
         selected_week=week,
         scope=scope,
         hot_window_hours=normalize_hot_window_hours(hot_window_hours),
+        sort_by=sort_by,
+        performance_week=performance_week,
+        position=position,
     )
 
 

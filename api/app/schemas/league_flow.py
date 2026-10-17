@@ -777,6 +777,8 @@ class LeagueWaiverPlayerRead(BaseModel):
     # separate from the forecast prevents a completed-game total from being
     # mislabeled as a projection in the waiver wire.
     final_fantasy_points: float | None = None
+    # Verified result for performance_week, independent of current availability.
+    performance_fantasy_points: float | None = None
     # The active waiver period can move to a new week before every player has
     # a new game. Keep the most recent verified score separate from the
     # active-week value so discovery boards can show a blue, truthful result
@@ -818,6 +820,7 @@ class LeagueWaiversRead(BaseModel):
     # against. This is intentionally separate from the operational waiver
     # period, which can advance during Tuesday maintenance.
     week: int
+    performance_week: int | None = None
     fantasy_team_id: int | None = None
     waiver_priority: int | None = None
     faab_remaining: int | None = None
