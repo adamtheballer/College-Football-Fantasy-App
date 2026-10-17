@@ -15,6 +15,7 @@ from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameSta
 from collegefootballfantasy_api.app.models.player_stat import PlayerStat
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
 from collegefootballfantasy_api.app.services.historical_stats import canonical_historical_season_rows
+from collegefootballfantasy_api.app.services.player_chart_publication import points_from_verified_stats
 from collegefootballfantasy_api.app.services.player_game_feed import PlayerGameFeed, accepted_player_game_feed, matching_weekly_stat
 from collegefootballfantasy_api.app.schemas.game_log import (
     PlayerGameLogRead,
@@ -84,6 +85,13 @@ def _stat_read(
     scoring_rules: dict | None,
 ) -> PlayerGameLogStatRead | None:
     if stat is None:
+        return None
+    # Older backfills inserted identity/event metadata for omitted athletes.
+    # That placeholder does not establish zero production or a played season.
+    # Keep actual recorded zero counts, including later corrected backfills.
+    if (stat.stats or {}).get("backfill_zero_stat") and points_from_verified_stats(
+        stat.stats, position=position,
+    ) is None:
         return None
     # A legacy provider total is retained only when its row contains no
     # retired return production. Rows with punt returns have that stale total
@@ -419,8 +427,17 @@ def _build_scheduled_player_game_log(
         game = games_by_id.get(schedule.game_id) if schedule.game_id is not None else None
         game_stat = stats_by_game.get(schedule.game_id) if schedule.game_id is not None else None
         feed = feeds.get(schedule.game_id) if not schedule.is_bye else None
-        stat = game_stat or (feed if feed and feed.stats is not None else None) or matching_weekly_stat(stats_by_week.get(schedule.week), game)
-        stat_read = _stat_read(stat, position=player.position, scoring_rules=scoring_rules)
+        stat = None
+        stat_read = None
+        for candidate in (
+            game_stat,
+            feed if feed and feed.stats is not None else None,
+            matching_weekly_stat(stats_by_week.get(schedule.week), game),
+        ):
+            candidate_read = _stat_read(candidate, position=player.position, scoring_rules=scoring_rules)
+            if candidate_read is not None:
+                stat, stat_read = candidate, candidate_read
+                break
         rows.append(
             PlayerGameLogRowRead(
                 schedule_id=schedule.id,

@@ -107,3 +107,17 @@ def test_weekly_stat_from_other_event_does_not_leak_into_game_log(client, db_ses
     db_session.commit()
     row = client.get(f"/players/{player.id}/game-log?season=2026").json()["games"][0]
     assert row["game_status"] == "active" and row["stats"] is None
+
+
+def test_legacy_zero_placeholder_cannot_hide_accepted_game_stats(client, db_session):
+    from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
+    player, game, snapshot, poll = _live_fixture(db_session)
+    db_session.add(PlayerGameStat(
+        player_id=player.id, game_id=game.id, season=2026, week=1,
+        source="espn_final_boxscore", stats={"EventID": game.external_id, "backfill_zero_stat": True},
+    ))
+    db_session.commit()
+    row = client.get(f"/players/{player.id}/game-log?season=2026").json()["games"][0]
+    assert row["stats"]["stats"] == snapshot.normalized_rows[0]["stats"]
+    assert row["stats"]["fantasy_points"] > 0
+    assert row["game_status"] == "active"
