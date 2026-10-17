@@ -630,10 +630,15 @@ for (const width of [320, 390, 1280]) {
     await expect.poll(visibleIds).toEqual([2, 1, 3, 4]);
     await expect(page.getByTestId(`${pointsPrefix}2`)).toHaveText("35.0");
     expect(requests.at(-1)?.searchParams.get("week")).toBeNull();
+    // Radix restores focus when its closing menu finishes. Wait for that
+    // accessibility transition before typing so its delayed focus restore
+    // cannot redirect Playwright's immediate clear keystroke to the trigger.
+    await expect(page.getByRole("combobox", { name: "Performance week" })).toBeFocused();
     await page.getByPlaceholder("Search players, schools...").fill("Missing");
     await expect.poll(visibleIds).toEqual([4]);
     await expect(page.getByTestId(`${pointsPrefix}4`)).toHaveText("—");
     await page.getByPlaceholder("Search players, schools...").fill("");
+    await expect(page.getByPlaceholder("Search players, schools...")).toHaveValue("");
     await expect.poll(visibleIds).toEqual([2, 1, 3, 4]);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await page.screenshot({ path: info.outputPath(`weekly-performance-${width}.png`) });
