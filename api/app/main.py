@@ -32,6 +32,7 @@ from collegefootballfantasy_api.app.api.routes import (
     rosters,
     saturday_pick,
     weekly_challenges,
+    challenge_experiences,
     schedule,
     stats,
     teams,
@@ -111,5 +112,7 @@ app.include_router(trades.router, prefix="/trade", tags=["trade"])
 app.include_router(trades.league_router, tags=["trade"])
 app.include_router(insights.router, prefix="/insights", tags=["insights"])
 
+app.include_router(challenge_experiences.router, prefix="/weekly-challenges", tags=["weekly-challenges"])
+app.include_router(challenge_experiences.admin_router, prefix="/admin/weekly-challenges", tags=["admin-weekly-challenges"])
 app.include_router(weekly_challenges.router, prefix="/weekly-challenges", tags=["weekly-challenges"])
 app.include_router(weekly_challenges.admin_router, prefix="/admin/weekly-challenges", tags=["admin-weekly-challenges"])

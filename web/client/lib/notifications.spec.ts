@@ -25,3 +25,6 @@ describe("notification destination routing", () => {
     expect(resolveNotificationPath(null)).toBe("/alerts");
   });
 });
+
+// Challenges are app-wide and do not require a league membership.
+it("routes server-authorized challenge notifications without a league",()=>{expect(resolveNotificationPath({type:"challenge",league_id:null,resource_id:12})).toBe("/weekly-challenges/12");});

@@ -7,11 +7,12 @@ type LegalDocumentLayoutProps = {
   title: string;
   description: string;
   children: ReactNode;
+  lastUpdated?: string;
 };
 
 const LAST_UPDATED = "August 20, 2026";
 
-export function LegalDocumentLayout({ title, description, children }: LegalDocumentLayoutProps) {
+export function LegalDocumentLayout({ title, description, children, lastUpdated = LAST_UPDATED }: LegalDocumentLayoutProps) {
   useEffect(() => {
     document.title = `${title} | College Football Fantasy`;
     let descriptionElement = document.querySelector<HTMLMetaElement>('meta[name="description"]');
@@ -51,7 +52,7 @@ export function LegalDocumentLayout({ title, description, children }: LegalDocum
             <h1 className="mt-3 text-4xl font-bold tracking-[-0.03em] text-cfb-text-primary sm:text-5xl print:text-black">
               {title}
             </h1>
-            <p className="mt-4 text-base leading-7 text-cfb-text-secondary print:text-slate-700">Last updated: {LAST_UPDATED}</p>
+            <p className="mt-4 text-base leading-7 text-cfb-text-secondary print:text-slate-700">Last updated: {lastUpdated}</p>
             <div className="mt-6 text-sm font-semibold text-cfb-text-secondary print:text-slate-700">
               <PublicLegalLinks className="justify-start" />
             </div>

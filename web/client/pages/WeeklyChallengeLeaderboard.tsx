@@ -1,3 +1,7 @@
+import {
+  ChallengeLeaderboardFilters,
+  ChallengeModeStandings,
+} from "@/components/challenges/ChallengeLeaderboardModes";
 import { Link, useSearchParams } from "react-router-dom";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -7,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { apiGet } from "@/lib/api";
 import {
+  type Round,
   type Leaderboard,
   type LeaderRow,
   useCurrentChallenges,
@@ -44,11 +49,33 @@ function StandingRow({ row }: { row: LeaderRow }) {
 
 export default function WeeklyChallengeLeaderboard() {
   const { user } = useAuth();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
+  const mode = params.get("mode") ?? "overall";
   const [view, setView] = useState<"week" | "season">("week");
   const current = useCurrentChallenges();
   const season = Number(params.get("season")) || current.data?.season;
   const roundId = Number(params.get("round")) || current.data?.id;
+  const history = useQuery({
+    queryKey: ["weekly-challenges", "leaderboard-history", user?.id],
+    enabled: !!user,
+    queryFn: () =>
+      apiGet<Round[]>("/weekly-challenges/history", {
+        limit: 30,
+        include_experiences: true,
+      }),
+    refetchInterval: 30_000,
+  });
+  const selectedRound = useQuery({
+    queryKey: ["weekly-challenges", "leaderboard-round", user?.id, roundId],
+    enabled: !!user && !!roundId && roundId !== current.data?.id,
+    queryFn: () =>
+      apiGet<Round>(`/weekly-challenges/rounds/${roundId}`, {
+        include_experiences: true,
+      }),
+    refetchInterval: 30_000,
+  });
+  const round =
+    roundId === current.data?.id ? current.data : selectedRound.data;
   const query = useQuery({
     queryKey: [
       "weekly-challenges",
@@ -71,72 +98,106 @@ export default function WeeklyChallengeLeaderboard() {
       <PageHeader
         title={view === "season" ? "Season Championship" : "Weekly Leaderboard"}
         eyebrow={`${season ?? "Competition"}${view === "week" && query.data?.week ? ` · Week ${query.data.week}` : ""} · Recognition only`}
-        description="Combined challenge points across all five competitions. Equal totals share rank."
+        description="The Overall championship retains the five existing formats’ achievement points. Each new mode uses its own standings; fantasy points, fan accuracy and survivor weeks are never added together."
       />
       <Button asChild variant="outline">
         <Link to="/weekly-challenges">Weekly Challenges</Link>
       </Button>
-      <div className="flex gap-3" aria-label="Leaderboard period">
-        <Button
-          variant={view === "week" ? "default" : "outline"}
-          aria-pressed={view === "week"}
-          onClick={() => setView("week")}
+      <ChallengeLeaderboardFilters />
+      <label className="block text-xs">
+        Competition week
+        <select
+          aria-label="Leaderboard week"
+          className="cfb-control mt-2 min-h-11 w-full p-3 text-base"
+          value={roundId ?? ""}
+          onChange={(e) => {
+            const p = new URLSearchParams(params);
+            p.set("round", e.target.value);
+            p.set(
+              "season",
+              String(
+                history.data?.find((r) => r.id === Number(e.target.value))
+                  ?.season ?? season,
+              ),
+            );
+            p.delete("competition");
+            setParams(p);
+          }}
         >
-          This Week
-        </Button>
-        <Button
-          variant={view === "season" ? "default" : "outline"}
-          aria-pressed={view === "season"}
-          onClick={() => setView("season")}
-        >
-          Season
-        </Button>
-      </div>
-      <SurfaceCard>
-        <h2 className="cfb-section-title mb-3">Top 10</h2>
-        {query.data?.provisional && (
-          <p className="mb-4 text-sm text-amber-300">
-            Provisional weekly standings — some challenges are still processing.
-            Pending awards are excluded.
-          </p>
-        )}
-        {view === "season" && (
-          <p className="mb-4 text-sm text-muted-foreground">
-            Finalized challenge awards only. Raw fantasy totals never count
-            directly toward the Season Championship.
-          </p>
-        )}
-        {(query.isPending || current.isPending) && (
-          <p role="status">Loading standings…</p>
-        )}
-        {(query.isError || current.isError) && (
-          <p role="alert">
-            Standings are temporarily unavailable.{" "}
-            <button
-              className="underline"
-              onClick={() => {
-                void current.refetch();
-                void query.refetch();
-              }}
+          {(history.data ?? (current.data ? [current.data] : [])).map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.season} · Week {r.week}
+            </option>
+          ))}
+        </select>
+      </label>
+      {mode !== "overall" ? (
+        <ChallengeModeStandings round={round} />
+      ) : (
+        <>
+          <div className="flex gap-3" aria-label="Leaderboard period">
+            <Button
+              variant={view === "week" ? "default" : "outline"}
+              aria-pressed={view === "week"}
+              onClick={() => setView("week")}
             >
-              Retry
-            </button>
-          </p>
-        )}
-        {query.data?.data.length === 0 && (
-          <p className="text-sm text-muted-foreground">
-            No finalized challenge awards yet.
-          </p>
-        )}
-        {query.data?.data.map((row) => (
-          <StandingRow key={row.user_id} row={row} />
-        ))}
-      </SurfaceCard>
-      {query.data?.your_rank && (
-        <SurfaceCard>
-          <h2 className="cfb-section-title mb-3">Your Rank</h2>
-          <StandingRow row={query.data.your_rank} />
-        </SurfaceCard>
+              This Week
+            </Button>
+            <Button
+              variant={view === "season" ? "default" : "outline"}
+              aria-pressed={view === "season"}
+              onClick={() => setView("season")}
+            >
+              Season
+            </Button>
+          </div>
+          <SurfaceCard>
+            <h2 className="cfb-section-title mb-3">Top 10</h2>
+            {query.data?.provisional && (
+              <p className="mb-4 text-sm text-amber-300">
+                Provisional weekly standings — some challenges are still
+                processing. Pending awards are excluded.
+              </p>
+            )}
+            {view === "season" && (
+              <p className="mb-4 text-sm text-muted-foreground">
+                Finalized challenge awards only. Raw fantasy totals never count
+                directly toward the Season Championship.
+              </p>
+            )}
+            {(query.isPending || current.isPending) && (
+              <p role="status">Loading standings…</p>
+            )}
+            {(query.isError || current.isError) && (
+              <p role="alert">
+                Standings are temporarily unavailable.{" "}
+                <button
+                  className="underline"
+                  onClick={() => {
+                    void current.refetch();
+                    void query.refetch();
+                  }}
+                >
+                  Retry
+                </button>
+              </p>
+            )}
+            {query.data?.data.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No finalized challenge awards yet.
+              </p>
+            )}
+            {query.data?.data.map((row) => (
+              <StandingRow key={row.user_id} row={row} />
+            ))}
+          </SurfaceCard>
+          {query.data?.your_rank && (
+            <SurfaceCard>
+              <h2 className="cfb-section-title mb-3">Your Rank</h2>
+              <StandingRow row={query.data.your_rank} />
+            </SurfaceCard>
+          )}
+        </>
       )}
     </div>
   );

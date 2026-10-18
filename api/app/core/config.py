@@ -128,6 +128,8 @@ class Settings(BaseSettings):
     # as a feature flag so licensed artwork can be restored without a schema
     # or API breaking change.
     player_headshots_enabled: bool = False
+    # Release switch hides user-supplied league artwork that may contain school/conference marks.
+    league_logos_enabled: bool = True
     espn_historical_stats_enabled: bool = False
     espn_historical_stats_base_url: str = (
         "https://site.web.api.espn.com/apis/common/v3/sports/football/college-football"

@@ -1,0 +1,20 @@
+meta {
+  name: Configure
+  type: http
+  seq: 6
+}
+put {
+  url: {{base_url}}/admin/weekly-challenges/experiences/{{weekly_challenge_id}}
+  body: json
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+body:json {
+  {"expected_version":{{challenge_version}},"game_ids":[{{challenge_game_id}}],"minimum_fans":3,"correct_points":10}
+}
+docs {
+  See docs/operations/challenge-experiences.md. Use an isolated environment first.
+  IDs and versions must come from real API responses. Review and publish using
+  the existing WeeklyChallenges Validate/Publish requests; draft configuration alone never opens entries.
+}

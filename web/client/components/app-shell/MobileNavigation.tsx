@@ -42,7 +42,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut, guidedN
   const isMoreActive = drawerItems.some(
     (item) => isShellNavItemActive(pathname, item) && !items.some((mobileItem) => mobileItem.name === item.name),
   );
-  // Guests have three destinations; signed-in managers have four. Include the
+  // Guests have three destinations; signed-in managers have five. Include the
   // More button in the grid calculation so neither state leaves a blank mobile
   // slot or packs the tabs unevenly to one side.
   const visibleItemCount = items.length + 1;
@@ -76,7 +76,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut, guidedN
                 aria-current={isActive ? "page" : undefined}
                 aria-label={item.badge ? `${item.name}: ${item.badge} unread ${item.name === "CHATS" ? "chat messages" : item.name.toLowerCase()}` : item.name}
                 className={cn(
-                  "font-ui relative flex min-h-[54px] min-w-0 flex-col items-center justify-center gap-1 rounded-sm px-0.5 text-[11px] font-semibold leading-none transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-transparent",
+                  "font-ui relative flex min-h-[54px] min-w-0 flex-col items-center justify-center gap-1 rounded-sm px-0.5 text-[9px] sm:text-[11px] font-semibold leading-none transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-transparent",
                   isGuided
                     ? "bg-cfb-brand/[0.18] text-cfb-text-primary ring-1 ring-cfb-brand/80 after:bg-cfb-brand"
                     : isActive
@@ -109,7 +109,7 @@ export function MobileNavigation({ items, allItems, pathname, onSignOut, guidedN
             aria-expanded={isMoreOpen}
             onClick={() => setIsMoreOpen(true)}
             className={cn(
-              "font-ui relative flex min-h-[54px] min-w-0 flex-col items-center justify-center gap-1 rounded-sm px-0.5 text-[11px] font-semibold leading-none transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-transparent",
+              "font-ui relative flex min-h-[54px] min-w-0 flex-col items-center justify-center gap-1 rounded-sm px-0.5 text-[9px] sm:text-[11px] font-semibold leading-none transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-transparent",
               isGuidedDrawerItem
                 ? "bg-cfb-brand/[0.18] text-cfb-text-primary ring-1 ring-cfb-brand/80 after:bg-cfb-brand"
                 : isMoreActive

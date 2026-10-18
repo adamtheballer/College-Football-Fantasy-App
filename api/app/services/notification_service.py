@@ -514,7 +514,7 @@ def queue_notification_event(
                 )
         return existing
     league = db.get(League, league_id) if league_id is not None else None
-    if league is None and normalized_event_type != "MAJOR_NEWS":
+    if league is None and normalized_event_type not in {"MAJOR_NEWS", "CHALLENGE_REMINDER", "CHALLENGE_RESULT"}:
         raise ValueError("notification league does not exist")
     payload_data = dict(payload or {})
     payload_data["league_id"] = league_id
@@ -1348,7 +1348,7 @@ def process_due_notifications_once(
                 .first()
                 is not None
             )
-            if row.league_id is None and row.event_type == "MAJOR_NEWS":
+            if row.league_id is None and row.event_type in {"MAJOR_NEWS", "CHALLENGE_REMINDER", "CHALLENGE_RESULT"}:
                 membership_exists = True
             if user is None or not user.is_active or not _event_still_eligible(db, row, user) or (not membership_exists and row.event_type != "INJURY"):
                 row.status = "canceled"
@@ -1492,6 +1492,8 @@ def _event_ttl(event_type: str) -> int:
 
 
 def _phone_category_allowed(event_type: str, prefs: NotificationPreference | None) -> bool:
+    if event_type in {"CHALLENGE_REMINDER", "CHALLENGE_RESULT"}:
+        return (prefs is None or prefs.push_matchups) and _pref_allows_category("CHALLENGE", event_type, prefs)
     if event_type == "MAJOR_NEWS":
         return bool(prefs and prefs.push_major_news)
     field = "push_drafts" if event_type.startswith("DRAFT") else "push_matchups" if event_type.startswith("MATCHUP") else "push_injuries" if event_type == "INJURY" else None
@@ -1556,6 +1558,9 @@ def _event_still_eligible(db: Session, row: ScheduledNotification, user: User) -
             return False
         row.league_id = leagues[0]
         row.payload = {**payload, "league_ids": leagues, "league_id": leagues[0], "destination": {"type": "player", "league_id": leagues[0], "resource_id": event.player_id}}
+    if row.event_type in {"CHALLENGE_REMINDER", "CHALLENGE_RESULT"}:
+        from .challenge_experiences import notification_eligible
+        return notification_eligible(db, row, user)
     if row.event_type == "MAJOR_NEWS":
         announcement = db.get(NewsAnnouncement, payload.get("announcement_id"))
         return bool(announcement and announcement.status == "confirmed" and _news_user_eligible(db, user.id, announcement.audience))

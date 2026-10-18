@@ -55,7 +55,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         unreadChatSummary?.total_unread ?? 0,
         notifications?.unread_count ?? 0,
       ),
-    [isLoggedIn, notifications?.unread_count, unreadChatSummary?.total_unread, user],
+    [
+      isLoggedIn,
+      notifications?.unread_count,
+      unreadChatSummary?.total_unread,
+      user,
+    ],
   );
 
   const isDraftRoomPage = isDraftRoomRoute(location.pathname);
@@ -74,11 +79,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   // after they inspect a player card or return from a league child route.
   useLayoutEffect(() => {
     const scroller = mainScrollRef.current;
-    const targetTop = navigationType === "POP" ? scrollPositionsRef.current.get(location.key) ?? 0 : 0;
+    const targetTop =
+      navigationType === "POP"
+        ? (scrollPositionsRef.current.get(location.key) ?? 0)
+        : 0;
     scroller?.scrollTo({ top: targetTop, left: 0, behavior: "auto" });
     window.scrollTo({ top: targetTop, left: 0, behavior: "auto" });
     return () => {
-      if (scroller) scrollPositionsRef.current.set(location.key, scroller.scrollTop);
+      if (scroller)
+        scrollPositionsRef.current.set(location.key, scroller.scrollTop);
     };
   }, [location.key, navigationType]);
 
@@ -104,7 +113,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     }
 
     if (location.pathname !== "/") {
-      navigate("/", { replace: true, state: { replayGuide: replayGuideRequested } });
+      // Preserve protected destinations and creator referral links on first login.
+      // Automatic onboarding waits until Home; an explicit replay still goes Home.
+      if (replayGuideRequested)
+        navigate("/", { replace: true, state: { replayGuide: true } });
       return;
     }
 
@@ -119,8 +131,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   return (
     <>
-      <AppUpdateExperience accountId={user?.id ?? null} managerName={user?.firstName ?? "Manager"} sessionReady={sessionReady} onboarding={isGuideActive}
-        screenKey={location.key} pathname={location.pathname} />
+      <AppUpdateExperience
+        accountId={user?.id ?? null}
+        managerName={user?.firstName ?? "Manager"}
+        sessionReady={sessionReady}
+        onboarding={isGuideActive}
+        screenKey={location.key}
+        pathname={location.pathname}
+      />
       {user ? (
         <AppOnboardingTour
           isOpen={isGuideActive}
@@ -146,7 +164,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           isSaturdayPick6Page ||
           isAuthFlowPage
         }
-        compactContent={isDraftRoomPage || isCreateLeaguePage || isLeagueSectionPage}
+        compactContent={
+          isDraftRoomPage || isCreateLeaguePage || isLeagueSectionPage
+        }
         // Draft rooms use the same page-level scroll owner as every other
         // route. A fixed outer viewport plus a nested player-board scroller
         // traps touch gestures and makes the board feel stuck on mobile.
@@ -156,10 +176,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         guidedNavItem={guidedNavItem}
       >
         {isLeagueSectionPage ? (
-          <LeagueSectionFrame leagueId={Number(location.pathname.split("/")[2])} sessionReady={sessionReady} fullWidth={isLeagueMatchupPage}>
+          <LeagueSectionFrame
+            leagueId={Number(location.pathname.split("/")[2])}
+            sessionReady={sessionReady}
+            fullWidth={isLeagueMatchupPage}
+          >
             {children}
           </LeagueSectionFrame>
-        ) : children}
+        ) : (
+          children
+        )}
       </AppShell>
     </>
   );

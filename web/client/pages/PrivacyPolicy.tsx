@@ -4,6 +4,7 @@ export default function PrivacyPolicy() {
   return (
     <LegalDocumentLayout
       title="Privacy Policy"
+      lastUpdated="October 17, 2026"
       description="How College Football Fantasy processes account, league, and service information."
     >
       <LegalSection title="Introduction">
@@ -20,7 +21,9 @@ export default function PrivacyPolicy() {
           <li>league memberships, team ownership, league settings, and invitations;</li>
           <li>roster and lineup activity, draft history, trades, waiver activity, and Pick 6 selections when enabled;</li>
           <li>matchup results, fantasy scores, career history, notification preferences and delivery history; and</li>
-          <li>chat messages and other content you choose to submit in the service.</li>
+          <li>chat messages and other content you choose to submit in the service;</li>
+          <li>challenge entries, weekly school allegiance, published results, and survivor history; and</li>
+          <li>daily challenge views, share actions, and approved creator referral attribution for signed-in users, when optional challenge analytics are enabled.</li>
         </LegalList>
         <p>
           Passwords are not stored in plaintext. The service uses protected, hash-based credentials for password authentication.
@@ -62,6 +65,10 @@ export default function PrivacyPolicy() {
         <p>
           College Football Fantasy does not sell personal information in the ordinary sense of exchanging it for money.
         </p>
+      </LegalSection>
+
+      <LegalSection title="Challenge Analytics">
+        <p>Challenge analytics use daily account-level counts, not cross-site tracking, device fingerprints, or IP-based advertising identifiers. You can disable optional challenge analytics in the Challenges hub; browser Do Not Track is respected. Entry and score records still operate the competitions. Creator referral attribution is counted once for an account created within the preceding 24 hours after it follows a creator invitation. Account deletion removes private challenge entries and analytics.</p>
       </LegalSection>
 
       <LegalSection title="Data Retention">

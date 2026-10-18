@@ -1,0 +1,16 @@
+meta {
+  name: CurrentAll
+  type: http
+  seq: 2
+}
+get {
+  url: {{base_url}}/weekly-challenges/current?include_experiences=true
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+docs {
+  See docs/operations/challenge-experiences.md. Use an isolated environment first.
+  IDs and versions must come from real API responses. Review and publish using
+  the existing WeeklyChallenges Validate/Publish requests; draft configuration alone never opens entries.
+}

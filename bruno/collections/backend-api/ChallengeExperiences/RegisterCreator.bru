@@ -1,0 +1,19 @@
+meta {
+  name: RegisterCreator
+  type: http
+  seq: 11
+}
+post {
+  url: {{base_url}}/admin/weekly-challenges/creators
+  body: json
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+body:json {
+  {"slug":"reviewed-creator","name":"Reviewed Creator","authorized":false,"active":false,"links":{}}
+}
+docs {
+  Isolated examples only. Replace dates and identities with reviewed real data.
+  No approval, prediction or salary is invented by these requests. See docs/operations/challenge-experiences.md.
+}

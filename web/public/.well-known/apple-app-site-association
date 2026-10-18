@@ -7,6 +7,18 @@
           {
             "/": "/reset-password",
             "comment": "Allow password-reset links to open in the iOS app."
+          },
+          {
+            "/": "/weekly-challenges",
+            "comment": "Challenge hub."
+          },
+          {
+            "/": "/weekly-challenges/*",
+            "comment": "Challenge entry and result deep links."
+          },
+          {
+            "/": "/challenges/creator/*",
+            "comment": "Approved creator invitation links."
           }
         ]
       }

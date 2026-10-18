@@ -1,6 +1,7 @@
+import { isExperience } from "@/hooks/use-challenge-experiences";
 import { WeeklyChallengeSponsor } from "@/components/challenges/WeeklyChallengeSponsor";
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PageHeader, SurfaceCard } from "@/components/fantasy";
 import { Button } from "@/components/ui/button";
@@ -529,14 +530,14 @@ function Duels({ challenge: c }: { challenge: Challenge }) {
   );
 }
 
-function ChallengeResults({ challenge: c }: { challenge: Challenge }) {
+export function ChallengeResults({ challenge: c, pageSize = 25 }: { challenge: Challenge; pageSize?: number }) {
   const { user } = useAuth();
   const [offset, setOffset] = useState(0);
   const query = useQuery({
-    queryKey: ["weekly-challenges", "results", user?.id, c.id, offset],
+    queryKey: ["weekly-challenges", "results", user?.id, c.id, offset, pageSize],
     queryFn: () =>
       apiGet<Results>(`/weekly-challenges/challenges/${c.id}/results`, {
-        limit: 25,
+        limit: pageSize,
         offset,
       }),
     refetchInterval: 30_000,
@@ -626,14 +627,14 @@ function ChallengeResults({ challenge: c }: { challenge: Challenge }) {
           <Button
             variant="outline"
             disabled={offset === 0}
-            onClick={() => setOffset(Math.max(0, offset - 25))}
+            onClick={() => setOffset(Math.max(0, offset - pageSize))}
           >
             Previous
           </Button>
           <Button
             variant="outline"
-            disabled={offset + 25 >= query.data.total}
-            onClick={() => setOffset(offset + 25)}
+            disabled={offset + pageSize >= query.data.total}
+            onClick={() => setOffset(offset + pageSize)}
           >
             Next
           </Button>
@@ -650,6 +651,7 @@ export default function WeeklyChallengeDetail() {
   const query = useChallenge(Number(challengeId));
   const state = useChallengeState(query.data);
   const c = query.data ? { ...query.data, state } : undefined;
+  if (c && isExperience(c.kind)) return <Navigate to={`/weekly-challenges/experiences/${c.id}`} replace/>;
   return (
     <div className="mx-auto max-w-4xl space-y-5 pb-24 pt-3">
       <Button asChild variant="outline">

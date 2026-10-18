@@ -92,6 +92,16 @@ def _event(
 # The alpha event matrix.  Every producer must enqueue one of these events;
 # gameplay services never call providers directly.
 NOTIFICATION_EVENTS: dict[str, NotificationEventDefinition] = {
+    "CHALLENGE_REMINDER": _event(
+        "CHALLENGE_REMINDER", "CHALLENGE", "weekly challenge lifecycle", "participants in a published competition", "entry deadline is still in the future",
+        "Your challenge locks soon", "Review your official entry before the deadline.", "challenge", "challenge-reminder:{challenge_id}:{recipient_user_id}:{deadline}",
+        "lineup_reminders", None,
+    ),
+    "CHALLENGE_RESULT": _event(
+        "CHALLENGE_RESULT", "CHALLENGE", "weekly challenge settlement", "owner of a finalized entry", "verified final score and matching source hash",
+        "Your challenge results are in", "Open CFFB to view your result.", "challenge", "challenge-result:{challenge_id}:{recipient_user_id}:{source_hash}",
+        "matchup_result_alerts", None,
+    ),
     "MAJOR_NEWS": _event(
         "MAJOR_NEWS", "NEWS", "admin-confirmed announcement", "explicitly opted-in users", "admin confirmed",
         "College football news", "Open your approved announcement.", "announcement", "news:{announcement_id}:{recipient_user_id}",
@@ -437,6 +447,8 @@ def destination_for_event(event_type: str, *, league_id: int | None, payload: di
         destination["resource_id"] = payload["matchup_id"]
     if definition.destination_type == "player":
         destination["resource_id"] = payload.get("player_id")
+    if definition.destination_type == "challenge":
+        destination["resource_id"] = payload.get("challenge_id")
     if definition.destination_type == "announcement":
         destination["resource_id"] = payload.get("announcement_id")
     if definition.destination_type == "matchup" and payload.get("week") is not None:

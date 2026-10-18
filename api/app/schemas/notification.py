@@ -115,7 +115,7 @@ class LeagueNotificationPreferencesUpdate(BaseModel):
 
 
 class NotificationDestination(BaseModel):
-    type: Literal["draft", "trade", "waivers", "matchup", "chat", "league", "player", "announcement"]
+    type: Literal["draft", "trade", "waivers", "matchup", "chat", "league", "player", "announcement", "challenge"]
     league_id: int | None = Field(default=None, gt=0)
     resource_id: int | None = Field(default=None, gt=0)
     week: int | None = Field(default=None, ge=1, le=30)

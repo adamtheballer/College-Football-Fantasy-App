@@ -1,0 +1,16 @@
+meta {
+  name: Modes
+  type: http
+  seq: 1
+}
+get {
+  url: {{base_url}}/weekly-challenges/modes
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+docs {
+  See docs/operations/challenge-experiences.md. Use an isolated environment first.
+  IDs and versions must come from real API responses. Review and publish using
+  the existing WeeklyChallenges Validate/Publish requests; draft configuration alone never opens entries.
+}
