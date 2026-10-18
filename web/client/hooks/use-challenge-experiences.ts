@@ -58,6 +58,7 @@ export type Experience = {
   entry_open_at: string;
   participants: number;
   locked_game_ids: number[];
+  ineligible_player_ids: number[];
   projections: Record<number, number>;
   creator: Creator | null;
   creator_picks: Pick[] | null;

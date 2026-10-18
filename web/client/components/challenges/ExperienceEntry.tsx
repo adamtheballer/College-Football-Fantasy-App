@@ -51,6 +51,7 @@ export function experienceEntryError(
       const salary = salaries.get(p.player_id!);
       if (
         !player ||
+        x.ineligible_player_ids.includes(p.player_id!) ||
         salary === undefined ||
         !MILLIONAIRE_SLOTS.includes(
           p.slot as (typeof MILLIONAIRE_SLOTS)[number],
@@ -427,13 +428,14 @@ export function ExperienceEntry({
                   const used = picks.some(
                     (v) => v.player_id === p.id && v.slot !== slot,
                   );
+                  const ineligible = x.ineligible_player_ids.includes(p.id);
                   const over = (prices.get(p.id) ?? Infinity) > available;
                   const g = c.games.find((g) => g.id === p.game_id);
                   return (
                     <button
                       key={p.id}
                       type="button"
-                      disabled={disabled || used || over}
+                      disabled={disabled || used || over || ineligible}
                       className="flex min-h-16 w-full items-center justify-between gap-3 rounded border border-border p-3 text-left disabled:opacity-40"
                       onClick={() => {
                         if (slot) {
@@ -453,13 +455,15 @@ export function ExperienceEntry({
                         </span>
                         <span className="block text-xs font-normal text-muted-foreground">
                           {deadlineText(g?.start_date ?? null)} ·{" "}
-                          {used
-                            ? "Already selected"
-                            : over
-                              ? "Over available budget"
-                              : x.projections[p.id] === undefined
-                                ? "Projection pending"
-                                : `${x.projections[p.id].toFixed(1)} projected pts`}
+                          {ineligible
+                            ? "No longer eligible"
+                            : used
+                              ? "Already selected"
+                              : over
+                                ? "Over available budget"
+                                : x.projections[p.id] === undefined
+                                  ? "Projection pending"
+                                  : `${x.projections[p.id].toFixed(1)} projected pts`}
                         </span>
                       </span>
                       <span className="shrink-0 font-black">

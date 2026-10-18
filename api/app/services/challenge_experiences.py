@@ -604,6 +604,19 @@ def _series_state(db, x, user_id, before_week=None):
     return enrollment, picks, status
 
 
+def ineligible_pool_ids(db, c):
+    """Recheck the existing canonical eligibility policy without changing frozen salaries/history."""
+    r = db.get(ChallengeRound, c.round_id)
+    current = {
+        p["id"]: p["game_id"] for p in core().catalog(db, r.season, r.week)["players"]
+    }
+    return {
+        p.player_id
+        for p in db.query(ChallengePoolPlayer).filter_by(challenge_id=c.id)
+        if current.get(p.player_id) != p.game_id
+    }
+
+
 def validate_entry(db, c, p, complete, user_id):
     selections = [s.model_dump(exclude_none=True) for s in p.selections]
     r = db.get(ChallengeRound, c.round_id)
@@ -641,6 +654,13 @@ def validate_entry(db, c, p, complete, user_id):
             fail(
                 "INVALID_ENTRY",
                 "Choose eligible published players in their required slots.",
+                422,
+                c,
+            )
+        if set(ids) & ineligible_pool_ids(db, c):
+            fail(
+                "PLAYER_INELIGIBLE",
+                "A selected player is no longer eligible for this slate. Choose another player.",
                 422,
                 c,
             )
@@ -1311,6 +1331,13 @@ def read(db, c, user, *, admin=False, include_details=True):
         "correct_points": c.config.get("correct_points", 10),
         "minimum_fans": c.config.get("minimum_fans", 3),
     }
+    if (
+        c.kind == "millionaire"
+        and public
+        and include_details
+        and state(db, c, r) == "Open"
+    ):
+        result["ineligible_player_ids"] = sorted(ineligible_pool_ids(db, c))
     mine = core().entry_for(db, c, user.id)
     score = (
         db.query(ChallengeScore).filter_by(entry_id=mine.id).one_or_none()
@@ -1933,30 +1960,13 @@ def read_challenge(db, c, user, *, admin=False, include_details=True):
 
 def published_projections(db, c, player_ids):
     import math
-    from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
-
+    from collegefootballfantasy_api.app.crud.projection import current_published_projections_query
     r = db.get(ChallengeRound, c.round_id)
-    values = {}
-    query = (
-        db.query(WeeklyProjection)
-        .filter(
-            WeeklyProjection.player_id.in_(player_ids),
-            WeeklyProjection.season == r.season,
-            WeeklyProjection.week == r.week,
-            WeeklyProjection.projection_version == "FINAL",
-            WeeklyProjection.is_published.is_(True),
-            WeeklyProjection.beta_ready_clause(),
-        )
-        .order_by(WeeklyProjection.updated_at.desc(), WeeklyProjection.id.desc())
-    )
-    for p in query:
-        if (
-            p.player_id not in values
-            and p.fantasy_points is not None
-            and math.isfinite(p.fantasy_points)
-        ):
-            values[p.player_id] = p.fantasy_points
-    return values
+    # Reuse the same version precedence as player cards, rosters and the projection API.
+    # A published correction or locked snapshot must outrank an older FINAL row.
+    rows = db.scalars(current_published_projections_query(season=r.season, week=r.week, player_ids=player_ids))
+    return {p.player_id: p.fantasy_points for p in rows
+            if p.fantasy_points is not None and math.isfinite(p.fantasy_points)}
 
 
 def notification_eligible(db, row, user):

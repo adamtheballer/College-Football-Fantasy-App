@@ -77,3 +77,9 @@ describe("expanded challenge entry preflight", () => {
     ).toMatch(/already used/);
   });
 });
+
+it("rejects a player whose canonical eligibility changed after publication", () => {
+  const c = get("millionaire");
+  c.experience!.ineligible_player_ids = [101];
+  expect(experienceEntryError(c, lineup, true)).toMatch(/eligible/);
+});

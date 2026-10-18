@@ -154,6 +154,7 @@ class ExperienceRead(BaseModel):
     season: int
     week: int
     locked_game_ids: list[int] = Field(default_factory=list)
+    ineligible_player_ids: list[int] = Field(default_factory=list)
     projections: dict[int, float] = Field(default_factory=dict)
     enabled: bool
     kind: ExperienceKind

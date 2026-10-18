@@ -37,8 +37,8 @@ existing five-format editor remains `/admin/weekly-challenges`.
   before publication. Full precision determines ties before display rounding.
 - **Fantasy Millionaire:** review one salary for every eligible pool player;
   a legal QB/RB/WR/WR/TE/FLEX formation must fit 100 virtual credits. Suggested
-  salary v1 is `clamp(floor(0.8 * trusted published FINAL projection + 0.5),1,30)`.
-  Missing trusted projections produce no suggestion; review is required. The
+  salary v1 is `clamp(floor(0.8 * authoritative published projection + 0.5),1,30)`.
+  Published snapshots use the existing projection API version precedence (locked/corrected before FINAL/preseason). Missing published projections produce no suggestion; review is required. A reviewed opening salary set may instead use published CFFB draft ranks, with its rule and source recorded explicitly; it must never masquerade as a point projection. The
   immutable salary/scoring snapshot applies to every entrant. Global first
   kickoff lock; opposing lineups remain private beforehand. Verified zero and
   confirmed nonparticipation are distinct from missing facts (pending).
@@ -109,10 +109,10 @@ fallback. Entitlements and AASA must match the signed distribution profile.
 ## Local validation evidence (October 17, 2026)
 
 - Full backend: 1,309 passed, 7 skipped (proper PYTHONPATH and loopback access).
-- Focused expanded modes: 39 passed, 1 PostgreSQL-only skip; the PostgreSQL
+- Focused expanded modes: 41 passed, 1 PostgreSQL-only skip; the PostgreSQL
   run passed all 106 challenge tests, with 12 final history/concurrency/deletion
   cases rerun against PostgreSQL after refinements.
-- Frontend: 690 tests across 103 files; application/test/Vite typechecks pass.
+- Frontend: 691 tests across 103 files; application/test/Vite typechecks pass.
 - Browser: 20 focused scenarios across 320/390/1280px, all four entry forms,
   signup/login return links, legacy formats/count limits and sponsor boundaries.
 - Production Vite build passes. PostgreSQL migration preserves legacy records

@@ -1169,3 +1169,35 @@ def test_creator_identity_mismatch_never_displays_an_unverified_comparison(exp):
         and x["creator_score"] is None
         and x["comparison"] is None
     )
+
+
+def test_millionaire_rechecks_canonical_eligibility_without_rewriting_an_entry(exp):
+    w = exp
+    c = publish(w, "millionaire")
+    assert save(w, c).status_code == 200
+    player = w["players"][0]
+    player.sheet_source_sheet_id = "no-longer-canonical"
+    w["db"].commit()
+    response = save(w, c, expected_revision=1)
+    assert (
+        response.status_code == 422
+        and response.json()["detail"]["code"] == "PLAYER_INELIGIBLE"
+    )
+    row = w["db"].query(ChallengeEntry).filter_by(challenge_id=c["id"]).one()
+    assert row.revision == 1 and row.status == "submitted"
+    x = (
+        w["client"]
+        .get(f"{BASE}/challenges/{c['id']}", headers=w["accounts"][1][1])
+        .json()["experience"]
+    )
+    assert player.id in x["ineligible_player_ids"]
+
+
+def test_salary_suggestions_reuse_canonical_published_projection_precedence(exp):
+    from collegefootballfantasy_api.app.models.weekly_projection import WeeklyProjection
+    w=exp;c=create(w,"millionaire");pid=w["players"][0].id
+    for version,points,published in [("PRESEASON",14,True),("FINAL",21,True),("CORRECTED_OUTLOOK",19,True),("LOCKED",30,False)]:
+        w["db"].add(WeeklyProjection(player_id=pid,season=2026,week=1,projection_version=version,fantasy_points=points,is_published=published))
+    w["db"].commit()
+    result=w["client"].get(f"{ADMIN}/experiences/{c['id']}/salary-suggestions",headers=w["accounts"][0][1])
+    assert result.status_code==200 and result.json()==[{"player_id":pid,"salary":15,"projection":19,"rule":"review-required-salary-v1"}]
