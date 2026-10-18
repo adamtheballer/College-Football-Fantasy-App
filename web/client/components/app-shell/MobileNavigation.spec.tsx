@@ -60,7 +60,7 @@ const renderGuestNavigation = () => {
 };
 
 describe("MobileNavigation", () => {
-  it("keeps four tap-friendly primary destinations visible and opens the full sidebar in More", () => {
+  it("keeps five tap-friendly primary destinations visible and opens the full sidebar in More", () => {
     renderNavigation();
 
     const navigation = screen.getByRole("navigation", { name: "Primary mobile navigation" });
@@ -72,6 +72,7 @@ describe("MobileNavigation", () => {
     expect(screen.getByLabelText("LEAGUES")).toBeTruthy();
     expect(screen.getByLabelText("CHATS: 2 unread chat messages")).toBeTruthy();
     expect(screen.getByLabelText("MOCK DRAFT")).toBeTruthy();
+    expect(screen.getByLabelText("CHALLENGES").getAttribute("href")).toBe("/weekly-challenges");
     expect(screen.getByRole("button", { name: "Open all navigation" })).toBeTruthy();
     expect(screen.queryByText("INJURY CENTER")).toBeNull();
 
@@ -153,10 +154,10 @@ describe("MobileNavigation", () => {
     expect(screen.getByRole("button", { name: "SIGN OUT" })).toBeTruthy();
   });
 
-  it("keeps the five primary labels on one line at narrow mobile widths", () => {
+  it("keeps all six labels on one line at narrow mobile widths", () => {
     renderNavigation();
 
-    for (const label of ["Home", "Leagues", "Chats", "Draft", "More"]) {
+    for (const label of ["Home", "Leagues", "Chats", "Draft", "Challenges", "More"]) {
       expect(screen.getByText(label).className).toContain("whitespace-nowrap");
     }
   });

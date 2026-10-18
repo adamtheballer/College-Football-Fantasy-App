@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from typing import Literal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, field_serializer
 
 from collegefootballfantasy_api.app.schemas.waiver import WaiverClaimRead, WaiverDropCandidateRead
 from collegefootballfantasy_api.app.services.player_pool_filters import (
@@ -444,6 +444,12 @@ class LeagueDetailRead(BaseModel):
     invite_code: str | None
     description: str | None = None
     icon_url: str | None = None
+
+    @field_serializer("icon_url")
+    def release_league_artwork(self, value: str | None) -> str | None:
+        from collegefootballfantasy_api.app.core.config import settings
+        return value if settings.league_logos_enabled else None
+
     status: str
     created_at: datetime
     updated_at: datetime

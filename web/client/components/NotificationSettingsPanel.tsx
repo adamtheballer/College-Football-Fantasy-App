@@ -309,7 +309,7 @@ export function NotificationSettingsPanel() {
           <p className="text-sm font-bold">Phone alert categories</p>
           {([
             ["push_drafts", "Drafts", "Your league’s draft starts and existing draft reminders."],
-            ["push_matchups", "Matchups", "Your weekly matchup begins and certified results."],
+            ["push_matchups", "Matchups", "Your weekly matchup begins, certified results, and joined challenge reminders/results."],
             ["push_injuries", "Injuries to my players", "Verified worsening availability for starters, bench, and IR."],
             ["push_major_news", "Major college-football news", "Opt in to announcements approved by a CFFB admin."],
           ] as const).map(([key, label, description]) => <div key={key} className="flex items-center justify-between gap-4">

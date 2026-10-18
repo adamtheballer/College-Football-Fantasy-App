@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
@@ -21,7 +21,10 @@ import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError, apiUnavailableMessage } from "@/lib/api";
 import { setPendingGuide } from "@/lib/onboarding";
-import { PASSWORD_POLICY_MESSAGE, passwordMeetsPolicy } from "@/lib/password-policy";
+import {
+  PASSWORD_POLICY_MESSAGE,
+  passwordMeetsPolicy,
+} from "@/lib/password-policy";
 
 const featureCards = [
   {
@@ -70,11 +73,12 @@ export const loginErrorMessage = (error: unknown): string => {
     return apiUnavailableMessage();
   }
 
-  if (error instanceof Error && (
-    error.message.includes("native refresh session") ||
-    error.message.includes("securely save") ||
-    error.message.includes("Keychain")
-  )) {
+  if (
+    error instanceof Error &&
+    (error.message.includes("native refresh session") ||
+      error.message.includes("securely save") ||
+      error.message.includes("Keychain"))
+  ) {
     return "Your iPhone could not securely save the sign-in session. Please try again or contact support.";
   }
 
@@ -83,7 +87,10 @@ export const loginErrorMessage = (error: unknown): string => {
 
 export type LoginMode = "signin" | "signup";
 
-export const initialLoginMode = (flow: string | null, _earlyAccessProEnabled: boolean): LoginMode => {
+export const initialLoginMode = (
+  flow: string | null,
+  _earlyAccessProEnabled: boolean,
+): LoginMode => {
   if (flow === "signup") return "signup";
   // Retire old Pro-code links without letting them surface an obsolete claim
   // workflow in the alpha release.
@@ -102,7 +109,11 @@ export const safeAuthRedirectTarget = (value: unknown): string => {
   if (typeof value !== "string") return "/";
 
   const candidate = value.trim();
-  if (!candidate.startsWith("/") || candidate.startsWith("//") || candidate.includes("\\")) {
+  if (
+    !candidate.startsWith("/") ||
+    candidate.startsWith("//") ||
+    candidate.includes("\\")
+  ) {
     return "/";
   }
 
@@ -130,17 +141,22 @@ export default function Login() {
     email_enabled: emailEnabled,
     password_reset_enabled: passwordResetEnabled,
   } = useRuntimeCapabilities();
-  const redirectTarget = safeAuthRedirectTarget(
-    typeof location.state === "object" && location.state && "from" in location.state
-      ? location.state.from
-      : undefined,
-  );
+  // Keep the protected destination stable while a lazy route transition is pending.
+  const redirectTarget = useRef(
+    safeAuthRedirectTarget(
+      typeof location.state === "object" &&
+        location.state &&
+        "from" in location.state
+        ? location.state.from
+        : undefined,
+    ),
+  ).current;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
-  const [mode, setMode] = useState<LoginMode>(
-    () => initialLoginMode(new URLSearchParams(location.search).get("flow"), false),
+  const [mode, setMode] = useState<LoginMode>(() =>
+    initialLoginMode(new URLSearchParams(location.search).get("flow"), false),
   );
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -159,7 +175,10 @@ export default function Login() {
   const selectMode = (nextMode: LoginMode, clearError = true) => {
     if (clearError) setError(null);
     setMode(nextMode);
-    navigate(loginPathForMode(nextMode), { replace: true });
+    navigate(loginPathForMode(nextMode), {
+      replace: true,
+      state: location.state,
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -213,7 +232,10 @@ export default function Login() {
   if (shouldHoldAuthEntry(isBootstrapping, isLoggedIn, false)) {
     return (
       <main className="mx-auto flex min-h-[calc(100vh-8rem)] w-full max-w-xl items-center justify-center px-4 py-8">
-        <p className="cfb-micro-label text-center text-cfb-text-secondary" role="status">
+        <p
+          className="cfb-micro-label text-center text-cfb-text-secondary"
+          role="status"
+        >
           Restoring your signed-in session…
         </p>
       </main>
@@ -223,7 +245,11 @@ export default function Login() {
   return (
     <main className="relative mx-auto grid min-h-[calc(100vh-8rem)] w-full max-w-7xl items-center gap-6 overflow-hidden px-4 py-8 sm:px-6 lg:grid-cols-[1.02fr_0.98fr] lg:px-8">
       <section className="relative hidden lg:block">
-        <SurfaceCard variant="scoreboard" padding="spacious" className="cfb-playbook-pattern min-h-[560px]">
+        <SurfaceCard
+          variant="scoreboard"
+          padding="spacious"
+          className="cfb-playbook-pattern min-h-[560px]"
+        >
           <div className="relative flex h-full flex-col justify-between gap-10">
             <div className="space-y-7">
               <Link
@@ -241,13 +267,12 @@ export default function Login() {
                 </p>
                 <h1 className="cfb-display-title text-4xl xl:text-5xl">
                   Lock in your
-                  <span className="block text-cfb-brand">
-                    title chase
-                  </span>
+                  <span className="block text-cfb-brand">title chase</span>
                 </h1>
                 <p className="max-w-xl text-base font-semibold leading-7 text-cfb-text-secondary">
-                  Sign in to manage your leagues, draft rooms, rosters, alerts, and matchup decisions
-                  from one college football command center.
+                  Sign in to manage your leagues, draft rooms, rosters, alerts,
+                  and matchup decisions from one college football command
+                  center.
                 </p>
               </div>
             </div>
@@ -256,9 +281,15 @@ export default function Login() {
               {featureCards.map((item) => {
                 const Icon = item.icon;
                 return (
-                  <div key={item.title} className={`rounded-2xl border p-4 ${item.tone}`}>
+                  <div
+                    key={item.title}
+                    className={`rounded-2xl border p-4 ${item.tone}`}
+                  >
                     <div className="flex items-start gap-3">
-                      <Icon className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+                      <Icon
+                        className="mt-0.5 h-5 w-5 shrink-0"
+                        aria-hidden="true"
+                      />
                       <div>
                         <p className="text-sm font-black uppercase tracking-[0.12em] text-cfb-text-primary">
                           {item.title}
@@ -277,7 +308,11 @@ export default function Login() {
       </section>
 
       <section className="relative mx-auto w-full max-w-[520px]">
-        <SurfaceCard variant="raised" padding="none" className="relative overflow-hidden">
+        <SurfaceCard
+          variant="raised"
+          padding="none"
+          className="relative overflow-hidden"
+        >
           <PlaybookDecor className="opacity-25" />
           <div className="absolute inset-x-0 top-0 h-0.5 bg-cfb-brand" />
 
@@ -304,58 +339,238 @@ export default function Login() {
             {mode === "signin" ? (
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-2">
-                  <label htmlFor="login-email" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">Email address</label>
+                  <label
+                    htmlFor="login-email"
+                    className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted"
+                  >
+                    Email address
+                  </label>
                   <span className="group relative block">
                     <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted transition-colors group-focus-within:text-cfb-cyan" />
-                    <Input id="login-email" type="email" placeholder="coach@saturday.com" className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-base font-bold text-cfb-text-primary placeholder:text-cfb-text-muted transition focus:border-cfb-brand/60 focus:ring-cfb-brand/25 md:text-sm" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                    <Input
+                      id="login-email"
+                      type="email"
+                      placeholder="coach@saturday.com"
+                      className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-base font-bold text-cfb-text-primary placeholder:text-cfb-text-muted transition focus:border-cfb-brand/60 focus:ring-cfb-brand/25 md:text-sm"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
                   </span>
                 </div>
                 <div className="space-y-2">
                   <span className="flex items-center justify-between px-3">
-                    <label htmlFor="login-password" className="text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">Password</label>
+                    <label
+                      htmlFor="login-password"
+                      className="text-[10px] font-black uppercase tracking-widest text-cfb-text-muted"
+                    >
+                      Password
+                    </label>
                     {emailEnabled && passwordResetEnabled ? (
-                      <Link to="/forgot-password" className="text-[9px] font-black uppercase tracking-widest text-cfb-gold transition hover:text-yellow-100">Forgot password?</Link>
+                      <Link
+                        to="/forgot-password"
+                        className="text-[9px] font-black uppercase tracking-widest text-cfb-gold transition hover:text-yellow-100"
+                      >
+                        Forgot password?
+                      </Link>
                     ) : null}
                   </span>
                   <span className="group relative block">
                     <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted transition-colors group-focus-within:text-cfb-cyan" />
-                    <Input id="login-password" type={showPassword ? "text" : "password"} placeholder="••••••••" className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 pr-12 text-base font-bold text-cfb-text-primary placeholder:text-cfb-text-muted transition focus:border-cfb-brand/60 focus:ring-cfb-brand/25 md:text-sm" value={password} onChange={(e) => setPassword(e.target.value)} required />
-                    <button type="button" aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword} onClick={() => setShowPassword((value) => !value)} className="absolute right-4 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-cfb-text-muted transition hover:bg-white/10 hover:text-cfb-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-cyan/60">
-                      {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+                    <Input
+                      id="login-password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 pr-12 text-base font-bold text-cfb-text-primary placeholder:text-cfb-text-muted transition focus:border-cfb-brand/60 focus:ring-cfb-brand/25 md:text-sm"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                    />
+                    <button
+                      type="button"
+                      aria-label={
+                        showPassword ? "Hide password" : "Show password"
+                      }
+                      aria-pressed={showPassword}
+                      onClick={() => setShowPassword((value) => !value)}
+                      className="absolute right-4 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-cfb-text-muted transition hover:bg-white/10 hover:text-cfb-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cfb-cyan/60"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" aria-hidden="true" />
+                      ) : (
+                        <Eye className="h-4 w-4" aria-hidden="true" />
+                      )}
                     </button>
                   </span>
                 </div>
-                {resetSuccess ? <div className="rounded-2xl border border-cfb-gold/35 bg-cfb-gold/[0.12] px-4 py-3 text-xs font-bold text-yellow-100">Password reset successfully. Sign in with your new password.</div> : null}
-                {error ? <div role="alert" className="rounded-2xl border border-cfb-danger/35 bg-cfb-danger/[0.14] px-4 py-3 text-xs font-bold text-red-100">{error}</div> : null}
-                <Button type="submit" className="group h-12 w-full rounded-2xl bg-cfb-brand text-sm font-semibold text-primary-foreground shadow-none hover:brightness-110" disabled={isLoading}>
-                  {isLoading ? <span className="h-5 w-5 rounded-full border-2 border-slate-950/30 border-t-slate-950 animate-spin" /> : <span className="flex items-center gap-2 transition-all group-hover:gap-4">Sign in to dashboard <ArrowRight className="h-4 w-4" aria-hidden="true" /></span>}
+                {resetSuccess ? (
+                  <div className="rounded-2xl border border-cfb-gold/35 bg-cfb-gold/[0.12] px-4 py-3 text-xs font-bold text-yellow-100">
+                    Password reset successfully. Sign in with your new password.
+                  </div>
+                ) : null}
+                {error ? (
+                  <div
+                    role="alert"
+                    className="rounded-2xl border border-cfb-danger/35 bg-cfb-danger/[0.14] px-4 py-3 text-xs font-bold text-red-100"
+                  >
+                    {error}
+                  </div>
+                ) : null}
+                <Button
+                  type="submit"
+                  className="group h-12 w-full rounded-2xl bg-cfb-brand text-sm font-semibold text-primary-foreground shadow-none hover:brightness-110"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <span className="h-5 w-5 rounded-full border-2 border-slate-950/30 border-t-slate-950 animate-spin" />
+                  ) : (
+                    <span className="flex items-center gap-2 transition-all group-hover:gap-4">
+                      Sign in to dashboard{" "}
+                      <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                  )}
                 </Button>
               </form>
             ) : (
               <form onSubmit={handleSignupSubmit} className="space-y-5">
-                <div className="space-y-2"><label htmlFor="signup-name" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">First name</label><span className="group relative block"><User className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" /><Input id="signup-name" type="text" placeholder="Your first name" maxLength={50} className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-base font-bold text-cfb-text-primary md:text-sm" value={firstName} onChange={(event) => setFirstName(event.target.value)} required /></span></div>
-                <div className="space-y-2"><label htmlFor="signup-email" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">Email address</label><span className="group relative block"><Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" /><Input id="signup-email" type="email" placeholder="coach@saturday.com" className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-base font-bold text-cfb-text-primary md:text-sm" value={email} onChange={(event) => setEmail(event.target.value)} required /></span></div>
-                <div className="space-y-2"><label htmlFor="signup-password" className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted">Password</label><span className="group relative block"><Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" /><Input id="signup-password" type={showPassword ? "text" : "password"} placeholder="••••••••" className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 pr-12 text-base font-bold text-cfb-text-primary md:text-sm" value={password} onChange={(event) => setPassword(event.target.value)} required /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((value) => !value)} className="absolute right-4 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-cfb-text-muted">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></span></div>
-                <p className="rounded-2xl border border-cfb-border-subtle bg-cfb-surface/60 px-4 py-3 text-xs font-semibold text-cfb-text-secondary">{PASSWORD_POLICY_MESSAGE}</p>
-                {error ? <div role="alert" className="rounded-2xl border border-cfb-danger/35 bg-cfb-danger/[0.14] px-4 py-3 text-xs font-bold text-red-100">{error}</div> : null}
-                <Button type="submit" className="group h-12 w-full rounded-2xl bg-cfb-brand text-sm font-semibold text-primary-foreground shadow-none hover:brightness-110" disabled={isLoading}>{isLoading ? <span className="h-5 w-5 rounded-full border-2 border-slate-950/30 border-t-slate-950 animate-spin" /> : <span className="flex items-center gap-2 transition-all group-hover:gap-4">Create account <ArrowRight className="h-4 w-4" aria-hidden="true" /></span>}</Button>
+                <div className="space-y-2">
+                  <label
+                    htmlFor="signup-name"
+                    className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted"
+                  >
+                    First name
+                  </label>
+                  <span className="group relative block">
+                    <User className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" />
+                    <Input
+                      id="signup-name"
+                      type="text"
+                      placeholder="Your first name"
+                      maxLength={50}
+                      className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-base font-bold text-cfb-text-primary md:text-sm"
+                      value={firstName}
+                      onChange={(event) => setFirstName(event.target.value)}
+                      required
+                    />
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <label
+                    htmlFor="signup-email"
+                    className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted"
+                  >
+                    Email address
+                  </label>
+                  <span className="group relative block">
+                    <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" />
+                    <Input
+                      id="signup-email"
+                      type="email"
+                      placeholder="coach@saturday.com"
+                      className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 text-base font-bold text-cfb-text-primary md:text-sm"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      required
+                    />
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <label
+                    htmlFor="signup-password"
+                    className="ml-3 block text-[10px] font-black uppercase tracking-widest text-cfb-text-muted"
+                  >
+                    Password
+                  </label>
+                  <span className="group relative block">
+                    <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cfb-text-muted" />
+                    <Input
+                      id="signup-password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="••••••••"
+                      className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface/80 pl-12 pr-12 text-base font-bold text-cfb-text-primary md:text-sm"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      required
+                    />
+                    <button
+                      type="button"
+                      aria-label={
+                        showPassword ? "Hide password" : "Show password"
+                      }
+                      onClick={() => setShowPassword((value) => !value)}
+                      className="absolute right-4 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-cfb-text-muted"
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </button>
+                  </span>
+                </div>
+                <p className="rounded-2xl border border-cfb-border-subtle bg-cfb-surface/60 px-4 py-3 text-xs font-semibold text-cfb-text-secondary">
+                  {PASSWORD_POLICY_MESSAGE}
+                </p>
+                {error ? (
+                  <div
+                    role="alert"
+                    className="rounded-2xl border border-cfb-danger/35 bg-cfb-danger/[0.14] px-4 py-3 text-xs font-bold text-red-100"
+                  >
+                    {error}
+                  </div>
+                ) : null}
+                <Button
+                  type="submit"
+                  className="group h-12 w-full rounded-2xl bg-cfb-brand text-sm font-semibold text-primary-foreground shadow-none hover:brightness-110"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <span className="h-5 w-5 rounded-full border-2 border-slate-950/30 border-t-slate-950 animate-spin" />
+                  ) : (
+                    <span className="flex items-center gap-2 transition-all group-hover:gap-4">
+                      Create account{" "}
+                      <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                    </span>
+                  )}
+                </Button>
               </form>
             )}
 
             <div className="rounded-2xl border border-cfb-border-subtle bg-cfb-surface/60 p-4">
-              <p className="text-sm font-semibold text-cfb-text-secondary">{mode === "signin" ? "New here? Create your account to get started." : "Already have an account? Sign in to continue."}</p>
+              <p className="text-sm font-semibold text-cfb-text-secondary">
+                {mode === "signin"
+                  ? "New here? Create your account to get started."
+                  : "Already have an account? Sign in to continue."}
+              </p>
             </div>
           </div>
 
           <div className="relative border-t border-cfb-border-subtle bg-cfb-surface/70 px-6 py-5 text-center">
-            {mode === "signin" ? <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[10px] font-bold uppercase tracking-widest text-cfb-text-secondary"><button type="button" onClick={() => selectMode("signup")}>Don&apos;t have an account?<span className="ml-1 font-black text-cfb-gold hover:text-yellow-100">Create one</span></button></div> : <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[10px] font-bold uppercase tracking-widest text-cfb-text-secondary"><button type="button" onClick={() => selectMode("signin")}>Already have an account?<span className="ml-1 font-black text-cfb-gold hover:text-yellow-100">Sign in</span></button></div>}
+            {mode === "signin" ? (
+              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[10px] font-bold uppercase tracking-widest text-cfb-text-secondary">
+                <button type="button" onClick={() => selectMode("signup")}>
+                  Don&apos;t have an account?
+                  <span className="ml-1 font-black text-cfb-gold hover:text-yellow-100">
+                    Create one
+                  </span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[10px] font-bold uppercase tracking-widest text-cfb-text-secondary">
+                <button type="button" onClick={() => selectMode("signin")}>
+                  Already have an account?
+                  <span className="ml-1 font-black text-cfb-gold hover:text-yellow-100">
+                    Sign in
+                  </span>
+                </button>
+              </div>
+            )}
           </div>
         </SurfaceCard>
         <div className="mt-5 text-center text-[11px] font-semibold text-cfb-text-muted">
           <PublicLegalLinks />
         </div>
       </section>
-
     </main>
   );
 }

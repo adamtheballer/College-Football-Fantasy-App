@@ -3,12 +3,12 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { apiGet, ApiError } from "@/lib/api";
 
-export type ChallengeKind = "slate12" | "upset" | "fantasy5" | "lock" | "duels";
+export type ChallengeKind = "slate12" | "upset" | "fantasy5" | "lock" | "duels" | "fanwars" | "millionaire" | "creator" | "survivor";
 export type Pick = {
   game_id?: number;
   team?: string;
   player_id?: number;
-  slot?: "QB" | "RB" | "WR" | "TE" | "FLEX";
+  slot?: "QB" | "RB" | "WR" | "WR1" | "WR2" | "TE" | "FLEX";
 };
 export type Entry = {
   id: number;
@@ -54,6 +54,8 @@ export type ChallengeSponsor = {
   week: number;
 };
 export type Challenge = {
+  participant_count?: number;
+  experience?: import("@/hooks/use-challenge-experiences").Experience | null;
   sponsor?: ChallengeSponsor | null;
   id: number;
   round_id: number;
@@ -136,6 +138,10 @@ export const CHALLENGE_NAMES: Record<ChallengeKind, string> = {
   fantasy5: "Fantasy Five",
   lock: "Lock of the Week",
   duels: "Rivalry Duels",
+  fanwars: "College Football Fan Wars",
+  millionaire: "Fantasy Millionaire",
+  creator: "Beat the Creator",
+  survivor: "Last Fan Standing",
 };
 export const FORMATS: Record<ChallengeKind, string> = {
   slate12: "12 winners · 1 point each",
@@ -143,6 +149,10 @@ export const FORMATS: Record<ChallengeKind, string> = {
   fantasy5: "QB, RB, WR, TE + FLEX · placement points",
   lock: "One winner · 5 points",
   duels: "5 shared games · head-to-head",
+  fanwars: "Represent Your School",
+  millionaire: "$100 virtual budget · six players",
+  creator: "Ten picks · beat an approved creator",
+  survivor: "One pick · survive another week",
 };
 export const deadlineText = (value: string | null) =>
   value
@@ -195,7 +205,7 @@ export function useCurrentChallenges(enabled = true) {
   return useQuery({
     queryKey: ["weekly-challenges", "current", user?.id],
     enabled: enabled && !!user && !isBootstrapping,
-    queryFn: () => apiGet<Round>("/weekly-challenges/current"),
+    queryFn: () => apiGet<Round>("/weekly-challenges/current", { include_experiences: true }),
     staleTime: 15_000,
     refetchInterval: 30_000,
   });

@@ -20,7 +20,7 @@ describe("public legal documents", () => {
     expect(screen.getByRole("heading", { name: "Privacy Policy" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Information We Collect" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "How We Use Information" })).toBeTruthy();
-    expect(screen.getByText("Last updated: August 20, 2026")).toBeTruthy();
+    expect(screen.getByText("Last updated: October 17, 2026")).toBeTruthy();
     expect(container.textContent).not.toMatch(/TODO|PLACEHOLDER|FIXME/i);
   });
 

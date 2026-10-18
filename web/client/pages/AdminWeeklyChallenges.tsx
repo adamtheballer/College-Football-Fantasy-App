@@ -449,7 +449,7 @@ export default function AdminWeeklyChallenges() {
             games · {catalog.players.length} eligible players. No slate or
             difficulty is guessed when source data is missing.
           </p>
-          {round.challenges.map((c) => (
+          {round.challenges.filter(c => !["fanwars","millionaire","creator","survivor"].includes(c.kind)).map((c) => (
             <ConfigEditor
               key={`${round.id}:${c.id}`}
               challenge={c}

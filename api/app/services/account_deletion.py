@@ -81,4 +81,11 @@ def permanently_delete_user_account(db: Session, *, user: User) -> None:
     # Remove redeemed records instead of retaining that email after deletion.
     db.query(BetaAccessCode).filter(BetaAccessCode.redeemed_user_id == user_id).delete(synchronize_session=False)
 
+    # Delete the private entry-to-school link before either parent cascades.
+    # PostgreSQL RESTRICT checks cannot depend on sibling cascade ordering.
+    from collegefootballfantasy_api.app.models.weekly_challenge import ChallengeEntry
+    from collegefootballfantasy_api.app.models.challenge_experience import ChallengeEntrySchool
+    db.query(ChallengeEntrySchool).filter(ChallengeEntrySchool.entry_id.in_(
+        db.query(ChallengeEntry.id).filter(ChallengeEntry.user_id == user_id)
+    )).delete(synchronize_session=False)
     db.delete(user)

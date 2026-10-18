@@ -1,0 +1,553 @@
+{
+  "fixture_only": true,
+  "challenges": [
+    {
+      "experience": {
+        "season": 2026,
+        "week": 8,
+        "locked_game_ids": [],
+        "projections": {},
+        "enabled": true,
+        "kind": "fanwars",
+        "entry_open_at": "2026-10-17T12:00:00Z",
+        "participants": 0,
+        "creator": null,
+        "creator_picks": null,
+        "creator_correct": null,
+        "creator_score": null,
+        "comparison": null,
+        "salary_budget": 100,
+        "salaries": [],
+        "correct_points": 10,
+        "minimum_fans": 3,
+        "schools": [
+          {
+            "id": 1,
+            "name": "Alabama",
+            "conference": "SEC"
+          },
+          {
+            "id": 2,
+            "name": "Ohio State",
+            "conference": "BIG10"
+          }
+        ],
+        "allegiance": null,
+        "your_points": null,
+        "your_rank": null,
+        "best_performer": null,
+        "player_points": {},
+        "personal_contribution": null,
+        "personal_correct": null,
+        "school_week_rank": null,
+        "school_season_rank": null,
+        "school_standings": [],
+        "rivalries": [],
+        "series": null,
+        "survivor_status": null,
+        "weeks_survived": 0,
+        "remaining_survivors": 0,
+        "eliminated": 0,
+        "previous_picks": [],
+        "corrections": []
+      },
+      "participant_count": 0,
+      "sponsor": {
+        "name": "Pigskin Dispatch",
+        "label": "Sponsored by Pigskin Dispatch",
+        "tagline": "Football history, stories & podcasts",
+        "logo_url": "/assets/sponsors/PigskinDispatchLogo.png",
+        "youtube_url": "https://www.youtube.com/channel/UCQatEELNJL5GWry7eMXh-Qg?utm_source=chatgpt.com",
+        "season": 2026,
+        "week": 8
+      },
+      "id": 6,
+      "round_id": 8,
+      "kind": "fanwars",
+      "name": "College Football Fan Wars",
+      "state": "Open",
+      "settlement_status": "published",
+      "version": 2,
+      "rules_version": "experiences-v1",
+      "rules": "QA fixture rules: authoritative server locks and real scoring are required.",
+      "lock_at": "2026-10-24T16:00:00Z",
+      "server_now": "2026-10-17T12:00:00Z",
+      "published_at": "2026-10-17T12:00:00Z",
+      "scoring_version": null,
+      "scoring_rules": null,
+      "games": [
+        {
+          "id": 1,
+          "home_team": "Alabama",
+          "away_team": "Away QA 1",
+          "start_date": "2026-10-24T16:00:00Z",
+          "status": "scheduled",
+          "home_points": null,
+          "away_points": null
+        },
+        {
+          "id": 2,
+          "home_team": "Home QA 2",
+          "away_team": "Away QA 2",
+          "start_date": "2026-10-24T16:30:00Z",
+          "status": "scheduled",
+          "home_points": null,
+          "away_points": null
+        },
+        {
+          "id": 3,
+          "home_team": "Home QA 3",
+          "away_team": "Away QA 3",
+          "start_date": "2026-10-24T17:00:00Z",
+          "status": "scheduled",
+          "home_points": null,
+          "away_points": null
+        }
+      ],
+      "players": [],
+      "featured_game_id": null,
+      "underdogs": [],
+      "entry": null,
+      "cancellation_reason": null,
+      "draft_config": null
+    },
+    {
+      "experience": {
+        "season": 2026,
+        "week": 8,
+        "locked_game_ids": [],
+        "projections": {
+          "101": 15.5,
+          "102": 15.5,
+          "103": 15.5,
+          "104": 15.5,
+          "105": 15.5,
+          "106": 15.5,
+          "107": 15.5
+        },
+        "enabled": true,
+        "kind": "millionaire",
+        "entry_open_at": "2026-10-17T12:00:00Z",
+        "participants": 0,
+        "creator": null,
+        "creator_picks": null,
+        "creator_correct": null,
+        "creator_score": null,
+        "comparison": null,
+        "salary_budget": 100,
+        "salaries": [
+          {
+            "player_id": 101,
+            "salary": 10.0
+          },
+          {
+            "player_id": 102,
+            "salary": 10.0
+          },
+          {
+            "player_id": 103,
+            "salary": 10.0
+          },
+          {
+            "player_id": 104,
+            "salary": 10.0
+          },
+          {
+            "player_id": 105,
+            "salary": 10.0
+          },
+          {
+            "player_id": 106,
+            "salary": 10.0
+          },
+          {
+            "player_id": 107,
+            "salary": 10.0
+          }
+        ],
+        "correct_points": 10,
+        "minimum_fans": 3,
+        "schools": [],
+        "allegiance": null,
+        "your_points": null,
+        "your_rank": null,
+        "best_performer": null,
+        "player_points": {},
+        "personal_contribution": null,
+        "personal_correct": null,
+        "school_week_rank": null,
+        "school_season_rank": null,
+        "school_standings": [],
+        "rivalries": [],
+        "series": null,
+        "survivor_status": null,
+        "weeks_survived": 0,
+        "remaining_survivors": 0,
+        "eliminated": 0,
+        "previous_picks": [],
+        "corrections": []
+      },
+      "participant_count": 0,
+      "sponsor": {
+        "name": "Pigskin Dispatch",
+        "label": "Sponsored by Pigskin Dispatch",
+        "tagline": "Football history, stories & podcasts",
+        "logo_url": "/assets/sponsors/PigskinDispatchLogo.png",
+        "youtube_url": "https://www.youtube.com/channel/UCQatEELNJL5GWry7eMXh-Qg?utm_source=chatgpt.com",
+        "season": 2026,
+        "week": 8
+      },
+      "id": 7,
+      "round_id": 8,
+      "kind": "millionaire",
+      "name": "Fantasy Millionaire",
+      "state": "Open",
+      "settlement_status": "published",
+      "version": 2,
+      "rules_version": "experiences-v1",
+      "rules": "QA fixture rules: authoritative server locks and real scoring are required.",
+      "lock_at": "2026-10-24T16:00:00Z",
+      "server_now": "2026-10-17T12:00:00Z",
+      "published_at": "2026-10-17T12:00:00Z",
+      "scoring_version": null,
+      "scoring_rules": null,
+      "games": [
+        {
+          "id": 1,
+          "home_team": "Alabama",
+          "away_team": "Away QA 1",
+          "start_date": "2026-10-24T16:00:00Z",
+          "status": "scheduled",
+          "home_points": null,
+          "away_points": null
+        }
+      ],
+      "players": [
+        {
+          "id": 101,
+          "game_id": 1,
+          "name": "QA QB 1",
+          "school": "Alabama",
+          "position": "QB",
+          "image_url": null
+        },
+        {
+          "id": 102,
+          "game_id": 1,
+          "name": "QA RB 2",
+          "school": "Alabama",
+          "position": "RB",
+          "image_url": null
+        },
+        {
+          "id": 103,
+          "game_id": 1,
+          "name": "QA WR 3",
+          "school": "Alabama",
+          "position": "WR",
+          "image_url": null
+        },
+        {
+          "id": 104,
+          "game_id": 1,
+          "name": "QA TE 4",
+          "school": "Alabama",
+          "position": "TE",
+          "image_url": null
+        },
+        {
+          "id": 105,
+          "game_id": 1,
+          "name": "QA RB 5",
+          "school": "Alabama",
+          "position": "RB",
+          "image_url": null
+        },
+        {
+          "id": 106,
+          "game_id": 1,
+          "name": "QA QB 6",
+          "school": "Alabama",
+          "position": "QB",
+          "image_url": null
+        },
+        {
+          "id": 107,
+          "game_id": 1,
+          "name": "QA WR 7",
+          "school": "Alabama",
+          "position": "WR",
+          "image_url": null
+        }
+      ],
+      "featured_game_id": null,
+      "underdogs": [],
+      "entry": null,
+      "cancellation_reason": null,
+      "draft_config": null
+    },
+    {
+      "experience": {
+        "season": 2026,
+        "week": 8,
+        "locked_game_ids": [],
+        "projections": {},
+        "enabled": true,
+        "kind": "creator",
+        "entry_open_at": "2026-10-17T12:00:00Z",
+        "participants": 0,
+        "creator": {
+          "id": 1,
+          "slug": "qa-analyst",
+          "name": "QA Analyst",
+          "description": "Authorized test fixture, not a live creator.",
+          "logo_url": null,
+          "links": {
+            "YouTube": "https://www.youtube.com/channel/test-fixture"
+          },
+          "authorized": true,
+          "active": true
+        },
+        "creator_picks": null,
+        "creator_correct": null,
+        "creator_score": null,
+        "comparison": null,
+        "salary_budget": 100,
+        "salaries": [],
+        "correct_points": 10,
+        "minimum_fans": 3,
+        "schools": [],
+        "allegiance": null,
+        "your_points": null,
+        "your_rank": null,
+        "best_performer": null,
+        "player_points": {},
+        "personal_contribution": null,
+        "personal_correct": null,
+        "school_week_rank": null,
+        "school_season_rank": null,
+        "school_standings": [],
+        "rivalries": [],
+        "series": null,
+        "survivor_status": null,
+        "weeks_survived": 0,
+        "remaining_survivors": 0,
+        "eliminated": 0,
+        "previous_picks": [],
+        "corrections": []
+      },
+      "participant_count": 0,
+      "sponsor": {
+        "name": "Pigskin Dispatch",
+        "label": "Sponsored by Pigskin Dispatch",
+        "tagline": "Football history, stories & podcasts",
+        "logo_url": "/assets/sponsors/PigskinDispatchLogo.png",
+        "youtube_url": "https://www.youtube.com/channel/UCQatEELNJL5GWry7eMXh-Qg?utm_source=chatgpt.com",
+        "season": 2026,
+        "week": 8
+      },
+      "id": 8,
+      "round_id": 8,
+      "kind": "creator",
+      "name": "Beat the Creator",
+      "state": "Open",
+      "settlement_status": "published",
+      "version": 2,
+      "rules_version": "experiences-v1",
+      "rules": "QA fixture rules: authoritative server locks and real scoring are required.",
+      "lock_at": "2026-10-24T16:00:00Z",
+      "server_now": "2026-10-17T12:00:00Z",
+      "published_at": "2026-10-17T12:00:00Z",
+      "scoring_version": null,
+      "scoring_rules": null,
+      "games": [
+        {
+          "id": 1,
+          "home_team": "Alabama",
+          "away_team": "Away QA 1",
+          "start_date": "2026-10-24T16:00:00Z",
+          "status": "scheduled",
+          "home_points": null,
+          "away_points": null
+        },
+        {
+          "id": 2,
+          "home_team": "Home QA 2",
+          "away_team": "Away QA 2",
+          "start_date": "2026-10-24T16:30:00Z",
+          "status": "scheduled",
+          "home_points": null,
+          "away_points": null
+        },
+        {
+          "id": 3,
+          "home_team": "Home QA 3",
+          "away_team": "Away QA 3",
+          "start_date": "2026-10-24T17:00:00Z",
+          "status": "scheduled",
+          "home_points": null,
+          "away_points": null
+        },
+        {
+          "id": 4,
+          "home_team": "Home QA 4",
+          "away_team": "Away QA 4",
+          "start_date": "2026-10-24T17:30:00Z",
+          "status": "scheduled",
+          "home_points": null,
+          "away_points": null
+        },
+        {
+          "id": 5,
+          "home_team": "Home QA 5",
+          "away_team": "Away QA 5",
+          "start_date": "2026-10-24T18:00:00Z",
+          "status": "scheduled",
+          "home_points": null,
+          "away_points": null
+        },
+        {
+          "id": 6,
+          "home_team": "Home QA 6",
+          "away_team": "Away QA 6",
+          "start_date": "2026-10-24T18:30:00Z",
+          "status": "scheduled",
+          "home_points": null,
+          "away_points": null
+        },
+        {
+          "id": 7,
+          "home_team": "Home QA 7",
+          "away_team": "Away QA 7",
+          "start_date": "2026-10-24T19:00:00Z",
+          "status": "scheduled",
+          "home_points": null,
+          "away_points": null
+        },
+        {
+          "id": 8,
+          "home_team": "Home QA 8",
+          "away_team": "Away QA 8",
+          "start_date": "2026-10-24T19:30:00Z",
+          "status": "scheduled",
+          "home_points": null,
+          "away_points": null
+        },
+        {
+          "id": 9,
+          "home_team": "Home QA 9",
+          "away_team": "Away QA 9",
+          "start_date": "2026-10-24T20:00:00Z",
+          "status": "scheduled",
+          "home_points": null,
+          "away_points": null
+        },
+        {
+          "id": 10,
+          "home_team": "Home QA 10",
+          "away_team": "Away QA 10",
+          "start_date": "2026-10-24T20:30:00Z",
+          "status": "scheduled",
+          "home_points": null,
+          "away_points": null
+        }
+      ],
+      "players": [],
+      "featured_game_id": null,
+      "underdogs": [],
+      "entry": null,
+      "cancellation_reason": null,
+      "draft_config": null
+    },
+    {
+      "experience": {
+        "season": 2026,
+        "week": 8,
+        "locked_game_ids": [],
+        "projections": {},
+        "enabled": true,
+        "kind": "survivor",
+        "entry_open_at": "2026-10-17T12:00:00Z",
+        "participants": 0,
+        "creator": null,
+        "creator_picks": null,
+        "creator_correct": null,
+        "creator_score": null,
+        "comparison": null,
+        "salary_budget": 100,
+        "salaries": [],
+        "correct_points": 10,
+        "minimum_fans": 3,
+        "schools": [],
+        "allegiance": null,
+        "your_points": null,
+        "your_rank": null,
+        "best_performer": null,
+        "player_points": {},
+        "personal_contribution": null,
+        "personal_correct": null,
+        "school_week_rank": null,
+        "school_season_rank": null,
+        "school_standings": [],
+        "rivalries": [],
+        "series": {
+          "name": "Week 8 QA Survivor Series",
+          "season": 2026,
+          "start_week": 8,
+          "end_week": 13,
+          "entry_open_at": "2026-10-17T12:00:00Z",
+          "first_lock_at": "2026-10-24T16:00:00Z",
+          "id": 1,
+          "active": true
+        },
+        "survivor_status": "not_joined",
+        "weeks_survived": 0,
+        "remaining_survivors": 0,
+        "eliminated": 0,
+        "previous_picks": [],
+        "corrections": []
+      },
+      "participant_count": 0,
+      "sponsor": {
+        "name": "Pigskin Dispatch",
+        "label": "Sponsored by Pigskin Dispatch",
+        "tagline": "Football history, stories & podcasts",
+        "logo_url": "/assets/sponsors/PigskinDispatchLogo.png",
+        "youtube_url": "https://www.youtube.com/channel/UCQatEELNJL5GWry7eMXh-Qg?utm_source=chatgpt.com",
+        "season": 2026,
+        "week": 8
+      },
+      "id": 9,
+      "round_id": 8,
+      "kind": "survivor",
+      "name": "Last Fan Standing",
+      "state": "Open",
+      "settlement_status": "published",
+      "version": 2,
+      "rules_version": "experiences-v1",
+      "rules": "QA fixture rules: authoritative server locks and real scoring are required.",
+      "lock_at": "2026-10-24T16:00:00Z",
+      "server_now": "2026-10-17T12:00:00Z",
+      "published_at": "2026-10-17T12:00:00Z",
+      "scoring_version": null,
+      "scoring_rules": null,
+      "games": [
+        {
+          "id": 1,
+          "home_team": "Alabama",
+          "away_team": "Away QA 1",
+          "start_date": "2026-10-24T16:00:00Z",
+          "status": "scheduled",
+          "home_points": null,
+          "away_points": null
+        }
+      ],
+      "players": [],
+      "featured_game_id": null,
+      "underdogs": [],
+      "entry": null,
+      "cancellation_reason": null,
+      "draft_config": null
+    }
+  ]
+}

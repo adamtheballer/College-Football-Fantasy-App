@@ -189,3 +189,6 @@ def db_session_fixture() -> Generator[Session, None, None]:
     finally:
         session.close()
         Base.metadata.drop_all(bind=engine)
+
+# Register mode-specific competition facts for SQLite and PostgreSQL test metadata.
+from collegefootballfantasy_api.app.models import challenge_experience  # noqa: F401,E402

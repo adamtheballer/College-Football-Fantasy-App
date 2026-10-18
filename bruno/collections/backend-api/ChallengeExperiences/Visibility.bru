@@ -1,0 +1,20 @@
+meta {
+  name: Visibility
+  type: http
+  seq: 9
+}
+put {
+  url: {{base_url}}/admin/weekly-challenges/experiences/{{weekly_challenge_id}}/visibility
+  body: json
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+body:json {
+  {"expected_version":{{challenge_version}},"enabled":false,"reason":"Temporarily hide for operational review"}
+}
+docs {
+  See docs/operations/challenge-experiences.md. Use an isolated environment first.
+  IDs and versions must come from real API responses. Review and publish using
+  the existing WeeklyChallenges Validate/Publish requests; draft configuration alone never opens entries.
+}

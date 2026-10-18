@@ -46,6 +46,10 @@ const Announcement = lazyWithRouteRecovery(() => import("./pages/Announcement"))
 const AdminScoring = lazyWithRouteRecovery(() => import("./pages/AdminScoring"));
 const AdminSchedule = lazyWithRouteRecovery(() => import("./pages/AdminSchedule"));
 const ComingSoon = lazyWithRouteRecovery(() => import("./pages/ComingSoon"));
+const ChallengeMode = lazyWithRouteRecovery(() => import("./pages/ChallengeMode"));
+const CreatorChallengeLink = lazyWithRouteRecovery(() => import("./pages/ChallengeMode").then(m => ({default:m.CreatorChallengeLink})));
+const ChallengeExperienceDetail = lazyWithRouteRecovery(() => import("./pages/ChallengeExperienceDetail"));
+const AdminChallengeExperiences = lazyWithRouteRecovery(() => import("./pages/AdminChallengeExperiences"));
 const WeeklyChallenges = lazyWithRouteRecovery(() => import("./pages/WeeklyChallenges"));
 const WeeklyChallengeDetail = lazyWithRouteRecovery(() => import("./pages/WeeklyChallengeDetail"));
 const WeeklyChallengeLeaderboard = lazyWithRouteRecovery(() => import("./pages/WeeklyChallengeLeaderboard"));
@@ -236,6 +240,10 @@ const ApplicationRoutes = () => (
                 <Route path="/coming-soon" element={<ProtectedRoute><ComingSoon /></ProtectedRoute>} />
                 <Route path="/weekly-challenges" element={<ProtectedRoute><WeeklyChallenges /></ProtectedRoute>} />
                 <Route path="/weekly-challenges/leaderboard" element={<ProtectedRoute><WeeklyChallengeLeaderboard /></ProtectedRoute>} />
+                <Route path="/weekly-challenges/modes/:kind" element={<ProtectedRoute><ChallengeMode /></ProtectedRoute>} />
+                <Route path="/weekly-challenges/experiences/:challengeId" element={<ProtectedRoute><ChallengeExperienceDetail /></ProtectedRoute>} />
+                <Route path="/challenges/creator/:slug" element={<ProtectedRoute><CreatorChallengeLink /></ProtectedRoute>} />
+                <Route path="/admin/challenge-experiences" element={<ProtectedRoute><AdminChallengeExperiences /></ProtectedRoute>} />
                 <Route path="/weekly-challenges/:challengeId" element={<ProtectedRoute><WeeklyChallengeDetail /></ProtectedRoute>} />
                 <Route path="/admin/weekly-challenges" element={<ProtectedRoute><AdminWeeklyChallenges /></ProtectedRoute>} />
                 <Route path="/managers/:userId" element={<ProtectedRoute><ManagerProfile /></ProtectedRoute>} />

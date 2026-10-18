@@ -21,12 +21,13 @@ class ChallengeRound(TimestampMixin, Base):
 class WeeklyChallenge(TimestampMixin, Base):
     __tablename__ = "weekly_challenges"
     __table_args__ = (
-        UniqueConstraint("round_id", "kind", name="uq_weekly_challenge_kind"),
+        UniqueConstraint("round_id", "kind", "variant", name="uq_weekly_challenge_variant"),
         Index("ix_weekly_challenges_settlement", "status", "last_scored_at"),
     )
     id: Mapped[int] = mapped_column(primary_key=True)
     round_id: Mapped[int] = mapped_column(ForeignKey("challenge_rounds.id", ondelete="CASCADE"), index=True)
     kind: Mapped[str] = mapped_column(String(30))
+    variant: Mapped[str] = mapped_column(String(80), default="primary", server_default="primary")
     status: Mapped[str] = mapped_column(String(24), default="draft")
     version: Mapped[int] = mapped_column(default=0)
     rules_version: Mapped[str] = mapped_column(String(50), default="weekly-v1")
@@ -47,6 +48,7 @@ class ChallengeSlateGame(Base):
     challenge_id: Mapped[int] = mapped_column(ForeignKey("weekly_challenges.id", ondelete="CASCADE"), index=True)
     game_id: Mapped[int] = mapped_column(ForeignKey("games.id", ondelete="RESTRICT"))
     snapshot: Mapped[dict] = mapped_column(JSON)
+    locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class ChallengePoolPlayer(Base):

@@ -181,6 +181,9 @@ def entry_for(db, c, user_id):
 
 
 def read_challenge(db, c, user, *, admin=False, now=None, include_details=True):
+    from . import challenge_experiences as experiences
+    if c.kind in experiences.KINDS:
+        return experiences.read_challenge(db, c, user, admin=admin, include_details=include_details)
     now = now or utcnow()
     r = db.get(ChallengeRound, c.round_id)
     games = games_for(db, c)
@@ -192,7 +195,7 @@ def read_challenge(db, c, user, *, admin=False, now=None, include_details=True):
     display_games = [{**x, "status": current[x["id"]].schedule_status,
         "home_points": current[x["id"]].home_points, "away_points": current[x["id"]].away_points} for x in snapshots]
     config = c.config if public else {}
-    return {"sponsor": weekly_challenge_sponsor(season=r.season, week=r.week), "id": c.id, "round_id": r.id, "kind": c.kind, "name": KINDS[c.kind],
+    return {"participant_count": db.query(ChallengeEntry.id).filter_by(challenge_id=c.id, status="submitted").count(), "sponsor": weekly_challenge_sponsor(season=r.season, week=r.week), "id": c.id, "round_id": r.id, "kind": c.kind, "name": KINDS[c.kind],
         "state": challenge_state(c, r, games, now), "settlement_status": c.status, "version": c.version, "rules_version": c.rules_version,
         "rules": RULES[c.kind] + DISRUPTION_RULE, "lock_at": c.lock_at if public else None,
         "server_now": now, "published_at": c.published_at,
@@ -203,9 +206,12 @@ def read_challenge(db, c, user, *, admin=False, now=None, include_details=True):
         "draft_config": {"game_ids": c.config.get("game_ids", []), "player_ids": c.config.get("player_ids", []), "featured_game_id": c.config.get("featured_game_id"), "underdogs": c.config.get("underdogs", [])} if admin else None}
 
 
-def read_round(db, row, user, *, admin=False):
+def read_round(db, row, user, *, admin=False, include_experiences=False):
     now = utcnow()
-    challenges = [read_challenge(db, c, user, now=now, admin=admin, include_details=False) for c in db.query(WeeklyChallenge).filter_by(round_id=row.id).order_by(WeeklyChallenge.id)]
+    from . import challenge_experiences as experiences
+    rows = db.query(WeeklyChallenge).filter_by(round_id=row.id).order_by(WeeklyChallenge.id).all()
+    rows = [c for c in rows if c.kind in KINDS or admin or include_experiences and c.published_at and experiences.visible(db, c)]
+    challenges = [read_challenge(db, c, user, now=now, admin=admin, include_details=False) for c in rows]
     states = [c["state"] for c in challenges]
     return {"sponsor": weekly_challenge_sponsor(season=row.season, week=row.week), "id": row.id, "season": row.season, "week": row.week, "next_rollover_at": row.next_rollover_at, "server_now": now,
         "state": "Open" if "Open" in states else "Upcoming" if all(x == "Upcoming" for x in states) else "Closed", "challenges": challenges}
@@ -231,7 +237,7 @@ def catalog(db, season, week):
     return {"season": season, "week": week, "games": [game_read(g) for g in games], "players": players}
 
 
-def validate_config(db, c, config):
+def validate_slate_games(db, c, config):
     r = db.get(ChallengeRound, c.round_id)
     issues = []
     ids = config.get("game_ids", [])
@@ -241,12 +247,21 @@ def validate_config(db, c, config):
     eligible_ids = {g.id for g in canonical_slate(db, r.season, r.week)[0]}
     if not set(ids).issubset(eligible_ids) or len({g.external_id for g in games}) != len(games):
         issues.append("Choose distinct provider events from the canonical weekly game catalog; resolve ambiguous or duplicate schedules first.")
-    if c.kind == "slate12" and len(ids) != 12: issues.append("Slate 12 requires exactly 12 games.")
-    if c.kind == "duels" and len(ids) != 5: issues.append("Rivalry Duels requires exactly 5 games.")
     if any(g.season != r.season or g.week != r.week or g.season_type != "regular" or not g.external_id or g.external_id.startswith(("sheet-", "sealed-")) or not g.start_date or
         (g.schedule_status or "").lower() not in SCHEDULED or aware(g.start_date) <= now + timedelta(minutes=5) or aware(g.start_date) >= aware(r.next_rollover_at) or
         any((t or "").strip().upper() in {"", "TBD", "BYE"} for t in (g.home_team, g.away_team)) for g in games):
         issues.append("Every game needs an authoritative same-week identity, future kickoff and scheduled status.")
+    return issues, games
+
+
+def validate_config(db, c, config):
+    from . import challenge_experiences as experiences
+    if c.kind in experiences.KINDS: return experiences.validate(db, c)
+    r = db.get(ChallengeRound, c.round_id)
+    issues, games = validate_slate_games(db, c, config)
+    ids = config.get("game_ids", [])
+    if c.kind == "slate12" and len(ids) != 12: issues.append("Slate 12 requires exactly 12 games.")
+    if c.kind == "duels" and len(ids) != 5: issues.append("Rivalry Duels requires exactly 5 games.")
     if c.kind == "slate12" and config.get("featured_game_id") not in ids: issues.append("Choose a featured tiebreaker game in the slate.")
     dogs = config.get("underdogs", [])
     if c.kind == "upset":
@@ -271,6 +286,7 @@ def validate_config(db, c, config):
 
 
 def configure(db, c, payload: ChallengeConfig, actor):
+    if c.kind not in KINDS: fail("INVALID_CONFIGURATION", "Use the mode-specific configuration editor.", 422, c)
     if c.version != payload.expected_version: fail("VERSION_CONFLICT", "Configuration changed. Reload before saving.", challenge=c)
     if c.status != "draft": fail("IMMUTABLE_RULES", "Published rules and slates are frozen. Cancel this challenge instead.", challenge=c)
     c.config = payload.model_dump(exclude={"expected_version"})
@@ -279,7 +295,19 @@ def configure(db, c, payload: ChallengeConfig, actor):
     db.commit()
 
 
+def freeze_slate(db, c, games, player_ids):
+    r = db.get(ChallengeRound, c.round_id)
+    for g in games:
+        db.add(ChallengeSlateGame(challenge_id=c.id, game_id=g.id, snapshot={"id": g.id, "external_id": g.external_id, "home_team": g.home_team, "away_team": g.away_team, "start_date": aware(g.start_date).isoformat(), "status": g.schedule_status}))
+    wanted = set(player_ids)
+    if wanted:
+        for p in catalog(db, r.season, r.week)["players"]:
+            if p["id"] in wanted: db.add(ChallengePoolPlayer(challenge_id=c.id, player_id=p["id"], game_id=p["game_id"], snapshot=p))
+
+
 def publish(db, c, expected_version, actor):
+    from . import challenge_experiences as experiences
+    if c.kind in experiences.KINDS: return experiences.publish(db, c, expected_version, actor)
     if c.version != expected_version: fail("VERSION_CONFLICT", "Configuration changed. Reload before publishing.", challenge=c)
     if c.status != "draft": fail("IMMUTABLE_RULES", "This challenge is already published or canceled.", challenge=c)
     issues, games = validate_config(db, c, c.config)
@@ -289,12 +317,7 @@ def publish(db, c, expected_version, actor):
         fail("CHALLENGE_CLOSED", "Cannot publish a historical round.", challenge=c)
     config = dict(c.config)
     if c.kind == "fantasy5": config.update(scoring_rules=get_scoring_rules(), scoring_version=CALCULATION_VERSION)
-    for g in games:
-        db.add(ChallengeSlateGame(challenge_id=c.id, game_id=g.id, snapshot={"id": g.id, "external_id": g.external_id, "home_team": g.home_team, "away_team": g.away_team, "start_date": aware(g.start_date).isoformat(), "status": g.schedule_status}))
-    if c.kind == "fantasy5":
-        wanted = set(config["player_ids"])
-        for p in catalog(db, r.season, r.week)["players"]:
-            if p["id"] in wanted: db.add(ChallengePoolPlayer(challenge_id=c.id, player_id=p["id"], game_id=p["game_id"], snapshot=p))
+    freeze_slate(db, c, games, config.get("player_ids", []))
     c.config = config
     c.status = "published"
     c.lock_at = min(aware(g.start_date) for g in games) - timedelta(minutes=5)
@@ -331,6 +354,8 @@ def validate_entry(db, c, payload, complete):
 
 
 def save_entry(db, c, user, payload: EntryWrite):
+    from . import challenge_experiences as experiences
+    if c.kind in experiences.KINDS: return experiences.save_entry(db, c, user, payload)
     assert_open(db, c)
     selections = validate_entry(db, c, payload, payload.submit)
     entry = entry_for(db, c, user.id)
@@ -413,6 +438,8 @@ def game_identity_matches(game, snapshot, round_):
 
 
 def settle(db, c, *, actor=None, reason="Scheduled settlement", force=False):
+    from . import challenge_experiences as experiences
+    if c.kind in experiences.KINDS: return experiences.settle(db, c, actor=actor, reason=reason, force=force)
     if c.status == "draft": return "upcoming"
     r = db.get(ChallengeRound, c.round_id)
     now = utcnow()
@@ -544,7 +571,7 @@ def settle(db, c, *, actor=None, reason="Scheduled settlement", force=False):
 
 
 def refresh_weekly_recognition(db, round_):
-    statuses = [s for (s,) in db.query(WeeklyChallenge.status).filter_by(round_id=round_.id)]
+    statuses = [s for (s,) in db.query(WeeklyChallenge.status).filter(WeeklyChallenge.round_id == round_.id, WeeklyChallenge.kind.in_(KINDS))]
     totals = db.query(ChallengeAward.user_id, func.sum(ChallengeAward.points)).filter_by(round_id=round_.id).group_by(ChallengeAward.user_id).all()
     ready = len(statuses) == 5 and all(s in {"final", "no_contest", "canceled"} for s in statuses)
     high = max((points for _, points in totals), default=0)
@@ -581,14 +608,15 @@ def leaderboard(db, user, *, season, round_id=None):
     query = db.query(User, ranked.c.points, ranked.c.rank).join(ranked, ranked.c.user_id == User.id)
     top = [row_read(x) for x in query.order_by(ranked.c.rank, User.id).limit(10)]
     mine = query.filter(User.id == user.id).first()
-    unsettled = db.query(WeeklyChallenge.id).join(ChallengeRound).filter(ChallengeRound.season == season, WeeklyChallenge.status.notin_(("final", "no_contest", "canceled")))
+    unsettled = db.query(WeeklyChallenge.id).join(ChallengeRound).filter(ChallengeRound.season == season, WeeklyChallenge.status.notin_(("final", "no_contest", "canceled")), WeeklyChallenge.kind.in_(KINDS))
     if round_id is not None: unsettled = unsettled.filter(ChallengeRound.id == round_id)
     return {"season": season, "week": db.get(ChallengeRound, round_id).week if round_id else None, "round_id": round_id, "provisional": unsettled.first() is not None if round_id else False, "data": top, "your_rank": row_read(mine) if mine and user.id not in [x["user_id"] for x in top] else None}
 
 
 def results(db, c, user, limit, offset):
     r = db.get(ChallengeRound, c.round_id)
-    deadline = effective_lock(c, games_for(db, c))
+    from . import challenge_experiences as experiences
+    deadline = experiences.deadline(db, c) if c.kind in experiences.KINDS else effective_lock(c, games_for(db, c))
     closed = deadline is not None and utcnow() >= deadline
     query = db.query(ChallengeEntry, User, ChallengeScore, ChallengeAward).join(User, User.id == ChallengeEntry.user_id).outerjoin(ChallengeScore, ChallengeScore.entry_id == ChallengeEntry.id).outerjoin(ChallengeAward, ChallengeAward.entry_id == ChallengeEntry.id).filter(ChallengeEntry.challenge_id == c.id, ChallengeEntry.status == "submitted")
     if not closed: query = query.filter(ChallengeEntry.user_id == user.id)
@@ -601,7 +629,7 @@ def results(db, c, user, limit, offset):
             "selections": e.selections if closed or e.user_id == user.id else None}
     data = [result_read(row) for row in query.order_by(ChallengeScore.rank.asc().nullslast(), User.id).limit(limit).offset(offset)]
     mine = query.filter(ChallengeEntry.user_id == user.id).first()
-    return {"challenge_id": c.id, "state": challenge_state(c, r, games_for(db, c), utcnow()), "data": data, "total": count, "limit": limit, "offset": offset, "my_result": result_read(mine) if mine else None}
+    return {"challenge_id": c.id, "state": experiences.state(db, c, r) if c.kind in experiences.KINDS else challenge_state(c, r, games_for(db, c), utcnow()), "data": data, "total": count, "limit": limit, "offset": offset, "my_result": result_read(mine) if mine else None}
 
 
 def process_weekly_challenges_once(db):
@@ -616,4 +644,6 @@ def process_weekly_challenges_once(db):
             settle(db, c)
             count += 1
         else: db.rollback()
+    from .challenge_experiences import queue_reminders
+    queue_reminders(db)
     return {"round_id": current.id, "checked": count}

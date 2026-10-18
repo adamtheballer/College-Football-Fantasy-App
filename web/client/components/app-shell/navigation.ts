@@ -74,6 +74,7 @@ export const getShellNavItems = (
       badge: chatUnreadCount > 99 ? "99+" : chatUnreadCount > 0 ? String(chatUnreadCount) : undefined,
     },
     { name: "MOCK DRAFT", path: "/draft", icon: Timer },
+    { name: "CHALLENGES", path: "/weekly-challenges", icon: Trophy },
     { name: "INJURY CENTER", path: "/injury-center", icon: ShieldAlert },
     {
       name: "ALERTS",
@@ -93,11 +94,8 @@ export const getShellNavItems = (
 };
 
 export const getMobileNavItems = (items: ShellNavItem[]) => {
-  // Keep the bottom bar to four destinations. A fifth permanent item does not
-  // leave enough space for the elevated quick-action button on a phone; the
-  // complete sidebar remains reachable through MobileNavigation's More sheet.
-  // Pick 6 is a dashboard challenge, not a permanent navigation destination.
-  const preferred = ["HOME", "LEAGUES", "CHATS", "MOCK DRAFT"];
+  // Keep all five primary destinations plus More visible on signed-in phones.
+  const preferred = ["HOME", "LEAGUES", "CHATS", "MOCK DRAFT", "CHALLENGES"];
   const byName = new Map(items.map((item) => [item.name, item]));
   const filtered = preferred.flatMap((name) => {
     const item = byName.get(name);

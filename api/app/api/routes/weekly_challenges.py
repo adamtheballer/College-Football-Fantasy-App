@@ -31,15 +31,15 @@ admin_router = APIRouter(dependencies=[Depends(mutation_limit)])
 
 
 @router.get("/current", response_model=RoundRead)
-def current(db: Session = Depends(get_db), user: User = Depends(require_verified_user)):
+def current(include_experiences: bool = False, db: Session = Depends(get_db), user: User = Depends(require_verified_user)):
     r = service.ensure_round(db, service.settings.current_season_year, service.competition_week(service.settings.current_season_year, service.utcnow()))
-    result = service.read_round(db, r, user)
+    result = service.read_round(db, r, user, include_experiences=include_experiences)
     db.commit()
     return result
 
 
 @router.get("/history", response_model=list[RoundRead])
-def history(limit: int = Query(15, ge=1, le=30), offset: int = Query(0, ge=0), db: Session = Depends(get_db), user: User = Depends(require_verified_user)):
+def history(include_experiences: bool = False, limit: int = Query(15, ge=1, le=30), offset: int = Query(0, ge=0), db: Session = Depends(get_db), user: User = Depends(require_verified_user)):
     year = service.settings.current_season_year
     week = service.competition_week(year, service.utcnow())
     published = select(WeeklyChallenge.round_id).where(WeeklyChallenge.published_at.is_not(None))
@@ -47,16 +47,16 @@ def history(limit: int = Query(15, ge=1, le=30), offset: int = Query(0, ge=0), d
         or_(ChallengeRound.season < year, and_(ChallengeRound.season == year, ChallengeRound.week <= week)),
         or_(ChallengeRound.id.in_(published), and_(ChallengeRound.season == year, ChallengeRound.week == week)),
     ).order_by(ChallengeRound.season.desc(), ChallengeRound.week.desc()).limit(limit).offset(offset).all()
-    result = [service.read_round(db, r, user) for r in rows]
+    result = [service.read_round(db, r, user, include_experiences=include_experiences) for r in rows]
     db.commit()
     return result
 
 
 @router.get("/rounds/{round_id}", response_model=RoundRead)
-def round_detail(round_id: int, db: Session = Depends(get_db), user: User = Depends(require_verified_user)):
+def round_detail(round_id: int, include_experiences: bool = False, db: Session = Depends(get_db), user: User = Depends(require_verified_user)):
     r = db.get(ChallengeRound, round_id)
     if r is None: service.fail("NOT_FOUND", "Round not found.", 404)
-    result = service.read_round(db, r, user)
+    result = service.read_round(db, r, user, include_experiences=include_experiences)
     db.commit()
     return result
 

@@ -11,6 +11,10 @@ export const CHALLENGE_PICK_COUNTS: Record<ChallengeKind, number> = {
   fantasy5: 5,
   lock: 1,
   duels: 5,
+  fanwars: 12,
+  millionaire: 6,
+  creator: 10,
+  survivor: 1,
 };
 export const FANTASY_SLOTS = ["QB", "RB", "WR", "TE", "FLEX"] as const;
 
@@ -38,7 +42,7 @@ export function challengeEntryError(
         const player = players.get(p.player_id!);
         return (
           !player ||
-          !FANTASY_SLOTS.includes(p.slot!) ||
+          !(FANTASY_SLOTS as readonly string[]).includes(p.slot!) ||
           p.game_id !== undefined ||
           p.team !== undefined ||
           (p.slot === "FLEX"

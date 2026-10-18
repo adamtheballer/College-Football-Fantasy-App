@@ -1,5 +1,5 @@
 export type NotificationDestination = {
-  type: "draft" | "trade" | "waivers" | "matchup" | "chat" | "league" | "player" | "announcement";
+  type: "draft" | "trade" | "waivers" | "matchup" | "chat" | "league" | "player" | "announcement" | "challenge";
   league_id: number | null;
   resource_id: number | null;
   week?: number | null;
@@ -34,6 +34,7 @@ export type NotificationList = {
 export const resolveNotificationPath = (destination: NotificationDestination | null): string => {
   if (!destination) return "/alerts";
   const validId = (value: unknown) => typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+  if (destination.type === "challenge") return validId(destination.resource_id) ? `/weekly-challenges/${destination.resource_id}` : "/weekly-challenges";
   if (destination.type === "announcement") return validId(destination.resource_id) ? `/announcements/${destination.resource_id}` : "/alerts";
   if (!validId(destination.league_id)) return "/alerts";
   switch (destination.type) {

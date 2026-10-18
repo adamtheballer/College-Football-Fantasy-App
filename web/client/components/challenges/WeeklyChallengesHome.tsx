@@ -26,7 +26,7 @@ export function WeeklyChallengesHome() {
         </div>
       </div>
       <p className="text-sm text-muted-foreground">
-        Five free competitions. Earn recognition, cosmetic badges, and a place
+        Free weekly competitions. Earn recognition, cosmetic badges, and a place
         in the Season Championship.
       </p>
       <div className="flex flex-wrap gap-3">
@@ -55,5 +55,7 @@ export function WeeklyChallengesHome() {
       <WeeklyChallengeSponsor sponsor={query.data.sponsor} />
       {card}
     </div>
-  ) : card;
+  ) : (
+    card
+  );
 }
