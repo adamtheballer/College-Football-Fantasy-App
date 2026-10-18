@@ -1489,7 +1489,7 @@ def read(db, c, user, *, admin=False, include_details=True):
                     "active_fans": by_school.get(b, {}).get("active_fans", 0),
                 },
                 "winner": None
-                if c.status != "final"
+                if c.status != "final" or not (by_school.get(a, {}).get("active_fans", 0) + by_school.get(b, {}).get("active_fans", 0))
                 else "tie"
                 if by_school.get(a, {}).get("fan_points", 0)
                 == by_school.get(b, {}).get("fan_points", 0)

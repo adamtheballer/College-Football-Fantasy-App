@@ -1201,3 +1201,10 @@ def test_salary_suggestions_reuse_canonical_published_projection_precedence(exp)
     w["db"].commit()
     result=w["client"].get(f"{ADMIN}/experiences/{c['id']}/salary-suggestions",headers=w["accounts"][0][1])
     assert result.status_code==200 and result.json()==[{"player_id":pid,"salary":15,"projection":19,"rule":"review-required-salary-v1"}]
+
+
+def test_rivalry_with_no_eligible_fans_does_not_declare_a_winner(exp):
+    w=exp;ids=[s.id for s in w["db"].query(CollegeTeam).filter(CollegeTeam.name.in_(["Alabama","Auburn"]))]
+    c=publish(w,"fanwars",rivalries=[ids]);assert score(w,c)=="final"
+    x=w["client"].get(f"{BASE}/challenges/{c['id']}",headers=w["accounts"][1][1]).json()["experience"]
+    assert x["rivalries"][0]["winner"] is None

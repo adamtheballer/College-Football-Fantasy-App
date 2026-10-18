@@ -109,7 +109,7 @@ fallback. Entitlements and AASA must match the signed distribution profile.
 ## Local validation evidence (October 17, 2026)
 
 - Full backend: 1,309 passed, 7 skipped (proper PYTHONPATH and loopback access).
-- Focused expanded modes: 41 passed, 1 PostgreSQL-only skip; the PostgreSQL
+- Focused expanded modes: 42 passed, 1 PostgreSQL-only skip; the PostgreSQL
   run passed all 106 challenge tests, with 12 final history/concurrency/deletion
   cases rerun against PostgreSQL after refinements.
 - Frontend: 691 tests across 103 files; application/test/Vite typechecks pass.
