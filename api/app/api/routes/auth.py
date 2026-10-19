@@ -67,6 +67,7 @@ from collegefootballfantasy_api.app.services.beta_access import (
     release_beta_access_reservation,
 )
 from collegefootballfantasy_api.app.services.content_moderation import moderate_user_text
+from collegefootballfantasy_api.app.services.signup_email import enforce_signup_email_policy
 from collegefootballfantasy_api.app.services.password_change import (
     PasswordChangeCredentialError,
     PasswordChangeValidationError,
@@ -329,6 +330,14 @@ def delete_current_user_account(
 
 @router.post("/signup", response_model=AuthResponse, response_model_exclude_none=True, status_code=status.HTTP_201_CREATED)
 def signup(payload: UserCreate, response: Response, request: Request, db: Session = Depends(get_db)) -> AuthResponse:
+    # Persist the attempt before validation/reservations: rejected addresses
+    # must count too, and must not consume an optional Early Access benefit.
+    enforce_auth_rate_limit(
+        db, action="signup", identifier=payload.email, request=request,
+        limit=settings.auth_signup_rate_limit,
+    )
+    db.commit()
+    enforce_signup_email_policy(payload.email)
     payload.first_name = moderate_user_text(
         db, actor_user_id=None, field_name="manager_name", value=payload.first_name, required=True
     ) or ""
@@ -349,13 +358,6 @@ def signup(payload: UserCreate, response: Response, request: Request, db: Sessio
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=GENERIC_MISMATCH_MESSAGE)
 
     try:
-        enforce_auth_rate_limit(
-            db,
-            action="signup",
-            identifier=signup_email,
-            request=request,
-            limit=settings.auth_signup_rate_limit,
-        )
         existing = db.query(User).filter(func.lower(User.email) == signup_email).first()
         if existing:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="email already registered")

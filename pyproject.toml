@@ -19,6 +19,8 @@ dependencies = [
   "pytest>=8.0.0",
   "argon2-cffi>=25.1.0",
   "bcrypt>=4.1.0",
+  "email-validator>=2.3,<3",
+  "disposable-email-domains>=0.0.269,<0.1",
 ]
 
 [tool.uv]

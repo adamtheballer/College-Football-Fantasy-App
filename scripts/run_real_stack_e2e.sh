@@ -34,6 +34,9 @@ export ENVIRONMENT="e2e"
 export SCORING_MODE="${SCORING_MODE:-disabled}"
 export SPORTSDATA_ENABLED="${SPORTSDATA_ENABLED:-false}"
 export EMAIL_ENABLED="${EMAIL_ENABLED:-false}"
+# Synthetic example.com/.test accounts have no inbox. Keep only this isolated
+# E2E stack offline; production defaults to enforcing mail-domain checks.
+export SIGNUP_EMAIL_CHECK_DELIVERABILITY="false"
 # The private-trade scenario advances only this disposable database to the
 # server-calculated processing time. This endpoint remains unavailable unless
 # this E2E-only guard is explicitly set by the supported test runner.

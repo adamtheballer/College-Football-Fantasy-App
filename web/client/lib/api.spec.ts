@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   apiGet,
+  apiPost,
   apiChallengeWrite,
   apiReleaseNoticeClaim,
   apiPatch,
@@ -94,6 +95,20 @@ describe("api client", () => {
       message:
         "basics.max_teams: Value error, max_teams must be an even number of at least 2; draft.draft_datetime_utc: Input should be a valid datetime",
     });
+  });
+
+  it.each([
+    [422, "Temporary email addresses cannot be used. Please use your regular email address."],
+    [422, "This email domain cannot receive mail. Check your email address and try again."],
+    [503, "We could not check your email domain right now. Please try again shortly."],
+    [429, "too many requests"],
+  ])("preserves signup policy feedback for status %s", async (status, message) => {
+    globalThis.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ detail: message }), {
+      status, headers: { "Content-Type": "application/json" },
+    }));
+    await expect(apiPost("/auth/signup", {
+      first_name: "Coach", email: "coach@mailinator.com", password: "StrongPass123!",
+    })).rejects.toMatchObject({ name: "ApiError", status, message });
   });
 
   it("preserves structured actionable errors for field-level form feedback", async () => {
