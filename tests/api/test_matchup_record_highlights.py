@@ -134,7 +134,7 @@ def test_foreign_season_or_league_standings_cannot_certify_application(db_sessio
 
 
 def test_actual_http_response_includes_atomic_record_and_result(client,db_session,clock):
-    identity=client.post('/auth/signup',json={'first_name':'Record HTTP','email':'record-http@example.invalid','password':'StrongPass123!'}).json()
+    identity=client.post('/auth/signup',json={'first_name':'Record HTTP','email':'record-http@example.com','password':'StrongPass123!'}).json()
     league,home,away,_,m=create_scoring_fixture(db_session)
     home.owner_user_id=identity['user']['id']
     db_session.add(LeagueMember(league_id=league.id,user_id=home.owner_user_id,role='commissioner'))

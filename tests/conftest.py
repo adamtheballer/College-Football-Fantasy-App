@@ -90,6 +90,15 @@ TestingSessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=Fals
 
 
 @pytest.fixture(autouse=True)
+def offline_signup_domains(monkeypatch: pytest.MonkeyPatch):
+    # Synthetic example.com fixtures have no mail service. Policy-specific
+    # tests explicitly enable deliverability and stub DNS, never the policy.
+    monkeypatch.setattr(settings, "signup_email_check_deliverability", False)
+    monkeypatch.setattr(settings, "signup_email_blocked_domains", "")
+    monkeypatch.setattr(settings, "signup_email_allowed_domains", "")
+
+
+@pytest.fixture(autouse=True)
 def certified_calendar_for_workflow_tests(monkeypatch: pytest.MonkeyPatch):
     """Inject deterministic certification for workflow tests only.
 

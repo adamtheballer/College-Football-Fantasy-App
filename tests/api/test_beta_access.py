@@ -60,6 +60,19 @@ def signup_payload(*, reservation: str | None = None, email: str = TEST_EMAIL) -
     return payload
 
 
+def test_signup_email_rejection_preserves_optional_reservation(client, db_session, beta_access_enabled, monkeypatch):
+    record = seed_beta_code(db_session)
+    validation = client.post("/beta-access/validate", json={"email": TEST_EMAIL, "code": TEST_CODE})
+    reservation = validation.json()["reservation_token"]
+    monkeypatch.setattr(settings, "signup_email_blocked_domains", "example.com")
+    assert client.post("/auth/signup", json=signup_payload(reservation=reservation)).status_code == 422
+    db_session.refresh(record)
+    assert record.state == "RESERVED"
+    assert record.redeemed_user_id is None
+    monkeypatch.setattr(settings, "signup_email_blocked_domains", "")
+    assert client.post("/auth/signup", json=signup_payload(reservation=reservation)).status_code == 201
+
+
 def test_normal_signup_is_open_and_optional_early_access_code_redeems_atomically(client, db_session, beta_access_enabled):
     seed_beta_code(db_session)
 

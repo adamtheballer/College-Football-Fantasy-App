@@ -165,6 +165,11 @@ class Settings(BaseSettings):
     auth_lockout_minutes: int = 15
     auth_rate_limit_window_minutes: int = 15
     auth_signup_rate_limit: int = 5
+    # Signup only: existing accounts must retain sign-in/reset access.
+    signup_email_check_deliverability: bool = True
+    signup_email_dns_timeout_seconds: float = Field(default=3.0, ge=0.1, le=10.0)
+    signup_email_blocked_domains: str = ""
+    signup_email_allowed_domains: str = ""
     auth_login_rate_limit: int = 10
     auth_refresh_rate_limit: int = 30
     auth_password_reset_rate_limit: int = 5
