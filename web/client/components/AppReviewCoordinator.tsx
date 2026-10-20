@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef } from "react";
 import { useRuntimeCapabilities } from "@/components/RuntimeCompatibilityGate";
 import { AppReviewCoordinator as Coordinator } from "@/lib/app-review";
-import { claimReview, isNativeIosReviewRuntime, nativeReviewAdapter, observeNativeReviewAvailability, readReviewState, rememberReviewClaim, reviewConsumed } from "@/lib/native-app-review";
+import { acknowledgeReviewInvocation, claimReview, isNativeIosReviewRuntime, nativeReviewAdapter, observeNativeReviewAvailability, readReviewState, rememberReviewClaim, reviewConsumed } from "@/lib/native-app-review";
 import { hasPendingGuide } from "@/lib/onboarding";
 import { hasReviewPresentationBlocker, observeReviewPresentation } from "@/lib/review-presentation";
 
@@ -38,7 +38,7 @@ export function AppReviewCoordinator({ accountId, sessionReady, onboarding, scre
 
   useLayoutEffect(() => {
     if (!isNativeIosReviewRuntime()) return;
-    const controller = new Coordinator({ adapter: nativeReviewAdapter, state: readReviewState, claim: claimReview,
+    const controller = new Coordinator({ adapter: nativeReviewAdapter, state: readReviewState, claim: claimReview, invoked: acknowledgeReviewInvocation,
       consumed: reviewConsumed, remember: rememberReviewClaim, now: Date.now, presentationDelayMs: 0 });
     coordinator.current = controller;
     let active = true;
@@ -59,6 +59,8 @@ export function AppReviewCoordinator({ accountId, sessionReady, onboarding, scre
     mutation.observe(document.body, { subtree: true, childList: true, attributes: true,
       attributeFilter: ["role", "aria-modal", "aria-busy", "class", "style", "hidden", "data-review-blocking", "data-launch-notice-ready"] });
     const removePresentation = observeReviewPresentation(update);
+    const meaningfulUse = () => { controller.meaningfulUse(); update(); };
+    window.addEventListener("cffb:meaningful-use", meaningfulUse);
     document.addEventListener("visibilitychange", update);
     document.addEventListener("focusin", update);
     document.addEventListener("focusout", update);
@@ -80,6 +82,7 @@ export function AppReviewCoordinator({ accountId, sessionReady, onboarding, scre
       refresh.current = () => {};
       mutation.disconnect();
       removePresentation();
+      window.removeEventListener("cffb:meaningful-use", meaningfulUse);
       document.removeEventListener("visibilitychange", update);
       document.removeEventListener("focusin", update);
       document.removeEventListener("focusout", update);

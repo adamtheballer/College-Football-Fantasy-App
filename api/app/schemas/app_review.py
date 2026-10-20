@@ -14,7 +14,9 @@ class AppReviewState(BaseModel):
     account_id: int
     enabled: bool
     review_request_claimed_at: datetime | None
+    review_request_invoked_at: datetime | None = None
+    eligible: bool = False
 
 
 class AppReviewClaimResult(AppReviewState):
-    authorization: Literal["granted", "already_claimed", "disabled"]
+    authorization: Literal["granted", "already_claimed", "disabled", "not_eligible"]

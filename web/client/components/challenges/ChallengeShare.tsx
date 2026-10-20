@@ -1,3 +1,8 @@
+import { experiencePath } from "@/hooks/use-challenge-experiences";
+import { useQuery } from "@tanstack/react-query";
+import { apiGet } from "@/lib/api";
+import type { Results } from "@/hooks/use-weekly-challenges";
+import { trackProductEvent } from "@/lib/product-analytics";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { SurfaceCard } from "@/components/fantasy";
@@ -18,14 +23,25 @@ const escape = (value: string) =>
       })[c]!,
   );
 export function ChallengeShare({ challenge: c }: { challenge: Challenge }) {
-  const x = c.experience!;
+  const x = c.experience;
   const { user } = useAuth();
   const time = useServerClock(c.server_now);
   const locked = !!c.lock_at && time >= Date.parse(c.lock_at);
+  const results = useQuery({
+    queryKey: ["weekly-challenges", "results", user?.id, c.id, 0, 25],
+    enabled: !!user && !x && c.state.includes("Final"),
+    queryFn: () =>
+      apiGet<Results>(`/weekly-challenges/challenges/${c.id}/results`, {
+        limit: 25,
+        offset: 0,
+      }),
+  });
+  const result = results.data?.my_result;
   const [showLineup, setShowLineup] = useState(false),
     [notice, setNotice] = useState("");
-  const title =
-    c.kind === "fanwars"
+  const title = !x
+    ? `Join me in CFFB ${c.name}. Make your picks and compete this week.`
+    : c.kind === "fanwars"
       ? x.allegiance && x.school_week_rank
         ? `I helped ${x.allegiance.name} climb to #${x.school_week_rank} in CFFB Fan Wars. Represent your school.`
         : "Represent your school in CFFB Fan Wars."
@@ -40,42 +56,51 @@ export function ChallengeShare({ challenge: c }: { challenge: Challenge }) {
             : x.weeks_survived > 0
               ? `Another week survived! ${x.weeks_survived} weeks in CFFB Last Fan Standing.`
               : "I'm joining CFFB Last Fan Standing.";
-  const url = new URL(
-    `/weekly-challenges/experiences/${c.id}`,
-    "https://collegefantasyfootball.org",
-  );
-  if (x.creator) url.searchParams.set("ref", x.creator.slug);
+  const url = new URL(experiencePath(c), "https://collegefantasyfootball.org");
+  if (x?.creator) url.searchParams.set("ref", x.creator.slug);
   const lines = [
-    `Week ${x.week} · ${x.season}`,
+    x
+      ? `Week ${x.week} · ${x.season}`
+      : c.week
+        ? `Week ${c.week} · ${c.season}`
+        : "CFFB Weekly Challenges",
     title,
-    ...(c.kind === "millionaire" && c.entry && (locked || showLineup)
+    ...(!x && result?.status === "final" && result.raw_points !== null
+      ? [
+          `${result.raw_points} result points · ${result.challenge_points ?? "Pending"} championship points · Rank #${result.rank ?? "—"}`,
+        ]
+      : []),
+    ...(x && c.kind === "millionaire" && c.entry && (locked || showLineup)
       ? c.entry.selections.map((p) => {
           const player = c.players.find((v) => v.id === p.player_id);
           return `${p.slot}: ${player?.name ?? "Selected player"} · ${player?.school ?? ""} · $${x.salaries.find((v) => v.player_id === p.player_id)?.salary ?? "—"}`;
         })
       : []),
-    ...(c.kind === "millionaire" && c.entry
+    ...(x && c.kind === "millionaire" && c.entry
       ? [
           `Virtual salary: $${c.entry.selections.reduce((sum, p) => sum + (x.salaries.find((v) => v.player_id === p.player_id)?.salary ?? 0), 0)}`,
         ]
       : []),
-    ...(c.state.includes("Final") && x.your_points !== null
+    ...(x && c.state.includes("Final") && x.your_points !== null
       ? [
           `${x.your_points} ${c.kind === "survivor" ? "weeks survived" : "points"} · Rank #${x.your_rank ?? "—"}`,
           ...(x.best_performer ? [`Best performer: ${x.best_performer}`] : []),
         ]
       : []),
-    ...(c.kind === "creator" && x.comparison
+    ...(x && c.kind === "creator" && x.comparison
       ? [
           `${x.comparison} · You ${x.your_points} vs. creator ${x.creator_score} points`,
         ]
       : []),
-    ...(c.kind === "survivor" ? [`${x.weeks_survived} weeks survived`] : []),
+    ...(x && c.kind === "survivor"
+      ? [`${x.weeks_survived} weeks survived`]
+      : []),
     url.toString(),
   ];
   const tracked = () => {
+    if (user) void trackProductEvent(user.id, "challenge_share", c.id);
     if (
-      user &&
+      user && x &&
       navigator.doNotTrack !== "1" &&
       localStorage.getItem(`cffb_analytics_opt_out_${user.id}`) !== "true"
     )
@@ -111,7 +136,7 @@ export function ChallengeShare({ challenge: c }: { challenge: Challenge }) {
       href = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = href;
-    a.download = `cffb-${c.kind}-week-${x.week}.svg`;
+    a.download = `cffb-${c.kind}-week-${x?.week ?? c.week ?? "current"}.svg`;
     a.click();
     URL.revokeObjectURL(href);
     tracked();
@@ -120,6 +145,7 @@ export function ChallengeShare({ challenge: c }: { challenge: Challenge }) {
     <SurfaceCard className="space-y-3">
       <h2 className="cfb-section-title text-xl">Share Your Challenge</h2>
       <p className="text-sm font-bold">{title}</p>
+      {!x && result?.status === "final" && result.raw_points !== null && <p className="text-sm">Your final result: {result.raw_points} points · Rank #{result.rank ?? "—"}</p>}
       {c.kind === "millionaire" && !locked && (
         <label className="flex min-h-11 items-center gap-2 text-xs">
           <input

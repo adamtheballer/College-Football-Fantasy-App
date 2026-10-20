@@ -17,6 +17,10 @@ def account(client, suffix="one"):
     response = client.post("/auth/signup", json={"first_name": "Update Manager", "email": f"update-{suffix}@example.com", "password": "StrongPass123!"})
     assert response.status_code == 201
     data = response.json()
+    from datetime import datetime, timezone
+    with TestingSessionLocal() as db:
+        db.get(User,data["user"]["id"]).created_at=datetime(2026,10,1,tzinfo=timezone.utc)
+        db.commit()
     return data['user']['id'], {"Authorization": f"Bearer {data['access_token']}", "X-CFFB-Release-Account": str(data['user']['id'])}
 
 

@@ -18,6 +18,8 @@ body:json {
 }
 docs {
   Local test accounts only. Enable IOS_APP_REVIEW_ENABLED in the local API.
-  First POST grants authorization; every subsequent POST returns already_claimed.
+  A submitted challenge or finalized matchup is required; otherwise not_eligible
+  leaves the opportunity unconsumed. First eligible POST grants authorization;
+  every subsequent POST returns already_claimed.
   This consumes lifetime eligibility. Never run against a production user's account.
 }

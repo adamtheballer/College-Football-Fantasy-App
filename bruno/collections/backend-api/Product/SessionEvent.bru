@@ -1,0 +1,19 @@
+meta {
+  name: Optional daily session event
+  type: http
+  seq: 4
+}
+post {
+  url: {{base_url}}/product/events
+  body: json
+}
+headers {
+  Authorization: Bearer {{access_token}}
+  X-CFFB-Challenge-Account: {{user_id}}
+}
+body:json {
+  {"kind":"session","platform":"web"}
+}
+tests {
+  test("Daily receipt", function () { expect(res.status).to.equal(200); });
+}

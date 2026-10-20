@@ -1,3 +1,4 @@
+import { useLeagues } from "@/hooks/use-leagues";
 import {
   ChallengeLeaderboardFilters,
   ChallengeModeStandings,
@@ -50,6 +51,8 @@ function StandingRow({ row }: { row: LeaderRow }) {
 export default function WeeklyChallengeLeaderboard() {
   const { user } = useAuth();
   const [params, setParams] = useSearchParams();
+  const leagues = useLeagues(100);
+  const leagueId = Number(params.get("league")) || undefined;
   const mode = params.get("mode") ?? "overall";
   const [view, setView] = useState<"week" | "season">("week");
   const current = useCurrentChallenges();
@@ -84,12 +87,14 @@ export default function WeeklyChallengeLeaderboard() {
       season,
       view,
       roundId,
+      leagueId,
     ],
     enabled: !!user && !!season && (view === "season" || !!roundId),
     queryFn: () =>
       apiGet<Leaderboard>("/weekly-challenges/leaderboard", {
         season,
         round_id: view === "week" ? roundId : undefined,
+        league_id: leagueId,
       }),
     refetchInterval: 30_000,
   });
@@ -135,6 +140,28 @@ export default function WeeklyChallengeLeaderboard() {
         <ChallengeModeStandings round={round} />
       ) : (
         <>
+          <label className="block text-xs">
+            Compare with
+            <select
+              aria-label="Leaderboard league group"
+              className="cfb-control mt-2 min-h-11 w-full px-3 text-base"
+              value={leagueId ?? ""}
+              onChange={(e) => {
+                const n = new URLSearchParams(params);
+                e.target.value
+                  ? n.set("league", e.target.value)
+                  : n.delete("league");
+                setParams(n);
+              }}
+            >
+              <option value="">Everyone</option>
+              {leagues.data?.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          </label>
           <div className="flex gap-3" aria-label="Leaderboard period">
             <Button
               variant={view === "week" ? "default" : "outline"}

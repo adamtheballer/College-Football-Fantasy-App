@@ -1,0 +1,14 @@
+meta {
+  name: PlayerHealth
+  type: http
+  seq: 3
+}
+get {
+  url: {{base_url}}/product/admin/player-health
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+tests {
+  test("Successful response", function () { expect(res.status).to.equal(200); });
+}

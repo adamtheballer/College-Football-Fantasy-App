@@ -35,3 +35,13 @@ def state(current_user: User = Depends(review_account), db: Session = Depends(ge
 def claim(payload: AppReviewClaim, current_user: User = Depends(review_account),
           db: Session = Depends(get_db)) -> AppReviewClaimResult:
     return claim_review(db, current_user.id, payload)
+
+
+@router.post("/invoked", response_model=AppReviewState, dependencies=[Depends(native_ios_request)])
+def invoked(current_user: User = Depends(review_account), db: Session = Depends(get_db)):
+    from datetime import datetime, timezone
+    from sqlalchemy import update
+    db.execute(update(User).where(User.id == current_user.id, User.review_request_claimed_at.is_not(None),
+        User.review_request_invoked_at.is_(None)).values(review_request_invoked_at=datetime.now(timezone.utc)))
+    db.commit()
+    return review_state(db, current_user.id)

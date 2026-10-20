@@ -62,11 +62,11 @@ def round_detail(round_id: int, include_experiences: bool = False, db: Session =
 
 
 @router.get("/leaderboard", response_model=LeaderboardRead)
-def leaderboard(season: int = Query(..., ge=2000, le=2100), round_id: int | None = Query(None, gt=0), db: Session = Depends(get_db), user: User = Depends(require_verified_user)):
+def leaderboard(season: int = Query(..., ge=2000, le=2100), round_id: int | None = Query(None, gt=0), league_id: int | None = Query(None, gt=0), db: Session = Depends(get_db), user: User = Depends(require_verified_user)):
     if round_id is not None:
         r = db.get(ChallengeRound, round_id)
         if r is None or r.season != season: service.fail("NOT_FOUND", "Round does not belong to this season.", 404)
-    return service.leaderboard(db, user, season=season, round_id=round_id)
+    return service.leaderboard(db, user, season=season, round_id=round_id, league_id=league_id)
 
 
 @router.get("/participants", response_model=list[Participant])

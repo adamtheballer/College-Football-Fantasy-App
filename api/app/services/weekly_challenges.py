@@ -195,7 +195,7 @@ def read_challenge(db, c, user, *, admin=False, now=None, include_details=True):
     display_games = [{**x, "status": current[x["id"]].schedule_status,
         "home_points": current[x["id"]].home_points, "away_points": current[x["id"]].away_points} for x in snapshots]
     config = c.config if public else {}
-    return {"participant_count": db.query(ChallengeEntry.id).filter_by(challenge_id=c.id, status="submitted").count(), "sponsor": weekly_challenge_sponsor(season=r.season, week=r.week), "id": c.id, "round_id": r.id, "kind": c.kind, "name": KINDS[c.kind],
+    return {"season": r.season, "week": r.week, "participant_count": db.query(ChallengeEntry.id).filter_by(challenge_id=c.id, status="submitted").count(), "sponsor": weekly_challenge_sponsor(season=r.season, week=r.week), "id": c.id, "round_id": r.id, "kind": c.kind, "name": KINDS[c.kind],
         "state": challenge_state(c, r, games, now), "settlement_status": c.status, "version": c.version, "rules_version": c.rules_version,
         "rules": RULES[c.kind] + DISRUPTION_RULE, "lock_at": c.lock_at if public else None,
         "server_now": now, "published_at": c.published_at,
@@ -592,7 +592,10 @@ def cancel(db, c, actor, expected_version, reason):
     settle(db, c, actor=actor, reason=reason, force=True)
 
 
-def leaderboard(db, user, *, season, round_id=None):
+def leaderboard(db, user, *, season, round_id=None, league_id=None):
+    if league_id is not None:
+        from collegefootballfantasy_api.app.api.deps import require_league_member
+        require_league_member(db, league_id, user)
     totals = (select(ChallengeAward.user_id.label("user_id"), func.sum(ChallengeAward.points).label("points"))
         .join(ChallengeRound, ChallengeRound.id == ChallengeAward.round_id)
         .join(ChallengeEntry, ChallengeEntry.id == ChallengeAward.entry_id)
@@ -600,6 +603,9 @@ def leaderboard(db, user, *, season, round_id=None):
         .join(User, User.id == ChallengeAward.user_id)
         .where(ChallengeRound.season == season, WeeklyChallenge.status.in_(("final", "no_contest", "canceled")), User.is_active.is_(True)))
     if round_id is not None: totals = totals.where(ChallengeAward.round_id == round_id)
+    if league_id is not None:
+        from collegefootballfantasy_api.app.models.league_member import LeagueMember
+        totals = totals.where(ChallengeAward.user_id.in_(select(LeagueMember.user_id).where(LeagueMember.league_id == league_id)))
     totals = totals.group_by(ChallengeAward.user_id).subquery()
     ranked = select(totals.c.user_id, totals.c.points, func.rank().over(order_by=totals.c.points.desc()).label("rank")).subquery()
     def row_read(row):

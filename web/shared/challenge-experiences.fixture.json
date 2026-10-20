@@ -110,7 +110,9 @@
       "underdogs": [],
       "entry": null,
       "cancellation_reason": null,
-      "draft_config": null
+      "draft_config": null,
+      "season": 2026,
+      "week": 8
     },
     {
       "experience": {
@@ -286,7 +288,9 @@
       "underdogs": [],
       "entry": null,
       "cancellation_reason": null,
-      "draft_config": null
+      "draft_config": null,
+      "season": 2026,
+      "week": 8
     },
     {
       "experience": {
@@ -460,7 +464,9 @@
       "underdogs": [],
       "entry": null,
       "cancellation_reason": null,
-      "draft_config": null
+      "draft_config": null,
+      "season": 2026,
+      "week": 8
     },
     {
       "experience": {
@@ -551,7 +557,9 @@
       "underdogs": [],
       "entry": null,
       "cancellation_reason": null,
-      "draft_config": null
+      "draft_config": null,
+      "season": 2026,
+      "week": 8
     }
   ]
 }

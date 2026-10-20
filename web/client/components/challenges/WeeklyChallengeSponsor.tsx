@@ -1,10 +1,13 @@
+import { Link } from "react-router-dom";
 import { Youtube } from "lucide-react";
 import type { ChallengeSponsor } from "@/hooks/use-weekly-challenges";
 
 /** The server resolves sponsorship from the displayed round, including history. */
 export function WeeklyChallengeSponsor({
   sponsor,
+  challengeHref,
 }: {
+  challengeHref?: string;
   sponsor?: ChallengeSponsor | null;
 }) {
   if (!sponsor) return null;
@@ -27,6 +30,14 @@ export function WeeklyChallengeSponsor({
         <p className="mt-1 text-sm font-bold sm:text-base">{sponsor.label}</p>
         <p className="mt-1 text-xs text-muted-foreground">{sponsor.tagline}</p>
       </div>
+      {challengeHref && (
+        <Link
+          to={challengeHref}
+          className="inline-flex min-h-11 items-center rounded-md border border-border px-3 text-sm font-bold text-primary"
+        >
+          Enter this week’s challenge
+        </Link>
+      )}
       <a
         href={sponsor.youtube_url}
         target="_blank"

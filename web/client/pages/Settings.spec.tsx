@@ -73,6 +73,8 @@ vi.mock("@/components/ui/select", async () => {
   };
 });
 
+vi.mock("@/components/challenges/ChallengeAnalyticsChoice", () => ({ ChallengeAnalyticsChoice: () => <div>Analytics preference</div> }));
+
 import Settings from "./Settings";
 import { ApiError } from "@/lib/api";
 

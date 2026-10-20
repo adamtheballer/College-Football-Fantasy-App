@@ -1,3 +1,4 @@
+import { ChallengeAnalyticsChoice } from "@/components/challenges/ChallengeAnalyticsChoice";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { User, Sliders, Shield, Save, LogOut, ImagePlus, Trash2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -610,6 +611,7 @@ export default function Settings() {
           icon={Sliders}
         >
           <div className="space-y-5">
+            <ChallengeAnalyticsChoice />
             <SettingItem 
               label="Default Active League"
               description="Choose which league opens first across roster/waiver/watchlist views"

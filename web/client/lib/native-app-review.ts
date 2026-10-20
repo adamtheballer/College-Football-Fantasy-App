@@ -21,3 +21,5 @@ export function rememberReviewClaim(id: number): void {
   consumedAccounts.add(id);
   try { localStorage.setItem(key(id), "true"); } catch { /* Memory + server remain authoritative. */ }
 }
+
+export const acknowledgeReviewInvocation = (accountId: number) => apiReviewRequest<ReviewState>("/app-review/invoked", accountId, new AbortController().signal, {});

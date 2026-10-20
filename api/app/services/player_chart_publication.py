@@ -28,6 +28,7 @@ class ChartStatInput:
     week: int
     source: str
     stats: dict
+    updated_at: datetime | None = None
 
 
 def verified_fantasy_week_stats(db: Session, *, season: int, week: int, players: list[Player], final_games_only: bool = False) -> dict[int,ChartStatInput]:
@@ -35,7 +36,7 @@ def verified_fantasy_week_stats(db: Session, *, season: int, week: int, players:
     # Player history can become final before unrelated leagues/weeks do.
     # Strict reads accept only the exact game's final box score, never a
     # verified weekly/live aggregate alone.
-    result = {} if final_games_only else {row.player_id:ChartStatInput(row.player_id,row.id,row.week,row.source,row.stats) for row in db.query(PlayerStat).filter(PlayerStat.player_id.in_(source_weeks),PlayerStat.season==season,PlayerStat.week.in_(set(source_weeks.values())),PlayerStat.verified.is_(True)).all() if row.week==source_weeks[row.player_id]}
+    result = {} if final_games_only else {row.player_id:ChartStatInput(row.player_id,row.id,row.week,row.source,row.stats,row.updated_at) for row in db.query(PlayerStat).filter(PlayerStat.player_id.in_(source_weeks),PlayerStat.season==season,PlayerStat.week.in_(set(source_weeks.values())),PlayerStat.verified.is_(True)).all() if row.week==source_weeks[row.player_id]}
     from collegefootballfantasy_api.app.services.fantasy_game_selection import fantasy_games_by_school,school_key
     from collegefootballfantasy_api.app.models.player_game_stat import PlayerGameStat
     selected=fantasy_games_by_school(db,season=season,week=week)
@@ -50,7 +51,7 @@ def verified_fantasy_week_stats(db: Session, *, season: int, week: int, players:
             # Recover chart facts without rewriting weekly stats, matchups or
             # standings. Explicitly reject live, foreign-season and unmapped
             # games; do not sum two different games into one fantasy week.
-            result[player.id]=ChartStatInput(player.id,None,fact.week,fact.source,{**fact.stats,"_chart_game_stat_id":fact.id,"_chart_provider_game_id":game.external_id})
+            result[player.id]=ChartStatInput(player.id,None,fact.week,fact.source,{**fact.stats,"_chart_game_stat_id":fact.id,"_chart_provider_game_id":game.external_id},fact.updated_at)
     return result
 
 

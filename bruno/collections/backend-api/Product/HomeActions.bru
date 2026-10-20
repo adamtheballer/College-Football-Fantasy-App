@@ -1,0 +1,14 @@
+meta {
+  name: HomeActions
+  type: http
+  seq: 1
+}
+get {
+  url: {{base_url}}/product/home-actions
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+tests {
+  test("Successful response", function () { expect(res.status).to.equal(200); });
+}

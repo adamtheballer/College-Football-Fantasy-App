@@ -1,0 +1,22 @@
+meta {
+  name: Acknowledge native review invocation
+  type: http
+  seq: 3
+}
+post {
+  url: {{base_url}}/app-review/invoked
+  body: json
+}
+headers {
+  Authorization: Bearer {{access_token}}
+  Origin: capacitor://localhost
+  X-CFFB-Native-Session: ios
+  X-CFFB-Review-Account: {{review_account_id}}
+}
+body:json {
+  {}
+}
+docs {
+  Local test accounts only, after a granted claim and explicit native invoked:true
+  response. This records a native invocation, never sheet display or a rating.
+}

@@ -100,4 +100,5 @@ def ensure_models_registered() -> None:
         worker_heartbeat,
         weekly_challenge,
         challenge_experience,
+        product_event,
     )

@@ -182,3 +182,34 @@ describe("account lifetime review coordinator", () => {
     controller.update(ready); await wait(); expect(dependencies.remember).toHaveBeenCalledWith(11); expect(adapter.request).not.toHaveBeenCalled();
   });
 });
+
+describe("meaningful use eligibility and invocation receipts", () => {
+  it("does not consume an ineligible user; a submitted entry can trigger a fresh eligible check", async () => {
+    const eligible = vi.fn().mockResolvedValue({ ...state, eligible: false });
+    const { controller, dependencies, adapter } = fixture({ state: eligible });
+    controller.update(ready);
+    await wait();
+    expect(dependencies.claim).not.toHaveBeenCalled();
+    eligible.mockResolvedValue({ ...state, eligible: true });
+    controller.meaningfulUse();
+    await wait();
+    expect(dependencies.claim).toHaveBeenCalledTimes(1);
+    expect(adapter.request).toHaveBeenCalledTimes(1);
+  });
+  it("acknowledges a native invocation only when the bridge explicitly reports it", async () => {
+    const invoked = vi.fn().mockResolvedValue(undefined);
+    const { controller, adapter } = fixture({ invoked });
+    adapter.request.mockResolvedValue({ invoked: true });
+    controller.update(ready);
+    await wait();
+    expect(invoked).toHaveBeenCalledWith(11);
+  });
+  it("never equates an uncertain native response with a displayed rating sheet", async () => {
+    const invoked = vi.fn();
+    const { controller, adapter } = fixture({ invoked });
+    adapter.request.mockResolvedValue({ invoked: false });
+    controller.update(ready);
+    await wait();
+    expect(invoked).not.toHaveBeenCalled();
+  });
+});
