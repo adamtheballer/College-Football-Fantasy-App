@@ -42,6 +42,8 @@ async function shell(page: Page) {
     localStorage.setItem("cfb_completed_guide_999993", "true");
   });
   let failure = false;
+  let latestWeek = 7;
+  let noLeagues = false;
   await page.route("**/api/**", async (route) => {
     const url = new URL(route.request().url()),
       path = url.pathname.replace(/^\/api/, "");
@@ -74,7 +76,7 @@ async function shell(page: Page) {
       };
     else if (path === "/leagues")
       body = {
-        data: [
+        data: noLeagues ? [] : [
           {
             id: 101,
             name: "Custom scoring league",
@@ -114,6 +116,9 @@ async function shell(page: Page) {
       body = {
         ...context,
         period: url.searchParams.get("period") ?? "week",
+        week: url.searchParams.get("period") === "season" ? null : latestWeek,
+        through_week: latestWeek,
+        available_weeks: Array.from({length:latestWeek},(_,i)=>i+1),
         data: players.map((p) => ({ position: p.position, player: p })),
       };
     else if (path === "/player-rankings") {
@@ -159,6 +164,8 @@ async function shell(page: Page) {
     await route.fulfill({ json: body });
   });
   return {
+    rollover: () => { latestWeek = 8; },
+    withoutLeagues: () => { noLeagues = true; },
     fail: (v: boolean) => {
       failure = v;
     },
@@ -223,4 +230,22 @@ test("rankings errors stay errors and offer a working retry", async ({
   control.fail(false);
   await page.getByRole("button", { name: "Retry rankings" }).click();
   await expect(page.getByRole("table")).toContainText("Verified QB");
+});
+
+
+test("Home picks up the new completed week while it stays open",async({page})=>{
+  await page.clock.install();
+  const control=await shell(page);await page.goto("/");
+  const leaders=page.getByRole("region",{name:"Positional leaders"});
+  await expect(leaders).toContainText("Week 7");
+  control.rollover();await page.clock.runFor(180_100);
+  await expect(leaders).toContainText("Week 8");
+  await expect(leaders.getByRole("link",{name:"All player rankings"})).toHaveAttribute("href",/week=8/);
+});
+
+test("a new account without a league can enter its first challenge directly",async({page})=>{
+  const control=await shell(page);control.withoutLeagues();await page.goto("/");
+  await expect(page.getByText("No leagues joined yet")).toBeVisible();
+  await expect(page.getByRole("link",{name:"Make your first pick",exact:true})).toHaveAttribute("href","/weekly-challenges/17");
+  await expect(page.getByRole("region",{name:"Positional leaders"})).toContainText("Verified QB");
 });

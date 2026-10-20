@@ -59,11 +59,10 @@ def ranking_rows(db: Session, *, season: int, period: Literal["week", "season"] 
     players = eligible + db.query(Player).filter(Player.id.in_(own_ids - eligible_ids)).all() if own_ids - eligible_ids else eligible
     through = completed_through_week(season)
     games = db.query(Game).filter(Game.season == season, Game.week.between(0, through), Game.season_type == "regular").all()
-    schools = {school_key(p.school) for p in eligible}
-    available = sorted({max(1, g.week) for g in games
-                        if (g.schedule_status or "").lower() in {"final", "post"}
-                        and (school_key(g.home_team) in schools or school_key(g.away_team) in schools)})
-    selected = week if week is not None else (max(available) if available else (through or None))
+    # Calendar completion chooses the period. A missing provider week must
+    # show Pending, rather than silently falling back to an older winner.
+    available = list(range(1, through + 1))
+    selected = week if week is not None else (through or None)
     if selected is not None and not 1 <= selected <= through:
         raise HTTPException(422, "Rankings are available only for completed fantasy weeks.")
     weeks = list(range(1, through + 1)) if period == "season" else ([selected] if selected else [])
@@ -86,7 +85,8 @@ def ranking_rows(db: Session, *, season: int, period: Literal["week", "season"] 
                 canonical = schedule.get(school_key(p.school))
                 if canonical and canonical.is_bye:
                     byes.add(p.id)
-                elif school_key(p.school) in chosen or canonical:
+                else:
+                    # No canonical bye and no resolved game is unknown coverage.
                     expected[p.id] += 1
                 continue
             expected[p.id] += 1

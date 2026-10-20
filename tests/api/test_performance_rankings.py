@@ -88,6 +88,8 @@ def test_live_unverified_and_future_scores_cannot_become_leaders(client, db_sess
 def test_week_zero_is_counted_once_in_fantasy_week_one(client, db_session):
     p=player(db_session,'Opening scorer'); opener=game(db_session,week=0); later=game(db_session,week=1)
     opener.start_date=datetime(2026,8,29,16,tzinfo=timezone.utc)
+    from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
+    db_session.add(TeamSchedule(team_name='Texas',season=2026,week=2,location='bye',is_bye=True))
     score(db_session,p,opener,{'rush_yards':50}); score(db_session,p,later,{'rush_yards':900})
     db_session.commit()
     row=client.get('/player-rankings',params={'period':'season'}).json()['data'][0]
@@ -124,3 +126,13 @@ def test_last_regular_season_week_becomes_available_after_its_rollover(monkeypat
     monkeypatch.setattr(player_rankings,"calendar_cfb_week",lambda season:15)
     assert player_rankings.completed_through_week(2026,datetime(2026,12,15,12,59,tzinfo=timezone.utc))==14
     assert player_rankings.completed_through_week(2026,datetime(2026,12,15,13,0,tzinfo=timezone.utc))==15
+
+
+def test_default_never_hides_missing_latest_week_by_falling_back_to_older_results(client,db_session):
+    p=player(db_session,'Previous leader');g=game(db_session,week=1);score(db_session,p,g,{'rush_yards':100});db_session.commit()
+    latest=client.get('/player-rankings/leaders').json()
+    assert latest['week']==2 and all(x['player'] is None for x in latest['data'])
+    row=client.get('/player-rankings',params={'period':'season'}).json()['data'][0]
+    assert row['status']=='pending' and row['fantasy_points'] is None and row['missing_games']==1
+    prior=client.get('/player-rankings',params={'week':1}).json()['data'][0]
+    assert prior['fantasy_points']==10 and prior['position_rank']==1
