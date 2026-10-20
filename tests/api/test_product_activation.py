@@ -98,6 +98,7 @@ def test_home_actions_only_own_starters_incoming_trades_and_canonical_lock(clien
     from collegefootballfantasy_api.app.services import home_actions
     monkeypatch.setattr(home_actions,'calendar_cfb_week',lambda season,now:8)
     l=League(name='Action league',season_year=2026);db_session.add(l);db_session.flush()
+    db_session.add(LeagueMember(user_id=uid,league_id=l.id,role='member'))
     a=Team(league_id=l.id,owner_user_id=uid,name='Mine');b=Team(league_id=l.id,owner_user_id=other,name='Other');db_session.add_all([a,b]);db_session.flush()
     p=player(db_session,'Injured starter');bench=player(db_session,'Benched')
     db_session.add_all([RosterEntry(league_id=l.id,team_id=a.id,player_id=p.id,slot='RB',status='starter'),RosterEntry(league_id=l.id,team_id=a.id,player_id=bench.id,slot='BENCH',status='bench')])
@@ -108,6 +109,8 @@ def test_home_actions_only_own_starters_incoming_trades_and_canonical_lock(clien
     assert len(actions)==3 and 'Injured starter' in actions[0]['title']
     assert all('Benched' not in r['title'] for r in actions)
     assert any(r['href']==f'/leagues/{l.id}/trades/{trade.id}' for r in actions)
+    db_session.query(LeagueMember).filter_by(user_id=uid,league_id=l.id).delete();db_session.commit()
+    assert client.get('/product/home-actions',headers=h).json()['data']==[]
     assert not any(r['key'].startswith('injury:') for r in client.get('/product/home-actions',headers=account(client,'outsider')[1]).json()['data'])
 
 

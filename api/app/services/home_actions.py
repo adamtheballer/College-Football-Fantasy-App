@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.models.team import Team
 from collegefootballfantasy_api.app.models.league import League
+from collegefootballfantasy_api.app.models.league_member import LeagueMember
 from collegefootballfantasy_api.app.models.roster import RosterEntry
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.team_schedule import TeamSchedule
@@ -15,7 +16,7 @@ from collegefootballfantasy_api.app.schemas.product import HomeAction, HomeActio
 def home_actions(db: Session, user_id: int) -> HomeActions:
     now = datetime.now(timezone.utc)
     week = calendar_cfb_week(settings.current_season_year, now)
-    teams = db.query(Team, League).join(League).filter(Team.owner_user_id == user_id, League.season_year == settings.current_season_year).all()
+    teams = db.query(Team, League).join(League).join(LeagueMember, LeagueMember.league_id == League.id).filter(LeagueMember.user_id == user_id, Team.owner_user_id == user_id, League.season_year == settings.current_season_year).all()
     team_map = {t.id: (t, l) for t, l in teams}
     rows = db.query(RosterEntry, Player).join(Player).filter(RosterEntry.team_id.in_(team_map)).all() if team_map else []
     starters = [(r,p) for r,p in rows if r.slot.upper() not in {'BENCH','BN','IR','RESERVE'}]
