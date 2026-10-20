@@ -142,6 +142,7 @@ export default function AdminParticipation() {
           </SurfaceCard>
         </>
       )}
+      {h.isLoading && <p role="status">Checking player data sources…</p>}
       {h.isError ? (
         <SurfaceCard>
           <p role="alert">Player health could not load.</p>

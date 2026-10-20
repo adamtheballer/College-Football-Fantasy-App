@@ -19,6 +19,8 @@ export function HomeActions() {
     queryFn: () =>
       apiGet<{ data: Action[]; checked_at: string }>("/product/home-actions"),
     staleTime: 30_000,
+    refetchInterval: 180_000,
+    refetchIntervalInBackground: false,
   });
   if (q.isLoading)
     return (

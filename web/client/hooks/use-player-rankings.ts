@@ -68,6 +68,8 @@ export function usePlayerRankings(filters: RankingFilters, enabled = true) {
     queryFn: ({ signal }) =>
       apiGet<PlayerRankingList>("/player-rankings", filters, signal).then(checkedRankingResponse),
     staleTime: 30_000,
+    refetchInterval: 180_000,
+    refetchIntervalInBackground: false,
   });
 }
 export function usePositionLeaders(period: "week" | "season", enabled = true) {
@@ -78,6 +80,8 @@ export function usePositionLeaders(period: "week" | "season", enabled = true) {
     queryFn: ({ signal }) =>
       apiGet<PlayerLeaders>("/player-rankings/leaders", { period }, signal).then(checkedRankingResponse),
     staleTime: 30_000,
+    refetchInterval: 180_000,
+    refetchIntervalInBackground: false,
   });
 }
 export const rankingPeriodLabel = (data: RankingContext) =>
