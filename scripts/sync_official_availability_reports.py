@@ -16,6 +16,8 @@ from collegefootballfantasy_api.app.db.session import SessionLocal
 from collegefootballfantasy_api.app.services.league_weeks import calendar_cfb_week
 from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_fresh, get_or_create_sync_state, mark_sync_attempt, scope_dict_to_key
 from collegefootballfantasy_api.app.services.sportsdata_sync import sync_power4_injuries
+from scripts.sync_reviewed_availability import sync_reviewed_reports
+from collegefootballfantasy_api.app.integrations.conference_availability_reports import ConferenceReportPending
 
 
 def should_run_at_local_hour(
@@ -103,8 +105,16 @@ def main() -> None:
         return
 
     week = args.week or calendar_cfb_week(args.season, now_utc)
+    # Team/coach corrections commit independently even while public conference
+    # pages are pending or a vendor is unavailable.
+    reviewed = sync_reviewed_reports(season=args.season, week=week)
+    print(f"reviewed availability season={args.season} week={week} results={reviewed}", flush=True)
     results = refresh_conferences(season=args.season, week=week)
-    print(f"official availability reports season={args.season} week={week} results={results}")
+    print(f"official availability reports season={args.season} week={week} results={results}", flush=True)
+    # Record full-pool coverage after the successful source transactions.
+    print(f"availability coverage={sync_reviewed_reports(season=args.season, week=week)}", flush=True)
+    if reviewed.get("correction_errors"):
+        raise RuntimeError(f"Reviewed corrections incomplete: {reviewed['correction_errors']}; conference refreshes were still attempted")
     failed = [conference for conference, result in results.items() if result.get("error")]
     if failed:
         raise RuntimeError(f"Availability refresh partial: failed conferences: {', '.join(failed)}; successful conferences were committed independently")
@@ -127,6 +137,12 @@ def refresh_conferences(*, season: int, week: int) -> dict:
                 state.meta = dict(counts)
                 session.commit()
                 results[conference] = {"refreshed": refreshed, **counts}
+            except ConferenceReportPending as exc:
+                session.rollback()
+                state = get_or_create_sync_state(session, "official_conference_reports", "injuries_week", scope_dict_to_key(scope))
+                mark_sync_attempt(session, state=state, status="pending", error_message=str(exc)[:500])
+                session.commit()
+                results[conference] = {"pending": str(exc)}
             except Exception as exc:
                 session.rollback()
                 # The failed import transaction must not erase its health record.

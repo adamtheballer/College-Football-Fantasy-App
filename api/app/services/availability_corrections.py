@@ -37,7 +37,7 @@ _ZERO_COLUMNS = (
 )
 
 
-def has_active_manual_override(db: Session, *, player_id: int, season: int, week: int) -> bool:
+def has_active_manual_override(db: Session, *, player_id: int, season: int, week: int, dated_report: bool = False) -> bool:
     """Whether a reviewed, bounded team-report correction controls this week."""
     return db.scalar(
         select(PlayerAvailabilityEvent.id).where(
@@ -46,6 +46,8 @@ def has_active_manual_override(db: Session, *, player_id: int, season: int, week
             PlayerAvailabilityEvent.source.in_(MANUAL_VERIFIED_SOURCES),
             PlayerAvailabilityEvent.reviewed.is_(True),
             PlayerAvailabilityEvent.effective_from_week <= week,
+            # A new, dated game report in a later week can confirm a return.
+            *([PlayerAvailabilityEvent.week == week] if dated_report else []),
             (PlayerAvailabilityEvent.effective_until_week.is_(None))
             | (PlayerAvailabilityEvent.effective_until_week >= week),
         ).limit(1)

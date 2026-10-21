@@ -509,3 +509,21 @@ def test_big12_unlabelled_team_requires_unique_exact_conference_position_and_gam
 def test_big_ten_embedded_link_unwraps_only_the_explicit_public_report_destination():
     html = '<iframe id="embedded-app" src="https://nam04.safelinks.protection.outlook.com/?url=https%3A%2F%2Fapp.hdintelligence.com%2F%3Fsource%3DB10%26sport%3DFootball%26conf%3DB10%26type%3Dreport"></iframe>'
     assert _embedded_report_url(BeautifulSoup(html,'html.parser'),'https://bigten.org/fb/availability-reports/') == 'https://app.hdintelligence.com/?source=B10&sport=Football&conf=B10&type=report'
+
+
+def test_acc_uppercase_dated_footer_resolves_each_game_in_a_range_heading():
+    html = '''<h1>Games of October 23 - October 24, 2026</h1>
+    <div><div><img alt="Duke"><div>OUT<div>K #39 Cosme Salas</div></div></div>
+      <p>FRIDAY, OCTOBER 23 | 7:00 PM ET | CHARLOTTESVILLE, VA</p></div>
+    <div><div><img alt="Miami"><div>QUESTIONABLE<div>WR #3 Example Receiver</div></div></div>
+      <p>SATURDAY, OCTOBER 24 | 12:00 PM ET | MIAMI GARDENS, FL</p></div>'''
+    rows = parse_report_document(html,conference="ACC",source_url="https://theacc.com/report")
+    assert [(r["team_name"],r["game_date"],r["status"]) for r in rows] == [
+        ("Duke","2026-10-23","OUT"),("Miami","2026-10-24","QUESTIONABLE")]
+
+
+def test_explicit_pending_page_is_distinct_from_an_unreadable_report():
+    import pytest
+    from collegefootballfantasy_api.app.integrations.conference_availability_reports import ConferenceReportPending
+    with pytest.raises(ConferenceReportPending):
+        parse_report_document('<h1>Games of October 24, 2026</h1><p>REPORT PENDING 10/21/26</p>',conference="BIG10",source_url="https://bigten.org/fb/availability-reports/")

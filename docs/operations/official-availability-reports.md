@@ -52,3 +52,27 @@ The source status remains `OUT` unless the official report explicitly says IR
 or supplies an absence of **at least four weeks/games** (including
 season-ending). A `2-4 week` range is intentionally kept as `OUT` because the
 earliest stated return is under four weeks.
+
+## Reviewed reports and week rollover
+
+The scheduled command also reads `reports/availability/2026-reviewed-corrections.json`.
+Each entry requires an exact existing player/school/position identity, two public
+reports, the source publication timestamp and an explicit effective week window.
+Reports are applied once through the existing audited correction tool before the
+conference fetches, so a pending vendor page cannot roll them back. A late run
+writes only the current week. The job never changes actual points or completed
+week records, invents a projection, creates a player, or treats a missing name as
+healthy. Confirmed absences can be saved during a bye even without a projection.
+
+The API carries bounded reviewed absences across byes until their window ends.
+A verified later return clears an old season-ending or multiweek absence. A dated
+conference report for a later game can supersede an older manual report; the
+same-week manual protection is retained. Ordinary weekly OUT/Questionable rows
+are not blindly copied into a new week.
+
+An explicit report-pending page is recorded as `pending`, without advancing its
+last successful import timestamp. An unreadable page remains `failed`. ACC range
+headings use the game footer date, including uppercase Friday/Saturday footers.
+Every run saves a full canonical player-pool coverage receipt under provider
+`reviewed_availability_audit`, feed `player_pool`, scoped by season/week. Its
+`unreported` count is an evidence gap, not a claim those players are healthy.

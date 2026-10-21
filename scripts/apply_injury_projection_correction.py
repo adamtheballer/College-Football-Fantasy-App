@@ -78,9 +78,9 @@ def apply_correction(args: argparse.Namespace) -> dict[str, object]:
         else args.notes
     )
     with SessionLocal() as db:
-        player = db.scalar(
+        player = db.scalars(
             select(Player).where(Player.name == args.player, Player.school == args.school)
-        )
+        ).one_or_none()
         if player is None:
             raise ValueError(f"No exact player match for {args.player} ({args.school}).")
 
@@ -154,10 +154,8 @@ def apply_correction(args: argparse.Namespace) -> dict[str, object]:
             db, player=player, season=args.season, week=args.week,
             status=args.status, note=corroboration_note,
         )
-        if correction is None and args.status in {"OUT", "IR", "OUT_FOR_SEASON"}:
-            raise ValueError(
-                f"No published Week {args.week} projection exists for {args.player}; refusing to create an unverified correction."
-            )
+        # A verified absence remains valid during a bye or before projections
+        # are published. Save the source assertion without fabricating a score.
 
         result = {
             "player_id": player.id,

@@ -1,0 +1,87 @@
+[
+  {
+    "player": "Julian Sayin",
+    "school": "Ohio State",
+    "position": "QB",
+    "season": 2026,
+    "week": 8,
+    "status": "OUT",
+    "injury": "Throwing-arm injury",
+    "return_timeline": "Out indefinitely; no confirmed return date",
+    "effective_until_week": 15,
+    "published_at": "2026-10-21T00:58:00+00:00",
+    "notes": "Ryan Day confirmed on Oct. 20 that Sayin is out indefinitely following the Oct. 17 injury. No return date was confirmed; this is not a confirmed season-ending designation. A newer verified return report supersedes this assertion.",
+    "source_url": [
+      "https://sports.yahoo.com/articles/ohio-state-qb-julian-sayin-005824654.html",
+      "https://www.elevenwarriors.com/ohio-state-football/2026/10/164711/ohio-state-quarterback-julian-sayin-out-indefinitely-doubtful-to-return-this-season"
+    ]
+  },
+  {
+    "player": "Nico Iamaleava",
+    "school": "UCLA",
+    "position": "QB",
+    "season": 2026,
+    "week": 8,
+    "status": "OUT_FOR_SEASON",
+    "injury": "Knee injury",
+    "return_timeline": "Out for the 2026 season",
+    "effective_until_week": 15,
+    "published_at": "2026-10-20T00:49:00+00:00",
+    "notes": "Bob Chesney confirmed on Oct. 19 that Iamaleava will miss the rest of the season and requires knee surgery following the Oct. 10 injury.",
+    "source_url": [
+      "https://sports.yahoo.com/articles/ucla-confirms-nico-iamaleava-needs-203630560.html",
+      "https://www.washingtonpost.com/sports/colleges/2026/10/19/ucla-nico-iamaleava-injury/19de18ba-cc20-11f1-ac04-9f58578a68b4_story.html"
+    ]
+  },
+  {
+    "player": "Tre Spivey",
+    "school": "Arizona",
+    "position": "WR",
+    "season": 2026,
+    "week": 8,
+    "status": "OUT_FOR_SEASON",
+    "injury": "Foot injury",
+    "return_timeline": "Out for the 2026 season",
+    "effective_until_week": 15,
+    "published_at": "2026-10-05T19:34:00+00:00",
+    "notes": "Brent Brennan confirmed on Oct. 5 that Spivey will miss the rest of the 2026 season and requires surgery for the foot injury suffered against Cincinnati.",
+    "source_url": [
+      "https://wildcat.arizona.edu/166436/football/arizona-wide-receiver-tre-spivey-out-for-year-with-broken-foot/",
+      "https://sports.yahoo.com/articles/arizona-wr-tre-spivey-season-193443029.html"
+    ]
+  },
+  {
+    "player": "Mason Heintschel",
+    "school": "Pittsburgh",
+    "position": "QB",
+    "season": 2026,
+    "week": 8,
+    "status": "OUT_FOR_SEASON",
+    "injury": "Knee injury",
+    "return_timeline": "Out for the 2026 season",
+    "effective_until_week": 15,
+    "published_at": "2026-10-04T03:27:00+00:00",
+    "notes": "Pittsburgh confirmed a season-ending knee injury following the Oct. 2 Virginia Tech game. Pat Narduzzi subsequently confirmed the quarterback replacement.",
+    "source_url": [
+      "https://accsports.com/news/mason-heintschel-out-for-season/",
+      "https://sports.yahoo.com/articles/pitt-coach-pat-narduzzi-makes-192219831.html"
+    ]
+  },
+  {
+    "player": "LJ Martin",
+    "school": "BYU",
+    "position": "RB",
+    "season": 2026,
+    "week": 8,
+    "status": "OUT",
+    "injury": "Lower-body injury",
+    "return_timeline": "Reported 4-6 weeks from early October; return not confirmed",
+    "effective_until_week": 8,
+    "published_at": "2026-10-07T23:43:00+00:00",
+    "notes": "A reported minimum four-week absence following the Oct. 3 injury covers Week 8. This correction expires after Week 8 and does not assume the maximum recovery estimate.",
+    "source_url": [
+      "https://www.deseret.com/sports/2026/10/07/lj-martin-injury-update-byu-running-back-missing-notre-dame-game/",
+      "https://en.zarza.com/podcasts/locked-on-cougars-daily-podcast-on-byu-cougars-football-basketball-935433/episodio/brutal-byu-football-loses-star-lj-martin-for-critical-stretch-season-outlook-completely-changes/"
+    ]
+  }
+]
