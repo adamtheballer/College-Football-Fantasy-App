@@ -70,6 +70,18 @@ def publish_zero_projection_for_unavailable_player(
     receives the same zero result.
     """
     if status not in {"OUT", "IR", "OUT_FOR_SEASON"}:
+        if status == "FULL":
+            # A verified return must also retire the unlocked zero override;
+            # the preserved provider forecast becomes authoritative again.
+            correction = db.scalar(select(WeeklyProjection).where(
+                WeeklyProjection.player_id == player.id,
+                WeeklyProjection.season == season,
+                WeeklyProjection.week == week,
+                WeeklyProjection.projection_version == CORRECTION_VERSION,
+                WeeklyProjection.locked_at.is_(None),
+            ))
+            if correction is not None:
+                correction.is_published = False
         return None
 
     source = db.scalar(

@@ -527,3 +527,33 @@ def test_explicit_pending_page_is_distinct_from_an_unreadable_report():
     from collegefootballfantasy_api.app.integrations.conference_availability_reports import ConferenceReportPending
     with pytest.raises(ConferenceReportPending):
         parse_report_document('<h1>Games of October 24, 2026</h1><p>REPORT PENDING 10/21/26</p>',conference="BIG10",source_url="https://bigten.org/fb/availability-reports/")
+
+
+def test_later_dated_return_supersedes_old_manual_absence_and_retires_unlocked_zero(db_session):
+    from collegefootballfantasy_api.app.models.game import Game
+    from collegefootballfantasy_api.app.services.availability_corrections import publish_zero_projection_for_unavailable_player
+    from collegefootballfantasy_api.app.services.injury_status import reviewed_injuries_for_week
+    p=Player(name="Returned QB",school="Ohio State",position="QB")
+    db_session.add(p);db_session.flush()
+    db_session.add_all([
+        Injury(player_id=p.id,season=2026,week=8,status="OUT"),
+        PlayerAvailabilityEvent(player_id=p.id,season=2026,week=8,status="OUT",
+            source=MANUAL_CORROBORATED_SOURCE,source_url="https://example.test/coach",
+            effective_from_week=8,effective_until_week=15,reviewed=True),
+        WeeklyProjection(player_id=p.id,season=2026,week=9,projection_version="PRELIMINARY",fantasy_points=21.0,is_published=True),
+        Game(season=2026,week=9,season_type="regular",home_team="USC",away_team="Ohio State",start_date=datetime(2026,10,31,23,30,tzinfo=timezone.utc)),
+    ])
+    db_session.flush()
+    publish_zero_projection_for_unavailable_player(db_session,player=p,season=2026,week=9,status="OUT",note="Reviewed absence")
+    db_session.flush()
+    assert db_session.scalar(current_published_projections_query(season=2026,week=9,player_ids=(p.id,))).fantasy_points == 0
+    result=_upsert_official_availability_rows(db_session,season=2026,week=9,rows=[{
+        "player_name":p.name,"team_name":p.school,"position":"QB","status":"AVAILABLE",
+        "conference":"BIG10","source_url":"https://bigten.org/fb/availability-reports/","game_date":"2026-10-31",
+    }])
+    db_session.flush()
+    assert result["overrides_preserved"] == 0
+    assert reviewed_injuries_for_week(db_session,season=2026,week=9)[p.id].status == "FULL"
+    assert p.id not in reviewed_injuries_for_week(db_session,season=2026,week=10)
+    projection=db_session.scalar(current_published_projections_query(season=2026,week=9,player_ids=(p.id,)))
+    assert projection.projection_version == "PRELIMINARY" and projection.fantasy_points == 21.0
