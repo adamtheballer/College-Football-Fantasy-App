@@ -6,6 +6,8 @@ dockerfilePath = "Dockerfile.api"
 # Public conference reports change through the week and shortly before kickoff.
 # Poll every 30 minutes in UTC; no paired DST schedule or off-day gap.
 cronSchedule = "*/30 * * * *"
-startCommand = "cd /app && exec env PYTHONPATH=/app uv run python scripts/sync_official_availability_reports.py --season 2026"
+# Dockerfile.api supplies WORKDIR=/app and PYTHONPATH=/app. Railway launches
+# Docker start commands in exec form, so shell builtins/operators cannot run here.
+startCommand = "uv run python scripts/sync_official_availability_reports.py --season 2026"
 restartPolicyType = "NEVER"
 restartPolicyMaxRetries = 1
