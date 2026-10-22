@@ -1,6 +1,6 @@
 /** One automatic lifetime authorization per account. StoreKit display is Apple's decision. */
-export type ReviewState = { account_id: number; enabled: boolean; review_request_claimed_at: string | null };
-export type ReviewClaim = ReviewState & { authorization: "granted" | "already_claimed" | "disabled" };
+export type ReviewState = { account_id: number; enabled: boolean; eligible?: boolean; review_request_invoked_at?: string | null; review_request_claimed_at: string | null };
+export type ReviewClaim = ReviewState & { authorization: "granted" | "already_claimed" | "disabled" | "not_eligible" };
 export type ReviewContext = { accountId: number | null; enabled: boolean; native: boolean; foreground: boolean; safe: boolean; screenKey: string };
 export type NativeReviewContext = { accountId: string; token: string; safe: boolean };
 export type ReviewReadiness = { ready: boolean; appVersion: string; appBuild: string };
@@ -12,6 +12,7 @@ export interface ReviewDependencies {
   adapter: ReviewAdapter;
   state(accountId: number, signal: AbortSignal): Promise<ReviewState>;
   claim(accountId: number, version: string, build: string, signal: AbortSignal): Promise<ReviewClaim>;
+  invoked?(accountId: number): Promise<unknown>;
   consumed(accountId: number): boolean;
   remember(accountId: number): void;
   now(): number;
@@ -49,6 +50,12 @@ export class AppReviewCoordinator {
   interrupt(): void {
     if (this.disposed || !this.context.native) return;
     this.cancel();
+    this.schedule();
+  }
+
+  meaningfulUse(): void {
+    const id = this.context.accountId;
+    if (id !== null && !this.visit.get(id)?.uncertain) this.visit.delete(id);
     this.schedule();
   }
 
@@ -112,7 +119,7 @@ export class AppReviewCoordinator {
       const state = await this.dependencies.state(id, abort.signal);
       if (state.account_id !== id) return;
       if (state.review_request_claimed_at) { this.remember(id); return; }
-      if (!state.enabled || !this.current(id, generation) || visit.uncertain) return;
+      if (!state.enabled || state.eligible === false || !this.current(id, generation) || visit.uncertain) return;
       // Once dispatched, a failed/aborted response is ambiguous. Only read
       // state on a later opportunity; never replay a grant in this visit.
       visit.uncertain = true;
@@ -128,7 +135,10 @@ export class AppReviewCoordinator {
       // its current scene, context and account-scoped invocation guard.
       const stillReady = await this.dependencies.adapter.synchronize(nativeContext);
       if (!stillReady.ready || !this.current(id, generation)) return;
-      await this.dependencies.adapter.request(nativeContext);
+      const invocation = await this.dependencies.adapter.request(nativeContext);
+      if (invocation && typeof invocation === "object" && "invoked" in invocation && invocation.invoked === true) {
+        await this.dependencies.invoked?.(id);
+      }
     } catch {
       // Review failures never affect authentication, navigation or app use.
     } finally {

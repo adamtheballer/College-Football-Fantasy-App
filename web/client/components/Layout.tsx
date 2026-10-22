@@ -1,3 +1,4 @@
+import { ProductSession } from "@/components/ProductSession";
 import React, {
   useEffect,
   useLayoutEffect,
@@ -131,6 +132,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   return (
     <>
+      <ProductSession />
       <AppUpdateExperience
         accountId={user?.id ?? null}
         managerName={user?.firstName ?? "Manager"}

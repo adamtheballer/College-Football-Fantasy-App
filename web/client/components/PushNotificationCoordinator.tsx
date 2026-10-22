@@ -1,3 +1,4 @@
+import { trackProductEvent } from "@/lib/product-analytics";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
@@ -50,6 +51,7 @@ export function PushNotificationCoordinator() {
       .then((result) => {
         if (!active || readPendingPushTap()?.eventId !== tap.eventId) return;
         clearPendingPushTap();
+        if (result.allowed) void trackProductEvent(user.id,"notification_open");
         navigate(result.allowed ? resolveNotificationPath(result.destination) : "/alerts");
       }).catch(() => {
         if (!active) return;

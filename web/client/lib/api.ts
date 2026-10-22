@@ -487,7 +487,7 @@ const apiRequest = async <T>({
   return parseJson<T>(res);
 };
 
-export const apiReviewRequest = <T>(path: "/app-review/state" | "/app-review/claim", accountId: number, signal: AbortSignal, body?: unknown) =>
+export const apiReviewRequest = <T>(path: "/app-review/state" | "/app-review/claim" | "/app-review/invoked", accountId: number, signal: AbortSignal, body?: unknown) =>
   apiRequest<T>({ method: body === undefined ? "GET" : "POST", path, body, signal, reviewAccountPrecondition: accountId });
 
 export const apiUserProfilePatch = <T>(accountId: number, body: unknown, signal?: AbortSignal) =>

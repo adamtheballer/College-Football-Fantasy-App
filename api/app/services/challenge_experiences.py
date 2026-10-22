@@ -1920,6 +1920,8 @@ def read_challenge(db, c, user, *, admin=False, include_details=True):
     return {
         "id": c.id,
         "round_id": r.id,
+        "season": r.season,
+        "week": r.week,
         "kind": c.kind,
         "name": KINDS[c.kind],
         "state": state(db, c, r),

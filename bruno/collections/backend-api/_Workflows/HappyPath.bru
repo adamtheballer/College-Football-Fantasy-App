@@ -18,3 +18,13 @@ docs {
   repeating returns already_seen. Do not consume production users' once-only
   opportunities as a smoke test.
 }
+
+docs {
+  Activation/rankings: HomeActions -> PlayerRankings/Leaders -> Rankings.
+  Compare standard scoring, league_id custom scoring, and mine=true;
+  My players keeps full-pool positional ranks. Admin Product/Participation and
+  PlayerHealth require an admin token. SessionEvent is optional and deduplicated
+  daily; the existing analytics preference controls storage.
+  New accounts skip the historical 1.03 recap. Native review requires a submitted
+  challenge or finalized matchup; claim and invocation are distinct.
+}

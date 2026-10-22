@@ -36,16 +36,17 @@ export function ChallengeAnalyticsChoice() {
       <label className="flex min-h-11 items-center gap-3">
         <input
           type="checkbox"
-          aria-label="Optional challenge analytics"
+          aria-label="Optional app usage analytics"
           disabled={!q.data || m.isPending}
           checked={q.data?.enabled ?? false}
           onChange={(e) => m.mutate(e.target.checked)}
         />
-        Optional challenge views, share counts and creator referral analytics
+        Optional app usage, challenge views, shares and referral analytics
       </label>
       <p>
-        Saved to your account. Browser Do Not Track is respected. Entries and
-        scores still operate when analytics are off.
+        Saved to your account. Browser Do Not Track is respected. Raw usage
+        events expire after 90 days. Entries and scores still operate when
+        analytics are off.
       </p>
       {(q.isError || m.isError) && (
         <p role="alert">

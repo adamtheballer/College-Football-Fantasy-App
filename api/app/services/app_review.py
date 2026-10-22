@@ -1,6 +1,9 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import select, update
+from sqlalchemy import select, update, or_
+from collegefootballfantasy_api.app.models.weekly_challenge import ChallengeEntry
+from collegefootballfantasy_api.app.models.matchup import Matchup
+from collegefootballfantasy_api.app.models.team import Team
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.core.config import settings
@@ -8,15 +11,29 @@ from collegefootballfantasy_api.app.models.user import User
 from collegefootballfantasy_api.app.schemas.app_review import AppReviewClaim, AppReviewClaimResult, AppReviewState
 
 
+def meaningful_use(db: Session, account_id: int) -> bool:
+    if db.scalar(select(ChallengeEntry.id).where(ChallengeEntry.user_id == account_id, ChallengeEntry.status == "submitted").limit(1)):
+        return True
+    owned = select(Team.id).where(Team.owner_user_id == account_id)
+    return db.scalar(select(Matchup.id).where(Matchup.status == "final",
+        or_(Matchup.home_team_id.in_(owned), Matchup.away_team_id.in_(owned))).limit(1)) is not None
+
+
 def review_state(db: Session, account_id: int) -> AppReviewState:
-    claimed_at = db.scalar(select(User.review_request_claimed_at).where(User.id == account_id))
+    user = db.get(User, account_id)
     return AppReviewState(account_id=account_id, enabled=settings.ios_app_review_enabled,
-                          review_request_claimed_at=claimed_at)
+        review_request_claimed_at=user.review_request_claimed_at if user else None,
+        review_request_invoked_at=user.review_request_invoked_at if user else None,
+        eligible=bool(user and (user.review_request_claimed_at is not None or meaningful_use(db, account_id))))
 
 
 def claim_review(db: Session, account_id: int, payload: AppReviewClaim) -> AppReviewClaimResult:
     if not settings.ios_app_review_enabled:
         return AppReviewClaimResult(**review_state(db, account_id).model_dump(), authorization="disabled")
+
+    state = review_state(db, account_id)
+    if state.review_request_claimed_at is None and not state.eligible:
+        return AppReviewClaimResult(**state.model_dump(), authorization="not_eligible")
 
     # PostgreSQL serializes competing updates on this immutable user's row and
     # rechecks the NULL predicate after waiting. No read-then-write race and no

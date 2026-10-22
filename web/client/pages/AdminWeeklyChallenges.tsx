@@ -399,6 +399,7 @@ export default function AdminWeeklyChallenges() {
         title="Manage Weekly Challenges"
         description="Prepare canonical weekly slates, validate, then publish. Rules and weights freeze at publication."
       />
+      <Button asChild variant="outline"><Link to="/admin/participation">Participation & data health</Link></Button>
       <Button asChild variant="outline">
         <Link to="/weekly-challenges">Challenge Hub</Link>
       </Button>

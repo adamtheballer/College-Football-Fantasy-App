@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { trackProductEvent } from "@/lib/product-analytics";
 import { Capacitor } from "@capacitor/core";
 
 import { Button } from "@/components/ui/button";
@@ -20,60 +21,23 @@ export const TOUR_STEPS: TourStep[] = [
   {
     navItem: "HOME",
     target: guidedNavTarget("HOME"),
-    title: "Home Dashboard",
+    title: "Your next move",
     description:
-      "Start here for your high-level fantasy dashboard, quick league access, and the main hub for the app.",
+      "Home shows open challenges, lineup reminders and verified player leaders. You can skip this guide and explore anytime.",
+  },
+  {
+    navItem: "CHALLENGES",
+    target: '[data-guide-challenges], [data-guide-nav="HOME"]',
+    title: "Make your first pick",
+    description:
+      "Choose an open Weekly Challenge. Lock of the Week needs one winner. Review your choice and tap Submit to make it official.",
   },
   {
     navItem: "LEAGUES",
     target: guidedNavTarget("LEAGUES"),
-    title: "Leagues",
+    title: "Your leagues",
     description:
-      "Use Leagues to create, join, and manage your fantasy leagues, view league settings, and prepare for your draft.",
-  },
-  {
-    navItem: "CHATS",
-    target: guidedNavTarget("CHATS"),
-    title: "Chats",
-    description:
-      "Use Chats for league conversation, manager coordination, trade talk, and commissioner updates. Each active league also has its own Chat tab between Watchlist and Settings.",
-  },
-  {
-    navItem: "MOCK DRAFT",
-    target: guidedNavTarget("MOCK DRAFT"),
-    title: "Mock Draft",
-    description:
-      "Practice your draft strategy in Mock Draft. It uses a separate simulation, so it never changes a real league, roster, or transaction.",
-  },
-  {
-    navItem: "INJURY CENTER",
-    // Drawer destinations retain their desktop target. On phones, the More
-    // tab is the visible highlight without opening the drawer over controls.
-    target: guidedNavTarget("INJURY CENTER", true),
-    title: "Injury Center",
-    description:
-      "Injury Center is where player availability and health context belongs so lineup and waiver decisions stay informed.",
-  },
-  {
-    navItem: "ALERTS",
-    target: guidedNavTarget("ALERTS", true),
-    title: "Alerts",
-    description:
-      "Alerts keeps league and player notifications in one supported workflow so you can review important changes quickly.",
-  },
-  {
-    navItem: "SETTINGS",
-    target: guidedNavTarget("SETTINGS", true),
-    title: "Settings",
-    description:
-      "Update your manager profile, choose your default league, and revisit this guide whenever you need it.",
-  },
-  {
-    navItem: "SIGN OUT",
-    target: guidedNavTarget("SIGN OUT", true),
-    title: "Sign Out",
-    description:
-      "Use Sign Out when you are finished on a shared device. You can sign back in later and return to your leagues and saved account.",
+      "Join or create a league, then manage your roster, matchups and waivers. Settings lets you replay this guide whenever you need it.",
   },
 ];
 
@@ -151,6 +115,7 @@ export function AppOnboardingTour({ isOpen, userId, onClose, onStepChange }: App
         event.preventDefault();
         clearPendingGuide(userId);
         setCompletedGuide(userId);
+        void trackProductEvent(userId,"guide_complete");
         onClose();
         return;
       }
@@ -244,12 +209,13 @@ export function AppOnboardingTour({ isOpen, userId, onClose, onStepChange }: App
   const finishGuide = () => {
     clearPendingGuide(userId);
     setCompletedGuide(userId);
+    void trackProductEvent(userId,"guide_complete");
     onClose();
   };
 
   return (
     <div className="fixed inset-0 z-[1200]" role="dialog" aria-modal="true" aria-live="polite">
-      <div className="absolute inset-0 bg-slate-950/28 backdrop-blur-[0.5px]" />
+      <div className="absolute inset-0 bg-black/40" />
 
       {targetRect && (
         <>
@@ -272,7 +238,7 @@ export function AppOnboardingTour({ isOpen, userId, onClose, onStepChange }: App
           </svg>
           <div
             aria-hidden="true"
-            className="pointer-events-none fixed rounded-[24px] border border-primary/90 bg-primary/5 shadow-[0_0_0_2px_rgba(96,165,250,0.25),0_0_28px_rgba(59,130,246,0.30)]"
+            className="pointer-events-none fixed rounded-lg border-2 border-primary"
             style={{
               left: Math.max(0, targetRect.left - PADDING),
               top: Math.max(0, targetRect.top - PADDING),
@@ -284,7 +250,7 @@ export function AppOnboardingTour({ isOpen, userId, onClose, onStepChange }: App
       )}
 
       <div
-        className="fixed z-[1210] max-h-[calc(100dvh-7rem)] overflow-y-auto rounded-[24px] border border-white/10 bg-[#08121d]/92 p-5 shadow-[0_30px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl sm:p-6"
+        className="fixed z-[1210] max-h-[calc(100dvh-7rem)] overflow-y-auto rounded-lg border border-border bg-card p-5 shadow-lg sm:p-6"
         style={
           tooltipPosition
             ? { top: tooltipPosition.top, left: tooltipPosition.left, width: tooltipPosition.width }

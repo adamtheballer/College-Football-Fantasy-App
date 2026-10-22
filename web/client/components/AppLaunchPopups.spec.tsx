@@ -29,6 +29,7 @@ vi.mock("@/lib/native-app-review", () => ({
   },
   observeNativeReviewAvailability: async () => ({ remove: async () => {} }),
   readReviewState: mocks.state,
+  acknowledgeReviewInvocation: vi.fn(),
   claimReview: mocks.claim,
   reviewConsumed: (id: number) => mocks.consumed.has(id),
   rememberReviewClaim: (id: number) => mocks.consumed.add(id),

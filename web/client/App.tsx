@@ -16,6 +16,8 @@ import RuntimeCompatibilityGate from "@/components/RuntimeCompatibilityGate";
 import { lazyWithRouteRecovery } from "@/lib/lazyWithRouteRecovery";
 import Layout from "./components/Layout";
 
+const AdminParticipation = lazyWithRouteRecovery(() => import("./pages/AdminParticipation"));
+const PlayerRankings = lazyWithRouteRecovery(() => import("./pages/PlayerRankings"));
 const Index = lazyWithRouteRecovery(() => import("./pages/Index"));
 const NotFound = lazyWithRouteRecovery(() => import("./pages/NotFound"));
 const Leagues = lazyWithRouteRecovery(() => import("./pages/Leagues"));
@@ -105,6 +107,7 @@ const ApplicationRoutes = () => (
             <Suspense fallback={<RouteFallback />}>
               <Routes>
                 <Route path="/" element={<Index />} />
+                <Route path="/player-rankings" element={<ProtectedRoute><PlayerRankings /></ProtectedRoute>} />
                 <Route path="/leagues" element={<Leagues />} />
                 <Route
                   path="/leagues/create"
@@ -245,6 +248,7 @@ const ApplicationRoutes = () => (
                 <Route path="/challenges/creator/:slug" element={<ProtectedRoute><CreatorChallengeLink /></ProtectedRoute>} />
                 <Route path="/admin/challenge-experiences" element={<ProtectedRoute><AdminChallengeExperiences /></ProtectedRoute>} />
                 <Route path="/weekly-challenges/:challengeId" element={<ProtectedRoute><WeeklyChallengeDetail /></ProtectedRoute>} />
+                <Route path="/admin/participation" element={<ProtectedRoute><AdminParticipation /></ProtectedRoute>} />
                 <Route path="/admin/weekly-challenges" element={<ProtectedRoute><AdminWeeklyChallenges /></ProtectedRoute>} />
                 <Route path="/managers/:userId" element={<ProtectedRoute><ManagerProfile /></ProtectedRoute>} />
                 <Route path="/saturday-pick-6" element={<ProtectedRoute><SaturdayPick6 /></ProtectedRoute>} />

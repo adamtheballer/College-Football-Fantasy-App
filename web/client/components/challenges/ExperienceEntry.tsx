@@ -1,3 +1,4 @@
+import { trackProductEvent } from "@/lib/product-analytics";
 import { useEffect, useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -200,6 +201,10 @@ export function ExperienceEntry({
       );
     },
     onSuccess: (e) => {
+      if (e.status === "submitted") {
+        void trackProductEvent(accountId, "challenge_submit", c.id);
+        window.dispatchEvent(new Event("cffb:meaningful-use"));
+      }
       setRevision(e.revision);
       setNotice(
         e.status === "submitted"
@@ -243,6 +248,7 @@ export function ExperienceEntry({
               a.name.localeCompare(b.name),
     );
   const change = (next: Pick[]) => {
+    if (next.length) void trackProductEvent(accountId, "challenge_start", c.id);
     setPicks(next);
     setNotice("");
     mutation.reset();

@@ -95,6 +95,9 @@ def test_same_saved_name_duplicate_and_unrelated_edits_do_not_extend_cooldown(cl
         response = client.patch("/auth/me", headers=headers, json=payload)
         assert response.status_code == 200 and response.json()["manager_name_changed_at"] == changed
     monkeypatch.setattr(settings, "ios_app_review_enabled", True)
+    # This test isolates profile cooldown from the review receipt mutation.
+    from collegefootballfantasy_api.app.services import app_review
+    monkeypatch.setattr(app_review, "meaningful_use", lambda db, uid: True)
     with TestingSessionLocal() as db:
         assert claim_review(db, user_id, AppReviewClaim(app_version="1", app_build="local")).authorization == "granted"
     response = client.get("/auth/me", headers=headers).json()

@@ -1,9 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { trackProductEvent } from "@/lib/product-analytics";
 import { useAuth } from "@/hooks/use-auth";
 import { apiGet, ApiError } from "@/lib/api";
 
-export type ChallengeKind = "slate12" | "upset" | "fantasy5" | "lock" | "duels" | "fanwars" | "millionaire" | "creator" | "survivor";
+export type ChallengeKind =
+  | "slate12"
+  | "upset"
+  | "fantasy5"
+  | "lock"
+  | "duels"
+  | "fanwars"
+  | "millionaire"
+  | "creator"
+  | "survivor";
 export type Pick = {
   game_id?: number;
   team?: string;
@@ -59,6 +69,8 @@ export type Challenge = {
   sponsor?: ChallengeSponsor | null;
   id: number;
   round_id: number;
+  season?: number;
+  week?: number;
   kind: ChallengeKind;
   name: string;
   state: string;
@@ -205,18 +217,26 @@ export function useCurrentChallenges(enabled = true) {
   return useQuery({
     queryKey: ["weekly-challenges", "current", user?.id],
     enabled: enabled && !!user && !isBootstrapping,
-    queryFn: () => apiGet<Round>("/weekly-challenges/current", { include_experiences: true }),
+    queryFn: () =>
+      apiGet<Round>("/weekly-challenges/current", {
+        include_experiences: true,
+      }),
     staleTime: 15_000,
     refetchInterval: 30_000,
   });
 }
 export function useChallenge(id: number) {
   const { user } = useAuth();
-  return useQuery({
+  const query = useQuery({
     queryKey: ["weekly-challenges", "detail", user?.id, id],
     enabled: !!user && Number.isSafeInteger(id) && id > 0,
     queryFn: () => apiGet<Challenge>(`/weekly-challenges/challenges/${id}`),
     staleTime: 5_000,
     refetchInterval: 30_000,
   });
+  useEffect(() => {
+    if (user && query.data)
+      void trackProductEvent(user.id, "challenge_view", id);
+  }, [user?.id, query.data?.id, id]);
+  return query;
 }

@@ -10,6 +10,7 @@ from collegefootballfantasy_api.app.db.model_registry import ensure_models_regis
 # were not incidentally imported by a route.
 ensure_models_registered()
 
+from collegefootballfantasy_api.app.api.routes import product
 from collegefootballfantasy_api.app.api.routes import (
     auth,
     app_review,
@@ -27,6 +28,7 @@ from collegefootballfantasy_api.app.api.routes import (
     matchups,
     notifications,
     players,
+    player_rankings,
     projections,
     provider_identity,
     rosters,
@@ -111,6 +113,8 @@ app.include_router(waivers.router, tags=["waivers"])
 app.include_router(trades.router, prefix="/trade", tags=["trade"])
 app.include_router(trades.league_router, tags=["trade"])
 app.include_router(insights.router, prefix="/insights", tags=["insights"])
+app.include_router(product.router, prefix="/product", tags=["product"])
+app.include_router(player_rankings.router, prefix="/player-rankings", tags=["player-rankings"])
 
 app.include_router(challenge_experiences.router, prefix="/weekly-challenges", tags=["weekly-challenges"])
 app.include_router(challenge_experiences.admin_router, prefix="/admin/weekly-challenges", tags=["admin-weekly-challenges"])

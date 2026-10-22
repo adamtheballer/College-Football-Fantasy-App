@@ -1,3 +1,5 @@
+import { ChallengeShare } from "@/components/challenges/ChallengeShare";
+import { trackProductEvent } from "@/lib/product-analytics";
 import { isExperience } from "@/hooks/use-challenge-experiences";
 import { WeeklyChallengeSponsor } from "@/components/challenges/WeeklyChallengeSponsor";
 import { useEffect, useState } from "react";
@@ -15,6 +17,7 @@ import {
   type Duel,
   type Participant,
   type Results,
+  FORMATS,
   challengeError,
   deadlineText,
   useChallenge,
@@ -89,6 +92,10 @@ export function EntryForm({
       );
     },
     onSuccess: (entry) => {
+      if (entry.status === "submitted") {
+        void trackProductEvent(accountId, "challenge_submit", c.id);
+        window.dispatchEvent(new Event("cffb:meaningful-use"));
+      }
       setRevision(entry.revision);
       setOfficial(entry.status === "submitted");
       setConfirmation(
@@ -101,6 +108,7 @@ export function EntryForm({
     onError: () => onSaved(),
   });
   const change = (next: Pick[]) => {
+    if (next.length) void trackProductEvent(accountId, "challenge_start", c.id);
     setConfirmation("");
     mutation.reset();
     setPicks(next);
@@ -530,11 +538,24 @@ function Duels({ challenge: c }: { challenge: Challenge }) {
   );
 }
 
-export function ChallengeResults({ challenge: c, pageSize = 25 }: { challenge: Challenge; pageSize?: number }) {
+export function ChallengeResults({
+  challenge: c,
+  pageSize = 25,
+}: {
+  challenge: Challenge;
+  pageSize?: number;
+}) {
   const { user } = useAuth();
   const [offset, setOffset] = useState(0);
   const query = useQuery({
-    queryKey: ["weekly-challenges", "results", user?.id, c.id, offset, pageSize],
+    queryKey: [
+      "weekly-challenges",
+      "results",
+      user?.id,
+      c.id,
+      offset,
+      pageSize,
+    ],
     queryFn: () =>
       apiGet<Results>(`/weekly-challenges/challenges/${c.id}/results`, {
         limit: pageSize,
@@ -651,7 +672,8 @@ export default function WeeklyChallengeDetail() {
   const query = useChallenge(Number(challengeId));
   const state = useChallengeState(query.data);
   const c = query.data ? { ...query.data, state } : undefined;
-  if (c && isExperience(c.kind)) return <Navigate to={`/weekly-challenges/experiences/${c.id}`} replace/>;
+  if (c && isExperience(c.kind))
+    return <Navigate to={`/weekly-challenges/experiences/${c.id}`} replace />;
   return (
     <div className="mx-auto max-w-4xl space-y-5 pb-24 pt-3">
       <Button asChild variant="outline">
@@ -676,7 +698,13 @@ export default function WeeklyChallengeDetail() {
           />
           <SurfaceCard className="space-y-3">
             <h2 className="cfb-section-title">Format and eligibility</h2>
-            <p className="text-sm leading-relaxed">{c.rules}</p>
+            <p className="text-sm leading-relaxed">{FORMATS[c.kind]}</p>
+            <details>
+              <summary className="min-h-11 cursor-pointer py-3 text-sm font-bold text-primary">
+                Full rules and eligibility
+              </summary>
+              <p className="text-sm leading-relaxed">{c.rules}</p>
+            </details>
             <p className="text-xs text-muted-foreground">
               Rules {c.rules_version}
               {c.scoring_version ? ` · Scoring ${c.scoring_version}` : ""}
@@ -739,6 +767,7 @@ export default function WeeklyChallengeDetail() {
           )}
           {c.kind === "duels" && <Duels challenge={c} />}
           <ChallengeResults challenge={c} />
+          <ChallengeShare challenge={c} />
         </>
       )}
     </div>

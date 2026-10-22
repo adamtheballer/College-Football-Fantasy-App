@@ -1,0 +1,14 @@
+meta {
+  name: Participation
+  type: http
+  seq: 2
+}
+get {
+  url: {{base_url}}/product/admin/participation?days=7
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+tests {
+  test("Successful response", function () { expect(res.status).to.equal(200); });
+}

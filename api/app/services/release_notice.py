@@ -9,6 +9,8 @@ from collegefootballfantasy_api.app.models.user_release_notice import UserReleas
 from collegefootballfantasy_api.app.schemas.release_notice import ReleaseNoticeResult
 
 RELEASE_KEY = "1.03"
+# Users who joined after this release need the short welcome guide, not a historical recap.
+RELEASED_AT = datetime(2026, 10, 19, 2, 49, 40, tzinfo=timezone.utc)
 
 
 def claim_release_notice(db: Session, account_id: int) -> ReleaseNoticeResult:
@@ -18,8 +20,10 @@ def claim_release_notice(db: Session, account_id: int) -> ReleaseNoticeResult:
     if user_id is None:
         raise HTTPException(401, "active account required")
     row = db.get(UserReleaseNotice, (account_id, RELEASE_KEY))
-    granted = row is None
-    if granted:
+    created = db.get(User, account_id).created_at
+    created = created.replace(tzinfo=timezone.utc) if created.tzinfo is None else created
+    granted = row is None and created < RELEASED_AT
+    if row is None:
         row = UserReleaseNotice(user_id=account_id, release_key=RELEASE_KEY, claimed_at=datetime.now(timezone.utc))
         db.add(row)
     # Persistence precedes permission, just like native App Review. A lost

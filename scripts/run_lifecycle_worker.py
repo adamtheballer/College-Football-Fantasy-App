@@ -65,6 +65,15 @@ def run_once() -> dict[str, dict[str, int | str]]:
             # transaction to its caller; commit the shared worker unit so its
             # daily guard survives the next five-second tick.
             db.commit()
+            # Optional observation runs after critical lifecycle commits, in a
+            # separate transaction. A reporting failure must not stop drafts.
+            try:
+                from collegefootballfantasy_api.app.services.player_data_health import run_due_product_health
+                with SessionLocal() as diagnostics:
+                    result["product_health"] = run_due_product_health(diagnostics, settings.current_season_year)
+            except Exception:
+                logger.exception("product_health_check_failed")
+                result["product_health"] = {"status": "failed"}
             return result
         except Exception:
             db.rollback()

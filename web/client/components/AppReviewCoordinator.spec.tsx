@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({ native: true, enabled: true, state: vi.fn(), c
 vi.mock("@/components/RuntimeCompatibilityGate", () => ({ useRuntimeCapabilities: () => ({ ios_app_review_enabled: mocks.enabled }) }));
 vi.mock("@/lib/native-app-review", () => ({ isNativeIosReviewRuntime: () => mocks.native,
   nativeReviewAdapter: { synchronize: mocks.synchronize, request: mocks.request }, observeNativeReviewAvailability: mocks.observe,
-  readReviewState: mocks.state, claimReview: mocks.claim, rememberReviewClaim: mocks.remember, reviewConsumed: mocks.consumed }));
+  readReviewState: mocks.state, acknowledgeReviewInvocation: vi.fn(), claimReview: mocks.claim, rememberReviewClaim: mocks.remember, reviewConsumed: mocks.consumed }));
 
 const props = { accountId: 11, sessionReady: true, onboarding: false, pathname: "/", screenKey: "home" };
 const tick = async (ms = 0) => { await act(() => vi.advanceTimersByTimeAsync(ms)); };

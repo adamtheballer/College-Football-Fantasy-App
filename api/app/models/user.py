@@ -10,6 +10,7 @@ from collegefootballfantasy_api.app.core.name_change import next_name_change_at
 class User(TimestampMixin, Base):
     __tablename__ = "users"
     __table_args__ = (
+        CheckConstraint("review_request_invoked_at IS NULL OR review_request_claimed_at IS NOT NULL", name="ck_users_review_invocation_claimed"),
         Index("ix_users_email", "email"),
         Index("ix_users_token", "api_token"),
         CheckConstraint(
@@ -33,6 +34,8 @@ class User(TimestampMixin, Base):
     email_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     beta_access_granted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_test_account: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false", nullable=False)
+    review_request_invoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     failed_login_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     last_failed_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -7,6 +7,8 @@ import {
 } from "lucide-react";
 
 import { EmptyState, SkeletonState } from "@/components/states";
+import { HomeActions } from "@/components/HomeActions";
+import { PositionLeadersHome } from "@/components/player/PositionLeadersHome";
 import { WeeklyChallengesHome } from "@/components/challenges/WeeklyChallengesHome";
 import { LeagueMatchupCarousel } from "@/components/league/LeagueMatchupCarousel";
 import { formatDisplayedProbabilityPair, validProbability } from "@/components/league/WinChanceMeter";
@@ -307,7 +309,9 @@ export default function Index() {
         )}
       </section>
 
+      <HomeActions />
       <WeeklyChallengesHome />
+      <PositionLeadersHome />
 
       <section className="grid gap-4 xl:grid-cols-2">
         <SurfaceCard variant="default" padding="none">

@@ -65,6 +65,8 @@ class ChallengeSponsorRead(BaseModel):
 
 
 class ChallengeRead(BaseModel):
+    season: int | None = None
+    week: int | None = None
     experience: ExperienceRead | None = None
     participant_count: int = 0
     sponsor: ChallengeSponsorRead | None = None

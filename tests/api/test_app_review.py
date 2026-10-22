@@ -19,6 +19,9 @@ PAYLOAD = {"app_version": "1.0", "app_build": "123"}
 
 @pytest.fixture(autouse=True)
 def enable_review(monkeypatch):
+    # These tests isolate atomic claim mechanics; eligibility has dedicated integration coverage.
+    from collegefootballfantasy_api.app.services import app_review
+    monkeypatch.setattr(app_review, "meaningful_use", lambda db, account_id: True)
     monkeypatch.setattr(settings, "ios_app_review_enabled", True)
 
 
@@ -33,7 +36,7 @@ def account(client, suffix="one"):
 def test_first_claim_persists_before_response_and_never_replays(client, db_session):
     user_id, headers = account(client)
     state = client.get("/app-review/state", headers=headers).json()
-    assert state == {"account_id": user_id, "enabled": True, "review_request_claimed_at": None}
+    assert state == {"account_id": user_id, "enabled": True, "review_request_claimed_at": None, "review_request_invoked_at": None, "eligible": True}
     first = client.post("/app-review/claim", headers=headers, json=PAYLOAD)
     assert first.status_code == 200
     assert first.json()["authorization"] == "granted"

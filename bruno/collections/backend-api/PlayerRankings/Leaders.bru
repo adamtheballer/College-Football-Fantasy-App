@@ -1,0 +1,14 @@
+meta {
+  name: Leaders
+  type: http
+  seq: 1
+}
+get {
+  url: {{base_url}}/player-rankings/leaders?period=week
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+tests {
+  test("Successful response", function () { expect(res.status).to.equal(200); });
+}
