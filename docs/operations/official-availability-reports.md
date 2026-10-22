@@ -15,6 +15,10 @@ command:
 uv run python scripts/sync_official_availability_reports.py --season 2026
 ```
 
+Railway executes Docker start commands directly. Keep this command free of shell
+builtins such as `cd` and operators such as `&&`; `Dockerfile.api` already sets
+the working directory and Python path to `/app`.
+
 Configure the Railway schedule as `*/30 * * * *` (UTC). The job runs every 30
 minutes, including Thursday/Friday report updates and game-day final reports.
 The former Wednesday/Sunday 10 AM schedule missed those changes. No paired
