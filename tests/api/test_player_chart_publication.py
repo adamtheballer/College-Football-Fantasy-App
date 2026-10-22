@@ -18,7 +18,9 @@ def final_week(db, week=1):
     return matchup
 
 
-def test_week_transition_retains_actuals_and_one_upcoming_forecast(db_session):
+def test_week_transition_retains_actuals_and_one_upcoming_forecast(db_session, monkeypatch):
+    from collegefootballfantasy_api.app.services import player_trajectory as trajectory_service
+    monkeypatch.setattr(trajectory_service, "calendar_matchup_display_week", lambda _season: 7)
     weeks = [final_week(db_session, w) for w in range(1, 7)]
     p = Player(name="Transition WR", school="Illinois", position="WR", raw_cfb27_rating=84)
     db_session.add(p); db_session.flush()
@@ -34,6 +36,7 @@ def test_week_transition_retains_actuals_and_one_upcoming_forecast(db_session):
     db_session.add(PlayerStat(player_id=p.id, season=2026, week=7, stats={"fantasy_points":24.6}, verified=True))
     final_week(db_session, 7)
     publish_finalized_chart_week(db_session, season=2026, week=7)
+    monkeypatch.setattr(trajectory_service, "calendar_matchup_display_week", lambda _season: 8)
     trajectory = build_player_trajectory(db_session, player_id=p.id, season=2026)
     assert [(pt.week,pt.actual_points) for pt in trajectory.projection if pt.actual_points is not None] == [(6,18.4),(7,24.6)]
     assert [pt.week for pt in trajectory.projection if not pt.is_finalized] == [8]

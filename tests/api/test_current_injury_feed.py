@@ -73,3 +73,72 @@ def test_unknown_official_designation_never_becomes_healthy():
 @pytest.mark.parametrize("query", ["week=0", "week=31", "season=0"])
 def test_injury_query_rejects_invalid_period(client, query):
     assert client.get(f"/injuries?{query}").status_code == 422
+
+
+def test_bounded_reviewed_absence_survives_bye_and_expires_without_carrying_normal_out(client, db_session):
+    from collegefootballfantasy_api.app.services.availability_corrections import MANUAL_CORROBORATED_SOURCE
+    p = Player(name="Long absence", school="Ohio State", position="QB")
+    db_session.add(p); db_session.flush()
+    db_session.add_all([
+        Injury(player_id=p.id, season=2026, week=8, status="OUT", return_timeline="Out indefinitely"),
+        PlayerAvailabilityEvent(player_id=p.id, season=2026, week=8, status="OUT",
+            source=MANUAL_CORROBORATED_SOURCE, source_url="https://example.test/coach",
+            effective_from_week=8, effective_until_week=11, reviewed=True),
+    ])
+    db_session.commit()
+    for week in (8, 9, 10, 11):
+        assert client.get(f"/injuries/player/{p.id}?season=2026&week={week}").json()["status"] == "OUT"
+        assert _injury_status_by_player(db_session, season=2026, week=week, player_ids={p.id}) == {p.id:"OUT"}
+    assert client.get(f"/injuries/player/{p.id}?season=2026&week=12").json()["status"] == "UNREPORTED"
+    assert client.get(f"/injuries/player/{p.id}?season=2026&week=7").json()["status"] == "UNREPORTED"
+
+
+def test_newer_week_return_clears_bounded_manual_and_season_absence(db_session):
+    from collegefootballfantasy_api.app.services.availability_corrections import MANUAL_CORROBORATED_SOURCE
+    from collegefootballfantasy_api.app.services.injury_status import reviewed_injuries_for_week
+    p = Player(name="Verified return", school="UCLA", position="QB")
+    db_session.add(p); db_session.flush()
+    db_session.add_all([
+        Injury(player_id=p.id, season=2026, week=8, status="OUT_FOR_SEASON"),
+        Injury(player_id=p.id, season=2026, week=9, status="FULL"),
+        PlayerAvailabilityEvent(player_id=p.id, season=2026, week=8, status="OUT_FOR_SEASON",
+            source=MANUAL_CORROBORATED_SOURCE, source_url="https://example.test/coach",
+            effective_from_week=8, effective_until_week=15, reviewed=True),
+    ])
+    db_session.commit()
+    assert reviewed_injuries_for_week(db_session,season=2026,week=9)[p.id].status == "FULL"
+    assert p.id not in reviewed_injuries_for_week(db_session,season=2026,week=10)
+
+
+def test_newer_same_week_full_clears_a_bounded_assertion(db_session):
+    from collegefootballfantasy_api.app.services.availability_corrections import MANUAL_CORROBORATED_SOURCE
+    from collegefootballfantasy_api.app.services.injury_status import reviewed_injuries_for_week
+    p=Player(name="Same week recovery",school="UCLA",position="QB")
+    db_session.add(p);db_session.flush()
+    now=datetime.now(timezone.utc)
+    db_session.add_all([
+        Injury(player_id=p.id,season=2026,week=8,status="OUT",updated_at=now-timedelta(hours=3)),
+        PlayerAvailabilityEvent(player_id=p.id,season=2026,week=8,status="OUT",
+            source=MANUAL_CORROBORATED_SOURCE,source_url="https://example.test/coach",
+            effective_from_week=8,effective_until_week=15,reviewed=True,created_at=now-timedelta(hours=2)),
+        Injury(player_id=p.id,season=2026,week=8,status="FULL",updated_at=now),
+    ])
+    db_session.commit()
+    assert reviewed_injuries_for_week(db_session,season=2026,week=8)[p.id].status == "FULL"
+
+
+def test_repeated_weekly_out_does_not_clear_a_confirmed_long_absence(db_session):
+    from collegefootballfantasy_api.app.services.availability_corrections import MANUAL_CORROBORATED_SOURCE
+    from collegefootballfantasy_api.app.services.injury_status import reviewed_injuries_for_week
+    p=Player(name="Repeating OUT",school="UCLA",position="QB")
+    db_session.add(p);db_session.flush()
+    db_session.add_all([
+        Injury(player_id=p.id,season=2026,week=8,status="OUT_FOR_SEASON"),
+        Injury(player_id=p.id,season=2026,week=9,status="OUT"),
+        PlayerAvailabilityEvent(player_id=p.id,season=2026,week=8,status="OUT_FOR_SEASON",
+            source=MANUAL_CORROBORATED_SOURCE,source_url="https://example.test/coach",
+            effective_from_week=8,effective_until_week=15,reviewed=True),
+    ])
+    db_session.commit()
+    assert reviewed_injuries_for_week(db_session,season=2026,week=9)[p.id].status == "OUT_FOR_SEASON"
+    assert reviewed_injuries_for_week(db_session,season=2026,week=10)[p.id].status == "OUT_FOR_SEASON"

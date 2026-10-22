@@ -45,6 +45,10 @@ class ConferenceReportUnavailable(RuntimeError):
     """Raised when a public report cannot be read as a document."""
 
 
+class ConferenceReportPending(ConferenceReportUnavailable):
+    """The source explicitly says the next report has not been published yet."""
+
+
 def parse_archive_document(html: str, *, conference: str, source_url: str) -> list[dict[str, str | None]]:
     """Read dated archive rows for deliberate audits/backfills, never live fallback.
 
@@ -198,7 +202,7 @@ def _parse_grouped_report_cards(soup: BeautifulSoup, *, conference: str, source_
             year = re.search(r", (\d{4})$", text)
             parent = element.parent
             while parent and parent.name not in {"body", "html"}:
-                footer = re.search(r"(?:Friday|Saturday|Thursday|Sunday), ([A-Z][a-z]+ \d{1,2}) \|", parent.get_text(" ", strip=True))
+                footer = re.search(r"(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), ([A-Z][a-z]+ \d{1,2}) \|", parent.get_text(" ", strip=True), re.I)
                 if footer and year:
                     try:
                         return datetime.strptime(f"{footer.group(1)}, {year.group(1)}", "%B %d, %Y").date().isoformat()
@@ -305,6 +309,8 @@ def parse_report_document(
     if not rows:
         rows = _parse_grouped_report_cards(soup, conference=conference, source_url=source_url)
     report_text = soup.get_text(" ", strip=True).lower()
+    if not rows and "report pending" in report_text and soup.find("h1"):
+        raise ConferenceReportPending(f"{conference} official availability report is pending publication")
     no_report_markers = ("no games until", "no games scheduled", "no reports available")
     if not rows and not any(marker in report_text for marker in no_report_markers):
         raise ConferenceReportUnavailable(
@@ -421,6 +427,8 @@ class ConferenceAvailabilityReportClient:
                     conference=source.conference,
                     source_url=official_source_url,
                 )
+            except ConferenceReportPending:
+                raise
             except ConferenceReportUnavailable as rendered_error:
                 raise ConferenceReportUnavailable(
                     f"static document unreadable ({static_error}); rendered document unreadable ({rendered_error})"

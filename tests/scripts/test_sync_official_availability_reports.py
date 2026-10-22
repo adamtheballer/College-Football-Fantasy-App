@@ -115,3 +115,20 @@ def test_deployed_schedule_refreshes_throughout_the_week():
     assert config['cronSchedule'] == '*/30 * * * *'
     assert '--only-local-weekday' not in config['startCommand']
     assert '--only-local-hour' not in config['startCommand']
+
+
+def test_pending_source_does_not_become_ready_or_erase_a_prior_success(db_session, monkeypatch):
+    from scripts import sync_official_availability_reports as job
+    from conftest import TestingSessionLocal
+    from collegefootballfantasy_api.app.models.provider_sync_state import ProviderSyncState
+    from collegefootballfantasy_api.app.integrations.conference_availability_reports import ConferenceReportPending
+    monkeypatch.setattr(job,"SessionLocal",TestingSessionLocal)
+    def sync(session,*,season,week,conference):
+        if conference == "BIG10":raise ConferenceReportPending("Official report pending")
+        return {"rows_seen":1,"created":0}
+    monkeypatch.setattr(job,"sync_power4_injuries",sync)
+    results=job.refresh_conferences(season=2026,week=8)
+    assert results["BIG10"] == {"pending":"Official report pending"}
+    state=db_session.query(ProviderSyncState).filter(ProviderSyncState.status=="pending").one()
+    assert state.last_success_at is None
+    assert state.last_attempted_at is not None

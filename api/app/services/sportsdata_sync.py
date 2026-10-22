@@ -14,6 +14,7 @@ from collegefootballfantasy_api.app.core.config import settings
 from collegefootballfantasy_api.app.integrations.conference_availability_reports import (
     ConferenceAvailabilityReportClient,
     ConferenceReportUnavailable,
+    ConferenceReportPending,
     report_source_for,
 )
 from collegefootballfantasy_api.app.integrations.sportsdata import SportsDataClient
@@ -605,7 +606,7 @@ def _upsert_official_availability_rows(
         # older or incomplete conference report, but only for the weeks it
         # explicitly covers.  Once the window ends, normal official sync
         # resumes automatically.
-        if has_active_manual_override(db, player_id=player.id, season=season, week=week):
+        if has_active_manual_override(db, player_id=player.id, season=season, week=week, dated_report=bool(row.get("game_date"))):
             overrides_preserved += 1
             continue
         semantic_change = (
@@ -749,6 +750,8 @@ def sync_power4_injuries(
         source = report_source_for(conference_key)
         try:
             source_rows.extend(client.get_rows(source))
+        except ConferenceReportPending:
+            raise
         except (httpx.HTTPError, ConferenceReportUnavailable) as exc:
             unavailable.append(f"{conference_key}: {exc}")
     if unavailable and len(unavailable) == len(conferences) and not source_rows:

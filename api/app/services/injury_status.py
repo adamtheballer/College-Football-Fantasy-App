@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import timezone
+
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from collegefootballfantasy_api.app.models.injury import Injury
@@ -35,18 +38,70 @@ def reviewed_injuries_for_week(
     """
     if player_ids == set():
         return {}
-    query = db.query(Injury).filter(Injury.season == season, Injury.week <= week)
+    from collegefootballfantasy_api.app.services.availability_corrections import MANUAL_VERIFIED_SOURCES
+    # Keep this a single bounded query for the roster/matchup read budget.
+    query = db.query(Injury, PlayerAvailabilityEvent).outerjoin(
+        PlayerAvailabilityEvent,
+        and_(
+            PlayerAvailabilityEvent.player_id == Injury.player_id,
+            PlayerAvailabilityEvent.season == season,
+            PlayerAvailabilityEvent.reviewed.is_(True),
+            PlayerAvailabilityEvent.source.in_(MANUAL_VERIFIED_SOURCES),
+            PlayerAvailabilityEvent.source_url.is_not(None),
+            PlayerAvailabilityEvent.effective_from_week <= week,
+            PlayerAvailabilityEvent.effective_until_week >= week,
+        ),
+    ).filter(Injury.season == season, Injury.week <= week)
     if player_ids is not None:
         query = query.filter(Injury.player_id.in_(player_ids))
-    rows = query.order_by(Injury.updated_at.desc(), Injury.id.desc()).all()
-    current: dict[int, Injury] = {}
-    season_absences: dict[int, Injury] = {}
+    pairs = query.order_by(Injury.week.desc(), Injury.updated_at.desc(), Injury.id.desc(),
+                           PlayerAvailabilityEvent.created_at.desc(), PlayerAvailabilityEvent.id.desc()).all()
+    rows_by_id = {}
+    events: dict[int, PlayerAvailabilityEvent] = {}
+    for row, event in pairs:
+        rows_by_id.setdefault(row.id, row)
+        if event is not None:
+            events.setdefault(event.player_id, event)
+    rows = list(rows_by_id.values())
+    latest: dict[int, Injury] = {}
     for row in rows:
-        if row.week == week:
-            current.setdefault(row.player_id, row)
+        latest.setdefault(row.player_id, row)
+    # Interpret the latest report, not any historical season-ending row. A
+    # subsequently verified return must clear an old season absence.
+    # A subsequent weekly OUT repeats the absence; only a different later
+    # designation can clear the confirmed season-ending report.
+    season_absences = {}
+    settled = set()
+    for row in rows:
+        if row.player_id in settled or normalize_injury_status(row.status) == "OUT":
+            continue
+        settled.add(row.player_id)
         if normalize_injury_status(row.status) == "OUT_FOR_SEASON":
-            season_absences.setdefault(row.player_id, row)
-    return {**current, **season_absences}
+            season_absences[row.player_id] = row
+    current = {pid: row for pid, row in latest.items()
+               if row.week == week or normalize_injury_status(row.status) == "OUT_FOR_SEASON"}
+
+    current.update(season_absences)
+
+    for pid, event in events.items():
+        report = latest.get(pid)
+        # Explicit later-week reports supersede older corroborated assertions;
+        # an absence cannot become permanent or defeat a verified return.
+        if report is not None:
+            status = normalize_injury_status(report.status)
+            event_status = normalize_injury_status(event.status)
+            repeated_absence = status == event_status or (status == "OUT" and event_status == "OUT_FOR_SEASON")
+            if report.week > event.week and not repeated_absence:
+                continue
+            if (report.week == event.week and report.updated_at and event.created_at
+                and report.updated_at.replace(tzinfo=timezone.utc) > event.created_at.replace(tzinfo=timezone.utc)
+                and normalize_injury_status(report.status) != normalize_injury_status(event.status)):
+                continue
+        source = next((r for r in rows if r.player_id == pid and r.week == event.week
+                       and normalize_injury_status(r.status) == normalize_injury_status(event.status)), None)
+        if source is not None:
+            current[pid] = source
+    return current
 
 
 def normalize_injury_status(raw_status: str | None) -> str:
@@ -91,8 +146,8 @@ def is_out_for_season(db: Session, *, player_id: int, season: int) -> bool:
     Unlike a normal weekly status, this designation remains active after the
     week that recorded it so acquisition and roster reads stay consistent.
     """
-    statuses = db.query(Injury.status).filter(
-        Injury.player_id == player_id,
-        Injury.season == season,
-    ).all()
-    return any(normalize_injury_status(status) == "OUT_FOR_SEASON" for (status,) in statuses)
+    from collegefootballfantasy_api.app.services.league_weeks import calendar_cfb_week
+    report = reviewed_injuries_for_week(
+        db, player_ids={player_id}, season=season, week=calendar_cfb_week(season),
+    ).get(player_id)
+    return report is not None and normalize_injury_status(report.status) == "OUT_FOR_SEASON"
