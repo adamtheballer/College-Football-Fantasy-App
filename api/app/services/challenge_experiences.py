@@ -1567,7 +1567,7 @@ def read(db, c, user, *, admin=False, include_details=True):
     return ExperienceRead.model_validate(result).model_dump()
 
 
-def leaderboard(db, c, user, *, metric="accuracy", conference=None, season=False):
+def leaderboard(db, c, user, *, metric="power", conference=None, season=False):
     if c.status == "draft" or not visible(db, c):
         fail("NOT_PUBLISHED", "This competition has not opened.", 409, c)
     x = detail(db, c)
@@ -1685,8 +1685,7 @@ def leaderboard(db, c, user, *, metric="accuracy", conference=None, season=False
             }
 
     total = q.count()
-    rows = [row_read(row) for row in q.order_by(ranked.c.rank, User.id).limit(10)]
-    mine = q.filter(User.id == user.id).first()
+    rows = [row_read(row) for row in q.order_by(ranked.c.rank, User.id).limit(core().LEADERBOARD_LIMIT)]
     return {
         "challenge_id": c.id,
         "kind": c.kind,
@@ -1700,10 +1699,10 @@ def leaderboard(db, c, user, *, metric="accuracy", conference=None, season=False
         "provisional": c.status not in {"final", "no_contest", "canceled"},
         "total": total,
         "data": rows,
-        "your_rank": row_read(mine) if mine else None,
+        "your_rank": next((row for row in rows if row["user_id"] == user.id), None),
         "school_standings": school_standings(
             db, c, metric=metric, conference=conference, season=season
-        )
+        )[:core().LEADERBOARD_LIMIT]
         if c.kind == "fanwars"
         else [],
     }

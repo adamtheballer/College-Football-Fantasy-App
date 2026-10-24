@@ -9,6 +9,7 @@ import { ManagerAvatar } from "@/components/profile/ManagerAvatar";
 import { useAuth } from "@/hooks/use-auth";
 import { apiGet, apiChallengeWrite } from "@/lib/api";
 import {
+  CHALLENGE_LEADERBOARD_LIMIT,
   type Challenge,
   type Entry,
   type Pick,
@@ -530,21 +531,20 @@ function Duels({ challenge: c }: { challenge: Challenge }) {
   );
 }
 
-export function ChallengeResults({ challenge: c, pageSize = 25 }: { challenge: Challenge; pageSize?: number }) {
+export function ChallengeResults({ challenge: c }: { challenge: Challenge }) {
   const { user } = useAuth();
-  const [offset, setOffset] = useState(0);
   const query = useQuery({
-    queryKey: ["weekly-challenges", "results", user?.id, c.id, offset, pageSize],
+    queryKey: ["weekly-challenges", "results", user?.id, c.id, CHALLENGE_LEADERBOARD_LIMIT],
     queryFn: () =>
       apiGet<Results>(`/weekly-challenges/challenges/${c.id}/results`, {
-        limit: pageSize,
-        offset,
+        limit: CHALLENGE_LEADERBOARD_LIMIT,
+        offset: 0,
       }),
     refetchInterval: 30_000,
   });
   return (
     <SurfaceCard className="space-y-4">
-      <h2 className="cfb-section-title text-xl">Results</h2>
+      <h2 className="cfb-section-title text-xl">Top 5</h2>
       <p className="text-sm text-muted-foreground">
         {c.state === "Open"
           ? "Only your own entry is visible before the deadline."
@@ -562,26 +562,7 @@ export function ChallengeResults({ challenge: c, pageSize = 25 }: { challenge: C
       {query.data?.data.length === 0 && (
         <p className="text-sm">No submitted results yet.</p>
       )}
-      {query.data?.my_result && (
-        <div className="rounded border border-primary/40 p-3">
-          <h3 className="text-sm font-bold">Your Result</h3>
-          <p className="mt-1 text-sm">
-            {query.data.my_result.challenge_points === null
-              ? "Processing — authoritative results are pending."
-              : `${query.data.my_result.challenge_points} challenge points`}
-            {query.data.my_result.rank
-              ? ` · Rank ${query.data.my_result.rank}`
-              : ""}
-          </p>
-          {query.data.my_result.raw_points !== null && (
-            <p className="text-sm text-muted-foreground">
-              {c.kind === "fantasy5" ? "Raw fantasy total" : "Raw result"}:{" "}
-              {query.data.my_result.raw_points}
-            </p>
-          )}
-        </div>
-      )}
-      {query.data?.data.map((row) => (
+      {query.data?.data.slice(0, CHALLENGE_LEADERBOARD_LIMIT).map((row) => (
         <div
           className="flex flex-wrap items-center justify-between gap-3 border-t border-border py-3"
           key={row.entry_id}
@@ -622,24 +603,6 @@ export function ChallengeResults({ challenge: c, pageSize = 25 }: { challenge: C
           </div>
         </div>
       ))}
-      {query.data && query.data.total > 25 && (
-        <div className="flex gap-3">
-          <Button
-            variant="outline"
-            disabled={offset === 0}
-            onClick={() => setOffset(Math.max(0, offset - pageSize))}
-          >
-            Previous
-          </Button>
-          <Button
-            variant="outline"
-            disabled={offset + pageSize >= query.data.total}
-            onClick={() => setOffset(offset + pageSize)}
-          >
-            Next
-          </Button>
-        </div>
-      )}
     </SurfaceCard>
   );
 }

@@ -919,7 +919,7 @@ def test_future_round_entries_are_rejected_and_upcoming_is_read_only(exp):
     assert w["db"].query(ChallengeEntry).count() == 0
 
 
-def test_top_ten_and_equal_score_ranks_are_authoritative(exp):
+def test_top_five_and_equal_score_ranks_are_authoritative(exp):
     w = exp
     c = publish(w, "millionaire")
     for user in [1, 2, 3]:
@@ -1033,7 +1033,7 @@ def test_shared_web_fixture_obeys_the_api_contract():
         assert ChallengeRead.model_validate(item).model_dump(mode="json") == item
 
 
-def test_top_ten_is_bounded_and_retains_the_requesting_users_rank(exp):
+def test_top_five_is_bounded_without_an_extra_personal_rank(exp):
     from collegefootballfantasy_api.app.models.user import User
 
     w = exp
@@ -1060,7 +1060,7 @@ def test_top_ten_is_bounded_and_retains_the_requesting_users_rank(exp):
         w["db"].add(
             ChallengeScore(
                 entry_id=e.id,
-                raw_points=100 - i,
+                raw_points=100 - min(i, 4),  # A fifth-place tie must not expand the five rows.
                 status="final",
                 source_hash="fixture",
                 details={"correct": 10},
@@ -1069,8 +1069,9 @@ def test_top_ten_is_bounded_and_retains_the_requesting_users_rank(exp):
         )
     w["db"].commit()
     board = svc.leaderboard(w["db"], w["db"].get(WeeklyChallenge, c["id"]), u)
-    assert len(board["data"]) == 10 and board["total"] == 14
-    assert board["your_rank"]["rank"] == 14 and board["your_rank"]["user_id"] == u.id
+    assert len(board["data"]) == 5 and board["total"] == 14
+    assert board["your_rank"] is None
+    assert [row["points"] for row in board["data"]] == [100, 99, 98, 97, 96]
 
 
 def test_survivor_repeated_scoring_does_not_duplicate_audits_or_notifications(exp):

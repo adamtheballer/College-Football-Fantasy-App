@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { apiGet } from "@/lib/api";
 import {
+  CHALLENGE_LEADERBOARD_LIMIT,
   type Round,
   type Leaderboard,
   type LeaderRow,
@@ -152,7 +153,7 @@ export default function WeeklyChallengeLeaderboard() {
             </Button>
           </div>
           <SurfaceCard>
-            <h2 className="cfb-section-title mb-3">Top 10</h2>
+            <h2 className="cfb-section-title mb-3">Top 5</h2>
             {query.data?.provisional && (
               <p className="mb-4 text-sm text-amber-300">
                 Provisional weekly standings — some challenges are still
@@ -187,16 +188,10 @@ export default function WeeklyChallengeLeaderboard() {
                 No finalized challenge awards yet.
               </p>
             )}
-            {query.data?.data.map((row) => (
+            {query.data?.data.slice(0, CHALLENGE_LEADERBOARD_LIMIT).map((row) => (
               <StandingRow key={row.user_id} row={row} />
             ))}
           </SurfaceCard>
-          {query.data?.your_rank && (
-            <SurfaceCard>
-              <h2 className="cfb-section-title mb-3">Your Rank</h2>
-              <StandingRow row={query.data.your_rank} />
-            </SurfaceCard>
-          )}
         </>
       )}
     </div>

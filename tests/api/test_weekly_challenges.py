@@ -312,7 +312,7 @@ def test_cancel_withdraws_awards_without_deleting_audit(world):
     assert w['db'].query(ChallengeEntry).count()==1 and w['db'].query(ChallengeAudit).count()>=4
 
 
-def test_rank_entire_population_before_top10_and_own_rank(world):
+def test_leaderboard_only_returns_top_five_without_an_extra_personal_rank(world):
     w=world;c=publish(w,'lock');finalize(w,'lock')
     for i in range(15):
         u=User(email=f'leader{i}@example.com',first_name=f'Leader {i}',password_hash='unused',api_token=f'leader-test-{i}',is_active=True)
@@ -324,10 +324,10 @@ def test_rank_entire_population_before_top10_and_own_rank(world):
     w['db'].add(mine);w['db'].flush();w['db'].add(ChallengeAward(entry_id=mine.id,round_id=w['round']['id'],user_id=mine.user_id,points=1,source_hash='fixture',revision=1));w['db'].commit()
     r=w['client'].get(f'{BASE}/leaderboard?season=2026&round_id={w["round"]["id"]}',headers=w['accounts'][1][1])
     assert r.status_code==200,r.text
-    value=r.json();assert len(value['data'])==10 and value['your_rank']['rank']==15
-    assert value['your_rank']['points']==1 and value['provisional']
+    value=r.json();assert len(value['data'])==5 and value['your_rank'] is None
+    assert value['provisional']
     assert value['week']==1
-    assert [(row['display_name'],row['points']) for row in value['data']]==[(f'Leader {i}',15-i) for i in range(10)]
+    assert [(row['display_name'],row['points']) for row in value['data']]==[(f'Leader {i}',15-i) for i in range(5)]
     top_user=w['db'].get(User,value['data'][0]['user_id']);top_user.first_name='Updated Leader';w['db'].commit()
     refreshed=w['client'].get(f'{BASE}/leaderboard?season=2026&round_id={w["round"]["id"]}',headers=w['accounts'][1][1]).json()
     assert refreshed['data'][0]['display_name']=='Updated Leader'

@@ -103,7 +103,7 @@ export function ChallengeModeStandings({
         (isExperience(detail.data.kind) ? (
           <ExperienceLeaderboard challenge={detail.data} />
         ) : (
-          <ChallengeResults challenge={detail.data} pageSize={10} />
+          <ChallengeResults challenge={detail.data} />
         ))}
     </>
   );
