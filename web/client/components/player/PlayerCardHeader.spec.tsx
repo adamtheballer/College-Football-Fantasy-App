@@ -46,18 +46,36 @@ describe("PlayerCardHeader injury status", () => {
     expect(screen.getByText(/• Miami/)).toBeTruthy();
   });
 
-  it("treats a missing official injury report as ACTIVE", () => {
+  it("keeps a missing official injury report unreported despite generic provider activity", () => {
     expect(resolvePlayerCardStatus({
       current_injury_status: null,
       about: { status: "Active", source: "espn" },
-    } as never, "UNREPORTED")).toBe("ACTIVE");
+    } as never, "UNREPORTED")).toBe("UNREPORTED");
   });
 
   it("normalizes provider casing for active labels", () => {
     expect(resolvePlayerCardStatus(undefined, "active")).toBe("ACTIVE");
   });
+
+  it.each([
+    [null, "NO REPORT", "bg-slate-300/70", "text-slate-200"],
+    ["FULL", "ACTIVE", "bg-emerald-300", "text-emerald-100"],
+  ])("distinguishes a reviewed return from missing evidence (%s)", (status, label, dotClass, textClass) => {
+    render(<PlayerCardHeader
+      card={{ current_injury_status: status, about: { status: "Active" }, player: {} } as never}
+      onClose={vi.fn()}
+      palette={getPlayerCardPalette("RB")}
+      player={{ id: 1, name: "Availability Player", position: "RB", school: "Missouri", status: "Active" }}
+      position="RB" title="Player Card"
+    />);
+    expect(screen.getAllByText(label)).toHaveLength(2);
+    expect(screen.queryByText(label === "ACTIVE" ? "NO REPORT" : "ACTIVE")).toBeNull();
+    const dot = screen.getByTestId("player-card-status-dot");
+    expect(dot.className).toContain(dotClass);
+    expect(dot.parentElement?.className).toContain(textClass);
+  });
   it("clears a stale contextual injury when the refreshed card has no current designation", () => {
-    expect(resolvePlayerCardStatus({ current_injury_status: null } as never, "OUT")).toBe("ACTIVE");
+    expect(resolvePlayerCardStatus({ current_injury_status: null } as never, "OUT")).toBe("UNREPORTED");
     expect(resolvePlayerCardStatus(undefined, "OUT")).toBe("OUT");
   });
 

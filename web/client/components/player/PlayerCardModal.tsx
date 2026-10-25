@@ -6,7 +6,7 @@ import { buildProjectedStats, formatStat, statRowsForPosition, statValue } from 
 import { cn } from "@/lib/utils";
 import type { PlayerStats } from "@/types/player";
 
-import { PlayerCardHeader, resolvePlayerCardStatus } from "./PlayerCardHeader";
+import { PlayerCardHeader, playerCardStatusLabel, resolvePlayerCardStatus } from "./PlayerCardHeader";
 import { PlayerTrajectoryChart } from "./PlayerTrajectoryChart";
 
 type PlayerCardTab = "news" | "summary" | "game-log" | "projections" | "history" | "value";
@@ -783,7 +783,7 @@ export function PlayerCardModal({
                     ["Class", card?.about.player_class ?? player.playerClass],
                     ["Born", card?.about.birthplace],
                     ["School", card?.about.team ?? player.school],
-                    ["Status", playerStatus],
+                    ["Status", playerCardStatusLabel(playerStatus)],
                   ].map(([label, value]) => (
                     <div key={label} className="min-w-0 rounded-sm border border-cfb-border-subtle bg-cfb-surface p-2 sm:p-3">
                       <p className="text-[9px] font-black uppercase tracking-[0.18em] text-white/45">{label}</p>

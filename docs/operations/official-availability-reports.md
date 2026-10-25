@@ -80,3 +80,17 @@ headings use the game footer date, including uppercase Friday/Saturday footers.
 Every run saves a full canonical player-pool coverage receipt under provider
 `reviewed_availability_audit`, feed `player_pool`, scoped by season/week. Its
 `unreported` count is an evidence gap, not a claim those players are healthy.
+
+The player-card contract preserves this distinction: `current_injury_status: null`
+means no current report and renders as **NO REPORT** with a neutral indicator.
+An explicitly reviewed `FULL` return renders as **ACTIVE**. Generic ESPN roster
+activity is not an injury clearance. The Injury Center includes the approved
+independent Notre Dame pool under `INDEPENDENT`, without changing conference
+membership or admitting other schools.
+
+The Oct. 25 full-pool audit is recorded in
+`reports/availability/2026-10-25-audit.json`, with an 815-player receipt in
+`reports/availability/2026-10-25-player-audit.csv`. It applied 13 sourced status
+corrections and verified unchanged stats, scores, matchups and target projections.
+Reviewed `FULL` and `TBD` corrections use the existing availability probability
+policy; a game designation does not invent practice participation.

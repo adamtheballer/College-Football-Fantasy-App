@@ -264,6 +264,7 @@ export function usePlayerTrajectory(
 
 export type PlayerCardResponse = {
   player: BackendPlayerRead;
+  /** FULL is a reviewed return; null/omitted means no current report. */
   current_injury_status?: string | null;
   recent_news?: Array<{
     id: number;
