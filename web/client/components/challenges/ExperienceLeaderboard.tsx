@@ -5,7 +5,7 @@ import { SurfaceCard } from "@/components/fantasy";
 import { Button } from "@/components/ui/button";
 import { apiGet } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
-import type { Challenge } from "@/hooks/use-weekly-challenges";
+import { CHALLENGE_LEADERBOARD_LIMIT, type Challenge } from "@/hooks/use-weekly-challenges";
 import type { ExperienceLeaderboard as Standings } from "@/hooks/use-challenge-experiences";
 export function ExperienceLeaderboard({
   challenge: c,
@@ -13,8 +13,8 @@ export function ExperienceLeaderboard({
   challenge: Challenge;
 }) {
   const { user } = useAuth();
-  const [metric, setMetric] = useState("accuracy"),
-    [conference, setConference] = useState(""),
+  const metric = "power";
+  const [conference, setConference] = useState(""),
     [season, setSeason] = useState(false);
   const q = useQuery({
     queryKey: [
@@ -39,7 +39,7 @@ export function ExperienceLeaderboard({
     <SurfaceCard className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="cfb-section-title text-xl">
-          {c.kind === "fanwars" ? "National School Leaderboard" : "Top 10"}
+          {c.kind === "fanwars" ? "Top 5 Schools" : "Top 5"}
         </h2>
         {q.data && (
           <span className="text-xs">
@@ -51,28 +51,12 @@ export function ExperienceLeaderboard({
       {c.kind === "fanwars" && (
         <>
           <p className="text-xs text-muted-foreground">
-            Fan Accuracy: resolved correct picks ÷ eligible resolved picks. At
-            least {c.experience?.minimum_fans} active fans per school. Schools
-            below the threshold remain provisional.
+            Schools ranked by Fan Points from resolved eligible picks.
           </p>
           <div
             className="flex flex-wrap gap-2"
-            aria-label="School ranking metric"
+            aria-label="School leaderboard period"
           >
-            <Button
-              variant={metric === "accuracy" ? "default" : "outline"}
-              aria-pressed={metric === "accuracy"}
-              onClick={() => setMetric("accuracy")}
-            >
-              Fan Accuracy
-            </Button>
-            <Button
-              variant={metric === "power" ? "default" : "outline"}
-              aria-pressed={metric === "power"}
-              onClick={() => setMetric("power")}
-            >
-              Fan Power
-            </Button>
             <Button
               variant={season ? "default" : "outline"}
               aria-pressed={season}
@@ -103,13 +87,13 @@ export function ExperienceLeaderboard({
                   <th className="p-2">Rank</th>
                   <th className="p-2">School</th>
                   <th className="p-2">
-                    {metric === "accuracy" ? "Accuracy" : "Fan Points"}
+                    Fan Points
                   </th>
                   <th className="p-2">Fans</th>
                 </tr>
               </thead>
               <tbody>
-                {q.data?.school_standings.slice(0, 10).map((s) => (
+                {q.data?.school_standings.slice(0, CHALLENGE_LEADERBOARD_LIMIT).map((s) => (
                   <tr key={s.school_id} className="border-t border-border">
                     <td className="p-2">
                       {s.rank ? `#${s.rank}` : "Provisional"}
@@ -122,9 +106,7 @@ export function ExperienceLeaderboard({
                       </span>
                     </td>
                     <td className="p-2">
-                      {metric === "accuracy"
-                        ? `${s.accuracy ?? 0}%`
-                        : s.fan_points}
+                      {s.fan_points}
                     </td>
                     <td className="p-2">{s.active_fans}</td>
                   </tr>
@@ -157,7 +139,7 @@ export function ExperienceLeaderboard({
         </p>
       )}
       <div className="divide-y divide-border">
-        {q.data?.data.map((row) => (
+        {q.data?.data.slice(0, CHALLENGE_LEADERBOARD_LIMIT).map((row) => (
           <section key={row.user_id} className="py-3">
             <div className="flex items-center justify-between gap-3">
               <Link to={row.profile_url} className="min-w-0 text-sm font-bold">
@@ -197,13 +179,6 @@ export function ExperienceLeaderboard({
           </section>
         ))}
       </div>
-      {q.data?.your_rank && (
-        <p className="border-t border-border pt-3 text-sm font-bold">
-          Your rank: #{q.data.your_rank.rank} ·{" "}
-          {q.data.your_rank.points ?? "Pending"}{" "}
-          {q.data.your_rank.points === null ? "" : q.data.unit}
-        </p>
-      )}
     </SurfaceCard>
   );
 }

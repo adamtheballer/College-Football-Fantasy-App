@@ -35,6 +35,7 @@ from collegefootballfantasy_api.app.services.fantasy_game_selection import schoo
 from collegefootballfantasy_api.app.services.injury_status import confirmed_nonparticipant_ids
 from collegefootballfantasy_api.app.services.weekly_challenge_sponsors import weekly_challenge_sponsor
 
+LEADERBOARD_LIMIT = 5
 KINDS = {"slate12": "Slate 12", "upset": "Upset Hunter", "fantasy5": "Fantasy Five", "lock": "Lock of the Week", "duels": "Rivalry Duels"}
 RULES = {
     "slate12": "Pick all 12 straight-up winners: 1 point per correct pick. Predict the featured game's combined score; smallest absolute error breaks placement ties, without extra season points. Exact ties share rank.",
@@ -606,11 +607,10 @@ def leaderboard(db, user, *, season, round_id=None):
         u, points, rank = row
         return {**participant(u), "points": int(points), "rank": int(rank)}
     query = db.query(User, ranked.c.points, ranked.c.rank).join(ranked, ranked.c.user_id == User.id)
-    top = [row_read(x) for x in query.order_by(ranked.c.rank, User.id).limit(10)]
-    mine = query.filter(User.id == user.id).first()
+    top = [row_read(x) for x in query.order_by(ranked.c.rank, User.id).limit(LEADERBOARD_LIMIT)]
     unsettled = db.query(WeeklyChallenge.id).join(ChallengeRound).filter(ChallengeRound.season == season, WeeklyChallenge.status.notin_(("final", "no_contest", "canceled")), WeeklyChallenge.kind.in_(KINDS))
     if round_id is not None: unsettled = unsettled.filter(ChallengeRound.id == round_id)
-    return {"season": season, "week": db.get(ChallengeRound, round_id).week if round_id else None, "round_id": round_id, "provisional": unsettled.first() is not None if round_id else False, "data": top, "your_rank": row_read(mine) if mine and user.id not in [x["user_id"] for x in top] else None}
+    return {"season": season, "week": db.get(ChallengeRound, round_id).week if round_id else None, "round_id": round_id, "provisional": unsettled.first() is not None if round_id else False, "data": top, "your_rank": None}
 
 
 def results(db, c, user, limit, offset):

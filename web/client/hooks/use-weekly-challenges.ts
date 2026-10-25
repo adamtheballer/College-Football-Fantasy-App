@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { apiGet, ApiError } from "@/lib/api";
 
+export const CHALLENGE_LEADERBOARD_LIMIT = 5;
+
 export type ChallengeKind = "slate12" | "upset" | "fantasy5" | "lock" | "duels" | "fanwars" | "millionaire" | "creator" | "survivor";
 export type Pick = {
   game_id?: number;

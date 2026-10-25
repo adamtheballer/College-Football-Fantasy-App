@@ -159,7 +159,7 @@ def upcoming(
 )
 def leaderboard(
     challenge_id: int,
-    metric: str = Query("accuracy", pattern="^(accuracy|power)$"),
+    metric: str = Query("power", pattern="^(accuracy|power)$"),
     conference: str | None = Query(None, pattern="^(SEC|BIG10|BIG12|ACC)$"),
     season: bool = False,
     db: Session = Depends(get_db),
