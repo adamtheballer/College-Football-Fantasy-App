@@ -9,11 +9,20 @@ from collegefootballfantasy_api.app.models.injury_impact import InjuryImpact
 from collegefootballfantasy_api.app.models.player import Player
 from collegefootballfantasy_api.app.models.player_availability_event import PlayerAvailabilityEvent
 from collegefootballfantasy_api.app.schemas.injury import InjuryList, InjuryRead
-from collegefootballfantasy_api.app.services.power4 import conference_for_school, resolve_power4_school
+from collegefootballfantasy_api.app.services.power4 import (
+    PLAYOFF_ELIGIBLE_INDEPENDENTS, conference_for_school, resolve_power4_school,
+)
 from collegefootballfantasy_api.app.services.injury_status import reviewed_injuries_for_week, normalize_injury_status
 from collegefootballfantasy_api.app.services.league_weeks import calendar_cfb_week
 
 router = APIRouter()
+
+
+def _injury_conference(school: str) -> str | None:
+    canonical = resolve_power4_school(school)
+    if canonical in PLAYOFF_ELIGIBLE_INDEPENDENTS:
+        return "INDEPENDENT"
+    return conference_for_school(canonical or school)
 
 
 @router.get("", response_model=InjuryList)
@@ -62,7 +71,7 @@ def list_injuries(
         if injury is None:
             continue
         canonical_team = resolve_power4_school(player.school or "")
-        player_conference = conference_for_school(canonical_team or player.school)
+        player_conference = _injury_conference(player.school or "")
         if not player_conference:
             continue
         if conference_normalized and conference_normalized not in {"ALL", "ANY", player_conference}:
@@ -107,7 +116,7 @@ def get_player_injury(
             player_id=player_id,
             player_name=player.name,
             team=player.school,
-            conference=conference_for_school(player.school),
+            conference=_injury_conference(player.school or ""),
             position=player.position,
             season=season,
             week=week,
@@ -125,7 +134,7 @@ def get_player_injury(
         player_id=player.id,
         player_name=player.name,
         team=canonical_team or player.school,
-        conference=conference_for_school(canonical_team or player.school),
+        conference=_injury_conference(player.school or ""),
         position=player.position,
         season=injury.season,
         week=injury.week,

@@ -204,7 +204,8 @@ test.describe("player card modal", () => {
     await expect(dialog.getByRole("cell", { name: "Live", exact: true })).toBeVisible();
   });
 
-  test("opens centered with canonical bio details and no provider profile control", async ({ page }, testInfo) => {
+  for (const designation of ["DOUBTFUL", null, "FULL"]) {
+  test(`opens centered with canonical bio details and no provider profile control (${designation ?? "UNREPORTED"})`, async ({ page }, testInfo) => {
     await seedAuthenticatedSession(page);
     await page.route("**/stats/teams**", async (route) => {
       await route.fulfill({
@@ -221,7 +222,7 @@ test.describe("player card modal", () => {
           contentType: "application/json",
           body: JSON.stringify({
             player: mockPlayer,
-            current_injury_status: "DOUBTFUL",
+            current_injury_status: designation,
             about: {
               espn_player_id: "999001",
               height: "6'3\"",
@@ -452,8 +453,15 @@ test.describe("player card modal", () => {
     await page.getByRole("button", { name: /Jeremiah Smith/i }).first().click();
     const dialog = page.getByRole("dialog", { name: /Jeremiah Smith player card/i });
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByLabel("Doubtful")).toHaveText("D");
-    await expect(dialog.getByTestId("player-card-status-dot")).toHaveClass(/bg-red-400/);
+    if (designation === "DOUBTFUL") {
+      await expect(dialog.getByLabel("Doubtful")).toHaveText("D");
+      await expect(dialog.getByTestId("player-card-status-dot")).toHaveClass(/bg-red-400/);
+    } else {
+      await expect(dialog.getByLabel("Doubtful")).toHaveCount(0);
+      await expect(dialog.getByText(designation === "FULL" ? "ACTIVE" : "NO REPORT", { exact: true })).toHaveCount(3);
+      await expect(dialog.getByText(designation === "FULL" ? "NO REPORT" : "ACTIVE", { exact: true })).toHaveCount(0);
+      await expect(dialog.getByTestId("player-card-status-dot")).toHaveClass(designation === "FULL" ? /bg-emerald-300/ : /bg-slate-300/);
+    }
     await expect(dialog.getByLabel("Questionable")).toHaveCount(0);
     await expect(dialog.getByText("ESPN PROFILE", { exact: true })).toHaveCount(0);
     await expect(dialog.getByText("6'3\"")).toBeVisible();
@@ -583,4 +591,5 @@ test.describe("player card modal", () => {
     await page.getByRole("button", { name: "Close player card" }).click();
     await expect(dialog).toBeHidden();
   });
+  }
 });

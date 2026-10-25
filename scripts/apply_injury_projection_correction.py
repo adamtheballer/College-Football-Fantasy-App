@@ -33,6 +33,7 @@ from collegefootballfantasy_api.app.services.availability_corrections import (
     MANUAL_VERIFIED_SOURCE,
     publish_zero_projection_for_unavailable_player,
 )
+from collegefootballfantasy_api.app.services.sportsdata_sync import _availability_multiplier
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -43,7 +44,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--school", required=True)
     parser.add_argument(
         "--status",
-        choices=("OUT", "OUT_FOR_SEASON", "DOUBTFUL", "QUESTIONABLE", "PROBABLE"),
+        choices=("OUT", "OUT_FOR_SEASON", "DOUBTFUL", "QUESTIONABLE", "PROBABLE", "TBD", "FULL"),
         required=True,
     )
     parser.add_argument("--injury", required=True)
@@ -95,9 +96,9 @@ def apply_correction(args: argparse.Namespace) -> dict[str, object]:
         injury.status = args.status
         injury.injury = args.injury
         injury.return_timeline = args.return_timeline
-        injury.practice_level = "DNP"
+        injury.practice_level = None  # A game designation does not establish practice participation.
         injury.is_game_time_decision = False
-        injury.is_returning = False
+        injury.is_returning = args.status == "FULL"
         injury.notes = corroboration_note[:500]
         effective_until_week = args.effective_until_week or args.week
         if effective_until_week < args.week:
@@ -117,8 +118,7 @@ def apply_correction(args: argparse.Namespace) -> dict[str, object]:
             event = PlayerAvailabilityEvent(player_id=player.id, season=args.season, week=args.week)
             db.add(event)
         event.status = args.status
-        event.probability_active = 0.0 if args.status in {"OUT", "OUT_FOR_SEASON"} else 0.7
-        event.availability_multiplier = 0.0 if args.status in {"OUT", "OUT_FOR_SEASON"} else 0.7
+        event.probability_active, event.availability_multiplier = _availability_multiplier(args.status)
         event.source = source
         event.source_url = source_url
         event.content_hash = content_hash
@@ -165,7 +165,7 @@ def apply_correction(args: argparse.Namespace) -> dict[str, object]:
             "week": args.week,
             "status": args.status,
             "projection_version": CORRECTION_VERSION,
-            "fantasy_points": 0.0 if correction is not None else None,
+            "fantasy_points": float(correction.fantasy_points) if correction is not None else None,
             "source_urls": source_urls,
             "corroborated": args.require_corroboration,
             "effective_until_week": effective_until_week,

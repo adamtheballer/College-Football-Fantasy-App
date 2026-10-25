@@ -51,6 +51,7 @@ const conferenceSortOrder: Record<string, number> = {
   BIG10: 1,
   BIG12: 2,
   ACC: 3,
+  INDEPENDENT: 4,
 };
 
 const positionSortOrder: Record<string, number> = {
@@ -182,6 +183,7 @@ export default function InjuryCenter() {
               <SelectItem value="ALL">All</SelectItem>
               <SelectItem value="SEC">SEC</SelectItem>
               <SelectItem value="ACC">ACC</SelectItem>
+              <SelectItem value="INDEPENDENT">Independent</SelectItem>
               <SelectItem value="BIG 10">Big 10</SelectItem>
               <SelectItem value="BIG 12">Big 12</SelectItem>
             </SelectContent>

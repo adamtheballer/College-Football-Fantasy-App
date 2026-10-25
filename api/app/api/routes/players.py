@@ -56,7 +56,6 @@ from collegefootballfantasy_api.app.services.player_season_rank import season_po
 from collegefootballfantasy_api.app.services.provider_cache import ensure_feed_fresh
 from collegefootballfantasy_api.app.services.auth_security import enforce_auth_rate_limit
 from collegefootballfantasy_api.app.services.injury_status import (
-    is_current_injury_designation,
     normalize_injury_status,
     reviewed_injuries_for_week,
 )
@@ -437,7 +436,7 @@ def get_player_card_endpoint(
     ).get(player.id)
     current_injury_status = (
         normalize_injury_status(current_injury_row.status)
-        if current_injury_row and is_current_injury_designation(current_injury_row.status)
+        if current_injury_row
         else None
     )
     injury_rows = (

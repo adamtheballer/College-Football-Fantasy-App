@@ -30,14 +30,17 @@ export const formatPlayerCardStatus = (value?: string | null) => {
     .replace(/-/g, " ")
     .replace(/\s+/g, " ");
 
-  // No reviewed injury report means the player is active until the injury
-  // pipeline supplies a current designation. This keeps provider casing out
-  // of the card so statuses never render as lowercase prose.
-  if (["", "N A", "NA", "NONE", "UNREPORTED", "FULL", "HEALTHY", "AVAILABLE", "ACTIVE"].includes(normalized)) {
+  // Missing current evidence is different from a verified available report.
+  if (["", "N/A", "N A", "NA", "NONE", "UNREPORTED"].includes(normalized)) {
+    return "UNREPORTED";
+  }
+  if (["FULL", "HEALTHY", "AVAILABLE", "ACTIVE"].includes(normalized)) {
     return "ACTIVE";
   }
   return normalized;
 };
+
+export const playerCardStatusLabel = (status: string) => status === "UNREPORTED" ? "NO REPORT" : status;
 
 export const resolvePlayerCardStatus = (
   card?: PlayerCardResponse | null,
@@ -63,13 +66,14 @@ export function PlayerCardHeader({
   const [headshotFailed, setHeadshotFailed] = useState(false);
   useEffect(() => setHeadshotFailed(false), [headshotUrl]);
   const playerStatus = resolvePlayerCardStatus(card, player.status);
+  const playerStatusLabel = playerCardStatusLabel(playerStatus);
   const statusSource = playerStatus;
   const statusBadge = playerAvailabilityBadge(statusSource);
   const statusTextClass = statusBadge?.code === "O" || statusBadge?.code === "D"
     ? "text-red-200"
     : statusBadge?.code === "Q" || statusBadge?.code === "P"
       ? "text-amber-100"
-      : "text-emerald-100";
+      : playerStatus === "UNREPORTED" ? "text-slate-200" : "text-emerald-100";
   const seasonRank = card?.season_positional_rank;
   const metricCards = [
     {
@@ -83,7 +87,7 @@ export function PlayerCardHeader({
       value: formatPlayerCardPositionRank(seasonRank),
     },
     { label: "Class", mobileLabel: "Class", value: card?.about.player_class ?? card?.player.player_class ?? player.playerClass ?? "—" },
-    { label: "Status", mobileLabel: "Status", value: playerStatus },
+    { label: "Status", mobileLabel: "Status", value: playerStatusLabel },
   ];
   return (
     <>
@@ -128,7 +132,7 @@ export function PlayerCardHeader({
               <PlayerAvailabilityIndicator status={statusSource} showActive={false}>
                 <span className={cn("inline-flex items-center gap-1.5", statusTextClass)}>
                   <span data-testid="player-card-status-dot" className={cn("h-1.5 w-1.5 rounded-full", playerAvailabilityDotClass(statusSource))} />
-                  {playerStatus}
+                  {playerStatusLabel}
                 </span>
               </PlayerAvailabilityIndicator>
               {card?.about.jersey ? <span className="text-white/70">#{card.about.jersey}</span> : null}

@@ -1,0 +1,390 @@
+{
+  "captured_at": "2026-10-25 17:34:53.102080+00:00",
+  "season": 2026,
+  "week": 8,
+  "scope": "All 815 canonical fantasy-pool QB/RB/WR/TE/K players; four power conferences plus Notre Dame.",
+  "method": "Compared every catalog identity with current reviewed reports, persistent season absences and bounded sourced corrections. Fetched all four current public conference pages (393 rows); reviewed prior-week gaps, season absences, returns and newly reported injuries. Unmatched or omitted players are not inferred healthy.",
+  "players_audited": 815,
+  "status_counts": {
+    "UNREPORTED": 703,
+    "OUT": 70,
+    "OUT_FOR_SEASON": 9,
+    "PROBABLE": 20,
+    "FULL": 1,
+    "QUESTIONABLE": 10,
+    "TBD": 2
+  },
+  "conference_counts": {
+    "SEC": 191,
+    "BIG12": 192,
+    "ACC": 204,
+    "BIG10": 216,
+    "INDEPENDENT": 12
+  },
+  "source_pages": [
+    {
+      "conference": "BIG12",
+      "url": "https://big12sports.com/sports/2025/8/14/FBreporting.aspx",
+      "rows_fetched": 74,
+      "game_dates": {
+        "2026-10-24": 74
+      }
+    },
+    {
+      "conference": "SEC",
+      "url": "https://www.secsports.com/fbreports",
+      "rows_fetched": 75,
+      "game_dates": {
+        "2026-10-24": 75
+      }
+    },
+    {
+      "conference": "ACC",
+      "url": "https://theacc.com/sports/2025/8/28/availability-reporting-football.aspx",
+      "rows_fetched": 159,
+      "game_dates": {
+        "2026-10-23": 62,
+        "2026-10-24": 97
+      }
+    },
+    {
+      "conference": "BIG10",
+      "url": "https://bigten.org/fb/availability-reports/",
+      "rows_fetched": 85,
+      "game_dates": {
+        "2026-10-24": 85
+      }
+    }
+  ],
+  "corrections_applied": [
+    {
+      "player": "Ahmad Hardy",
+      "school": "Missouri",
+      "position": "RB",
+      "season": 2026,
+      "week": 8,
+      "status": "OUT",
+      "injury": "Rehabilitation following surgery",
+      "return_timeline": "No confirmed return date; not declared season-ending",
+      "effective_until_week": 9,
+      "published_at": "2026-10-20T00:00:00+00:00",
+      "notes": "Ongoing absence confirmed during Missouri's bye. Coach said he had not begun the required ramp-up. Review window ends Week 9; a newer return report supersedes it.",
+      "source_url": [
+        "https://www.si.com/college/missouri/football/bye-week-comes-at-opportunistic-time-for-battered-mizzou-football",
+        "https://abc17news.com/news/2026/10/06/no-change-in-status-of-all-american-ahmad-hardy-as-he-continues-rehab/"
+      ],
+      "player_id": 1594,
+      "applied_at": "2026-10-25T17:34:21.224729+00:00"
+    },
+    {
+      "player": "Koby Howard",
+      "school": "Penn State",
+      "position": "WR",
+      "season": 2026,
+      "week": 8,
+      "status": "QUESTIONABLE",
+      "injury": "Undisclosed injury",
+      "return_timeline": "Questionable for Oct. 31 Purdue game",
+      "effective_until_week": 9,
+      "published_at": "2026-10-20T19:11:24+00:00",
+      "notes": "Matt Campbell described Purdue availability as questionable during the bye. This supersedes the older weekly OUT; it does not assert a season-ending injury.",
+      "source_url": [
+        "https://sports.yahoo.com/articles/penn-state-koby-howard-play-191124340.html",
+        "https://victorybellrings.com/koby-howard-s-return-after-penn-state-s-bye-week-isn-t-a-foregone-conclusion"
+      ],
+      "player_id": 1203,
+      "applied_at": "2026-10-25T17:34:21.257290+00:00"
+    },
+    {
+      "player": "Kylan Fox",
+      "school": "Purdue",
+      "position": "TE",
+      "season": 2026,
+      "week": 8,
+      "status": "OUT_FOR_SEASON",
+      "injury": "Knee injury",
+      "return_timeline": "Out for the 2026 season",
+      "effective_until_week": 15,
+      "published_at": "2026-10-10T22:02:40+00:00",
+      "notes": "Season absence confirmed following fall-camp injury; not a weekly absence that should disappear during a bye.",
+      "source_url": [
+        "https://www.aol.com/articles/two-former-starters-remain-purdue-220240000.html",
+        "https://getindiana.com/news/purdue-football-fall-camp-takeaways"
+      ],
+      "player_id": 1218,
+      "applied_at": "2026-10-25T17:34:21.279803+00:00"
+    },
+    {
+      "player": "Samuel Singleton Jr.",
+      "school": "Florida State",
+      "position": "RB",
+      "season": 2026,
+      "week": 8,
+      "status": "OUT",
+      "injury": "Undisclosed injury",
+      "return_timeline": "No near-term return; not declared season-ending",
+      "effective_until_week": 9,
+      "published_at": "2026-10-20T10:06:36+00:00",
+      "notes": "Mike Norvell said Singleton would remain unavailable in the near future. Review after Week 9; do not promote an indefinite absence to season-ending.",
+      "source_url": [
+        "https://www.aol.com/articles/fsu-football-changes-coming-mike-100636000.html",
+        "https://www.si.com/college/fsu/florida-state-seminoles-college-football/mike-norvell-latest-injury-update-fsu-football-samuel-singleton-jr-"
+      ],
+      "player_id": 1332,
+      "applied_at": "2026-10-25T17:34:21.311806+00:00"
+    },
+    {
+      "player": "Ousmane Kromah",
+      "school": "Florida State",
+      "position": "RB",
+      "season": 2026,
+      "week": 8,
+      "status": "OUT_FOR_SEASON",
+      "injury": "Lower-leg/ankle injury requiring surgery",
+      "return_timeline": "Out for the 2026 season",
+      "effective_until_week": 15,
+      "published_at": "2026-10-19T00:02:00+00:00",
+      "notes": "School announced season-ending surgery after the Miami game. Preserve the absence across the bye.",
+      "source_url": [
+        "https://www.aol.com/articles/florida-state-running-back-ousmane-212335000.html",
+        "https://www.si.com/college/fsu/florida-state-seminoles-college-football/mike-norvell-latest-injury-update-fsu-football-samuel-singleton-jr-"
+      ],
+      "player_id": 1331,
+      "applied_at": "2026-10-25T17:34:21.336570+00:00"
+    },
+    {
+      "player": "Jayden Limar",
+      "school": "Washington",
+      "position": "RB",
+      "season": 2026,
+      "week": 8,
+      "status": "OUT",
+      "injury": "Elbow injury",
+      "return_timeline": "Re-evaluation scheduled Nov. 1; return not confirmed",
+      "effective_until_week": 9,
+      "published_at": "2026-10-20T16:00:59+00:00",
+      "notes": "Remains unavailable pending Nov. 1 evaluation. Bounded through Week 9, not season-ending.",
+      "source_url": [
+        "https://www.aol.com/articles/jedd-fisch-shares-positive-washington-160059000.html",
+        "https://www.spokesman.com/stories/2026/oct/12/uw-quarterback-demond-williams-jr-day-to-day-with-/"
+      ],
+      "player_id": 1258,
+      "applied_at": "2026-10-25T17:34:21.362720+00:00"
+    },
+    {
+      "player": "Jordan Washington",
+      "school": "Washington",
+      "position": "RB",
+      "season": 2026,
+      "week": 8,
+      "status": "OUT_FOR_SEASON",
+      "injury": "Neck injury",
+      "return_timeline": "Reported out for the 2026 season",
+      "effective_until_week": 15,
+      "published_at": "2026-10-20T16:00:59+00:00",
+      "notes": "Latest team coverage reports a season absence. Exact Washington RB identity; does not apply to North Carolina's same-name TE.",
+      "source_url": [
+        "https://www.aol.com/articles/jedd-fisch-shares-positive-washington-160059000.html",
+        "https://www.spokesman.com/stories/2026/oct/12/uw-quarterback-demond-williams-jr-day-to-day-with-/"
+      ],
+      "player_id": 1259,
+      "applied_at": "2026-10-25T17:34:21.389776+00:00"
+    },
+    {
+      "player": "Christian Moss",
+      "school": "Washington",
+      "position": "WR",
+      "season": 2026,
+      "week": 8,
+      "status": "OUT_FOR_SEASON",
+      "injury": "Quadriceps injury",
+      "return_timeline": "Reported out for the 2026 season",
+      "effective_until_week": 15,
+      "published_at": "2026-10-20T16:00:59+00:00",
+      "notes": "Latest team coverage reports a season absence; earlier coach coverage discussed seeking another year of eligibility.",
+      "source_url": [
+        "https://www.aol.com/articles/jedd-fisch-shares-positive-washington-160059000.html",
+        "https://www.spokesman.com/stories/2026/oct/12/uw-quarterback-demond-williams-jr-day-to-day-with-/"
+      ],
+      "player_id": 1261,
+      "applied_at": "2026-10-25T17:34:21.415140+00:00"
+    },
+    {
+      "player": "Demond Williams Jr.",
+      "school": "Washington",
+      "position": "QB",
+      "season": 2026,
+      "week": 8,
+      "status": "QUESTIONABLE",
+      "injury": "Rib injury",
+      "return_timeline": "Practicing; medical clearance for games not confirmed",
+      "effective_until_week": 9,
+      "published_at": "2026-10-20T16:00:59+00:00",
+      "notes": "Practice clearance does not establish game clearance. Keep availability uncertain pending a newer report.",
+      "source_url": [
+        "https://www.aol.com/articles/jedd-fisch-shares-positive-washington-160059000.html",
+        "https://www.si.com/college/washington/football/brown-williams-will-share-husky-qb-job-during-bye-week-01m5az5hq4ex"
+      ],
+      "player_id": 1256,
+      "applied_at": "2026-10-25T17:34:21.437932+00:00"
+    },
+    {
+      "player": "Quincy Porter",
+      "school": "NOTRE DAME",
+      "position": "WR",
+      "season": 2026,
+      "week": 8,
+      "status": "OUT_FOR_SEASON",
+      "injury": "Knee injury requiring surgery",
+      "return_timeline": "Out for the 2026 season",
+      "effective_until_week": 15,
+      "published_at": "2026-09-28T00:00:00+00:00",
+      "notes": "Marcus Freeman confirmed season-ending surgery. Inclusion in the independent fantasy pool must also include injury coverage.",
+      "source_url": [
+        "https://www.washingtonpost.com/sports/colleges/2026/09/28/notre-dame-porter-injury/c1498302-bb6b-11f1-81fc-9b76f8343b6c_story.html",
+        "https://www.uhnd.com/football/2026/10/05/notre-dame-football-injury-report-moore-viliamu-asa-questionable-vs-stanford/"
+      ],
+      "player_id": 1873,
+      "applied_at": "2026-10-25T17:34:21.467075+00:00"
+    },
+    {
+      "player": "Trey'Dez Green",
+      "school": "LSU",
+      "position": "TE",
+      "season": 2026,
+      "week": 8,
+      "status": "FULL",
+      "injury": "Returned to game action",
+      "return_timeline": "Returned Oct. 24 against Auburn",
+      "effective_until_week": 8,
+      "published_at": "2026-10-24T23:59:00+00:00",
+      "notes": "Official game reports confirm his return with five receptions. Clear the older OUT designation; game availability does not establish full practice participation.",
+      "source_url": [
+        "https://lsusports.net/news/2026/10/24/football-rolls-past-auburn-38-17-behind-big-offensive-day",
+        "https://auburntigers.com/news/2026/10/24/auburns-falls-at-home-38-17-to-no-18-lsu"
+      ],
+      "player_id": 1565,
+      "applied_at": "2026-10-25T17:34:21.489695+00:00"
+    },
+    {
+      "player": "Cam Coleman",
+      "school": "Texas",
+      "position": "WR",
+      "season": 2026,
+      "week": 8,
+      "status": "TBD",
+      "injury": "Shoulder injury",
+      "return_timeline": "Evaluation pending; next-game availability not announced",
+      "effective_until_week": 9,
+      "published_at": "2026-10-25T01:54:44+00:00",
+      "notes": "Left the Oct. 24 game after landing on his shoulder. Injury is confirmed; do not invent a next-game OUT or recovery timeline.",
+      "source_url": [
+        "https://sports.yahoo.com/articles/cam-coleman-injury-texas-football-015444553.html",
+        "https://www.secsports.com/news/2026/10/no-19-texas-holds-off-no-7-ole-miss-rally-to-seal-upset"
+      ],
+      "player_id": 1644,
+      "applied_at": "2026-10-25T17:34:21.514747+00:00"
+    },
+    {
+      "player": "Kewan Lacy",
+      "school": "Ole Miss",
+      "position": "RB",
+      "season": 2026,
+      "week": 8,
+      "status": "TBD",
+      "injury": "Shoulder injury aggravated in game",
+      "return_timeline": "Postgame evaluation pending; no definitive return update",
+      "effective_until_week": 9,
+      "published_at": "2026-10-25T10:02:23+00:00",
+      "notes": "Postgame injury supersedes the pregame PROBABLE designation. Left the Texas game and did not return; future availability remains undetermined.",
+      "source_url": [
+        "https://sports.yahoo.com/articles/kewan-lacy-shoulder-injury-wont-100223088.html",
+        "https://www.aol.com/articles/kewan-lacy-injury-ole-miss-021311000.html"
+      ],
+      "player_id": 1570,
+      "applied_at": "2026-10-25T17:34:21.540455+00:00"
+    }
+  ],
+  "protected_tables_unchanged": true,
+  "protected_before": {
+    "player_stats": {
+      "count": 4015,
+      "hash": "141f8ae1109cf6cdc761b0671eedcdf3"
+    },
+    "player_game_stats": {
+      "count": 4225,
+      "hash": "8fcc43db1bf9d77c5534671945c0a5f5"
+    },
+    "player_week_scores": {
+      "count": 2665,
+      "hash": "41bc13845ca08d695a477add480124ae"
+    },
+    "team_week_scores": {
+      "count": 580,
+      "hash": "6095ffe363fe495a2b35315a837fb0ee"
+    },
+    "matchups": {
+      "count": 373,
+      "hash": "8d39ee5e805ae329d178bff09a930278"
+    }
+  },
+  "protected_after": {
+    "player_stats": {
+      "count": 4015,
+      "hash": "141f8ae1109cf6cdc761b0671eedcdf3"
+    },
+    "player_game_stats": {
+      "count": 4225,
+      "hash": "8fcc43db1bf9d77c5534671945c0a5f5"
+    },
+    "player_week_scores": {
+      "count": 2665,
+      "hash": "41bc13845ca08d695a477add480124ae"
+    },
+    "team_week_scores": {
+      "count": 580,
+      "hash": "6095ffe363fe495a2b35315a837fb0ee"
+    },
+    "matchups": {
+      "count": 373,
+      "hash": "8d39ee5e805ae329d178bff09a930278"
+    }
+  },
+  "projection_changes": 0,
+  "player_receipt": "2026-10-25-player-audit.csv",
+  "evidence_limits": [
+    "703 players have no current reviewed report. UNREPORTED is an evidence gap, not a health clearance.",
+    "Ordinary historical weekly designations are not carried forward without current evidence.",
+    "Bounded review windows are operational expiry dates, not promised medical recovery dates.",
+    "New injuries with no announced future availability are TBD; practice clearance alone is not game clearance."
+  ],
+  "root_causes": [
+    "Player card converted UNREPORTED/null to ACTIVE.",
+    "Player card API discarded explicitly reviewed FULL returns.",
+    "Weekly OUT reports expire during byes; ongoing absences need sourced bounded assertions.",
+    "Injury feed excluded approved independent Notre Dame players because conference_for_school returns null."
+  ],
+  "verification": {
+    "public_api": "13/13 corrected statuses verified after apply",
+    "backend": "1366 passed, 7 skipped (SQLite suite; PostgreSQL checks run in CI)",
+    "frontend": "701 passed",
+    "typecheck": "passed",
+    "build": "passed",
+    "browser": {
+      "verdict": "PASS",
+      "url": "http://127.0.0.1:4174/draft/mock/single-player?new=1&teams=4&timer=60",
+      "tool": "Playwright Chromium",
+      "states": [
+        "DOUBTFUL",
+        "UNREPORTED",
+        "FULL"
+      ],
+      "viewports": [
+        "desktop",
+        "390x844 mobile"
+      ],
+      "assertions": "NO REPORT with neutral dot for null evidence; ACTIVE with green dot for explicit FULL; red D for DOUBTFUL; forbidden conflicting labels absent. Close/reopen, section navigation, game log, projection chart verified.",
+      "screenshots": "Playwright test outputs for each state (not committed)."
+    }
+  }
+}

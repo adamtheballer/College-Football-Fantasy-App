@@ -186,6 +186,7 @@ class PlayerCardNewsRead(BaseModel):
 class PlayerCardRead(BaseModel):
     player: PlayerRead
     about: PlayerCardAboutRead
+    # FULL is an explicit reviewed return; null means no current report.
     current_injury_status: str | None = None
     injuries: list[PlayerCardInjuryRead]
     recent_news: list[PlayerCardNewsRead] = []

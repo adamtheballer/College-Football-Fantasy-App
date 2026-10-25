@@ -132,7 +132,7 @@ def test_player_card_resolved_current_injury_returns_normal_availability(client,
     response = client.get(f"/players/{player.id}/card?injury_season=2026&injury_week=1")
 
     assert response.status_code == 200
-    assert response.json()["current_injury_status"] is None
+    assert response.json()["current_injury_status"] == "FULL"
     assert response.json()["about"]["status"] == "Available"
 
 

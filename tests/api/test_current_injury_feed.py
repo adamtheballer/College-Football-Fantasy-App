@@ -44,7 +44,7 @@ def test_newer_available_report_clears_older_out_across_all_readers(client, db_s
     assert feed["total"] == 1
     assert feed["data"][0]["status"] == "FULL"
     assert client.get("/stats/injuries?season=2026&week=6").json()["data"][0]["status"] == "FULL"
-    assert client.get(f"/players/{p.id}/card?injury_season=2026&injury_week=6").json()["current_injury_status"] is None
+    assert client.get(f"/players/{p.id}/card?injury_season=2026&injury_week=6").json()["current_injury_status"] == "FULL"
     assert _injury_status_by_player(db_session, season=2026, week=6, player_ids={p.id}) == {}
 
 
@@ -68,6 +68,23 @@ def test_official_import_preserves_designation(status):
 
 def test_unknown_official_designation_never_becomes_healthy():
     assert _official_availability_status("Not yet evaluated", None) == "TBD"
+
+
+def test_independent_fantasy_players_are_included_without_expanding_to_other_schools(client, db_session):
+    players = [Player(name="Independent injured", school="NOTRE DAME", position="WR"),
+               Player(name="Outside fantasy pool", school="Boise State", position="WR")]
+    db_session.add_all(players)
+    db_session.flush()
+    for player in players:
+        db_session.add(Injury(player_id=player.id, season=2026, week=8, status="OUT_FOR_SEASON"))
+    db_session.commit()
+    rows = client.get("/injuries?season=2026&week=8").json()["data"]
+    assert [(r["player_id"], r["team"], r["conference"]) for r in rows] == [(players[0].id, "Notre Dame", "INDEPENDENT")]
+    assert client.get("/injuries?season=2026&week=8&conference=INDEPENDENT").json()["data"] == rows
+    assert client.get("/injuries?season=2026&week=8&conference=ACC").json()["data"] == []
+    assert client.get(f"/injuries/player/{players[0].id}?season=2026&week=8").json()["conference"] == "INDEPENDENT"
+    stats_rows = client.get("/stats/injuries?season=2026&week=8&conference=INDEPENDENT").json()["data"]
+    assert [(r["player_id"], r["conference"], r["status"]) for r in stats_rows] == [(players[0].id, "INDEPENDENT", "OUT_FOR_SEASON")]
 
 
 @pytest.mark.parametrize("query", ["week=0", "week=31", "season=0"])
