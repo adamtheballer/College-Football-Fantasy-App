@@ -42,7 +42,7 @@ def _player(db: Session, *, name: str, school: str) -> Player:
     return player
 
 
-def _upsert_role_snapshot(
+def upsert_role_snapshot(
     db: Session,
     *,
     player: Player,
@@ -50,6 +50,7 @@ def _upsert_role_snapshot(
     week: int,
     depth_order: int,
     role_status: str,
+    source: str = OFFICIAL_ROLE_SOURCE,
 ) -> None:
     snapshot = db.scalar(
         select(PlayerRoleSnapshot).where(
@@ -64,23 +65,25 @@ def _upsert_role_snapshot(
             season=season,
             week=week,
             school=player.school,
-            position="QB",
+            position=player.position,
         )
         db.add(snapshot)
-    snapshot.source = OFFICIAL_ROLE_SOURCE
+    snapshot.source = source
     snapshot.depth_order = depth_order
     snapshot.role_status = role_status
     snapshot.school = player.school
-    snapshot.position = "QB"
+    snapshot.position = player.position
 
 
-def _project_week(
+def publish_role_corrected_week(
     db: Session,
     *,
     players: list[Player],
     season: int,
     week: int,
     source_url: str,
+    new_player_ids: frozenset[int] = frozenset(),
+    source_label: str = "official_team_role",
 ) -> int:
     source_by_player = {
         player.id: db.scalar(
@@ -88,10 +91,10 @@ def _project_week(
         )
         for player in players
     }
-    missing = [player.name for player in players if source_by_player[player.id] is None]
+    missing = [player.name for player in players if source_by_player[player.id] is None and player.id not in new_player_ids]
     if missing:
         raise ValueError(f"Cannot role-correct Week {week}; no published baseline for {', '.join(missing)}.")
-    locked = [player.name for player in players if source_by_player[player.id].locked_at is not None]
+    locked = [player.name for player in players if source_by_player[player.id] is not None and source_by_player[player.id].locked_at is not None]
     if locked:
         raise ValueError(f"Cannot change locked Week {week} projections for {', '.join(locked)}.")
 
@@ -159,16 +162,19 @@ def _project_week(
                 projection_version=ROLE_CORRECTION_VERSION,
             )
             db.add(corrected)
+        elif corrected.locked_at is not None:
+            raise ValueError(f"Cannot change locked Week {week} role correction for {player.name}.")
         for column in _COPY_COLUMNS:
             setattr(corrected, column, getattr(candidate, column))
         # Preserve the canonical matchup linkage from the reviewed baseline.
-        corrected.team_id = source.team_id
-        corrected.opponent_team_id = source.opponent_team_id
+        if source is not None:
+            corrected.team_id = source.team_id
+            corrected.opponent_team_id = source.opponent_team_id
         corrected.is_published = True
         corrected.locked_at = None
         corrected.projection_status = "ACTIVE"
-        corrected.baseline_source = "official_team_role"
-        corrected.fallback_reason = f"Official starter role: {source_url}"[:500]
+        corrected.baseline_source = source_label
+        corrected.fallback_reason = f"{source_label}: {source_url}"[:500]
         corrected.model_version = ROLE_CORRECTION_MODEL_VERSION
         corrected.confidence = 0.95
 
@@ -198,13 +204,13 @@ def apply_tennessee_qb_starter_correction(
     for week in sorted({int(value) for value in weeks}):
         if week < 1 or week > 13:
             raise ValueError("Role corrections must target regular-season weeks 1 through 13.")
-        _upsert_role_snapshot(
+        upsert_role_snapshot(
             db, player=faizon, season=season, week=week, depth_order=1, role_status="starter"
         )
-        _upsert_role_snapshot(
+        upsert_role_snapshot(
             db, player=george, season=season, week=week, depth_order=2, role_status="backup"
         )
-        _project_week(db, players=[faizon, george], season=season, week=week, source_url=source_url)
+        publish_role_corrected_week(db, players=[faizon, george], season=season, week=week, source_url=source_url)
         corrected_weeks.append(week)
 
     return {

@@ -74,6 +74,7 @@ from collegefootballfantasy_api.app.services.league_weeks import (
 )
 from collegefootballfantasy_api.app.domain.matchup_records import FINAL_MATCHUP_STATUSES, finalized_matchup_records, record_application_fingerprint
 from collegefootballfantasy_api.app.services.fantasy_game_selection import fantasy_games_by_school, fantasy_stat_weeks
+from collegefootballfantasy_api.app.services.fantasy_week_finality import published_finalized_weeks, week_is_authoritatively_finalized
 from collegefootballfantasy_api.app.services.espn_live_scoring import espn_week_freshness
 from collegefootballfantasy_api.app.services.injury_status import is_current_injury_designation, normalize_injury_status, reviewed_injuries_for_week
 from collegefootballfantasy_api.app.services.league_workspace import build_standings_summary
@@ -1471,10 +1472,18 @@ def build_waivers_view(
     week = resolve_matchup_display_week(db, league, selected_week)
     if sort_by not in {"projection", "weekly_points"}:
         raise ValueError("Unknown waiver sort order.")
+    # Results can be published before the workspace's Wednesday rollover.
+    # Reuse durable completion receipts so later administrative matchups
+    # cannot move already-published Week 8 results back to Week 7.
+    latest_performance_week = max(
+        [max(0, week - 1), *[w for w in published_finalized_weeks(db, season=league.season_year) if w <= week]]
+    )
+    if latest_performance_week < week and week_is_authoritatively_finalized(db, season=league.season_year, week=week):
+        latest_performance_week = week
     if sort_by == "weekly_points" and scope == "hot":
         raise HTTPException(status_code=422, detail="Weekly performance is available on Waiver Wire and All Players.")
     if sort_by == "weekly_points":
-        performance_week = max(0, week - 1) if performance_week is None else performance_week
+        performance_week = latest_performance_week if performance_week is None else performance_week
     else:
         performance_week = None
     if performance_week is not None and not 0 <= performance_week <= week:
@@ -1735,6 +1744,7 @@ def build_waivers_view(
         league_id=league.id,
         week=week,
         performance_week=performance_week,
+        latest_performance_week=latest_performance_week,
         fantasy_team_id=team.id if team else None,
         waiver_priority=waiver_priority,
         faab_remaining=faab_remaining,
