@@ -323,8 +323,9 @@ export default function LeagueWaivers() {
   );
   const waiverData = waiverQuery.data;
   const displayWeek = waiverData?.week ?? waiverData?.current_period?.week ?? 1;
+  const latestPerformanceWeek = waiverData?.latest_performance_week ?? Math.max(0, displayWeek - 1);
   const pointsWeek = sortMode === "weekly-points"
-    ? waiverData?.performance_week ?? (performanceWeek === "previous" ? Math.max(0, displayWeek - 1) : Number(performanceWeek))
+    ? waiverData?.performance_week ?? (performanceWeek === "previous" ? latestPerformanceWeek : Number(performanceWeek))
     : displayWeek;
   const displayedWeekPoints = (player: AvailablePlayerRow) => sortMode === "weekly-points"
     ? waiverPerformancePoints(player.performance_fantasy_points, pointsWeek)
@@ -737,7 +738,7 @@ export default function LeagueWaivers() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="previous">Last week (Week {Math.max(0, displayWeek - 1)})</SelectItem>
+                      <SelectItem value="previous">Latest completed (Week {latestPerformanceWeek})</SelectItem>
                       {Array.from({ length: displayWeek + 1 }, (_, index) => displayWeek - index).map((week) => (
                         <SelectItem key={week} value={String(week)}>Week {week}</SelectItem>
                       ))}

@@ -589,18 +589,18 @@ for (const width of [320, 390, 1280]) {
       requests.push(url);
       if (fail) { await route.fulfill({ status: 503, json: { detail: "QA unavailable" } }); return; }
       const performance = url.searchParams.get("sort_by") === "weekly_points";
-      const week = Number(url.searchParams.get("performance_week") ?? 6);
+      const week = Number(url.searchParams.get("performance_week") ?? 8);
       const pos = url.searchParams.get("position");
       const pool = [
-        { id: 1, name: "Top Receiver", position: "WR", points: week === 6 ? 30 : 5 },
-        { id: 2, name: "Second Receiver", position: "WR", points: week === 6 ? 12 : 35 },
+        { id: 1, name: "Top Receiver", position: "WR", points: week === 8 ? 30 : 5 },
+        { id: 2, name: "Second Receiver", position: "WR", points: week === 8 ? 12 : 35 },
         { id: 3, name: "Zero Receiver", position: "WR", points: 0 },
         { id: 4, name: "Missing Receiver", position: "WR", points: null },
         ...["QB", "RB", "TE", "K"].map((position, index) => ({ id: index + 5, name: `${position} Leader`, position, points: 22 })),
       ].filter((p) => !pos || p.position === pos);
       if (performance) pool.sort((a, b) => (a.points === null ? 1 : 0) - (b.points === null ? 1 : 0) || (b.points ?? 0) - (a.points ?? 0));
       await route.fulfill({ json: {
-        league_id: 42, week: 7, performance_week: performance ? week : null,
+        league_id: 42, week: 8, performance_week: performance ? week : null, latest_performance_week: 8,
         fantasy_team_id: 1, claims: [], results: [], roster: [], total_available: pool.length,
         waiver_rules: { waiver_type: "rolling" },
         available_players: pool.map((p) => ({ ...p, school: "USC", opponent: "Current opponent", weekly_projected_fantasy_points: 20,
@@ -617,7 +617,7 @@ for (const width of [320, 390, 1280]) {
     const visibleIds = async () => page.locator(`[data-testid^="${rowPrefix}"]:visible`).evaluateAll((els) => els.map((el) => Number(el.getAttribute("data-testid")!.split("-").at(-1))));
     await page.getByRole("combobox", { name: "Waiver player sort" }).click();
     await page.getByRole("option", { name: "Weekly performance", exact: true }).click();
-    await expect(page.getByRole("combobox", { name: "Performance week" })).toHaveText("Last week (Week 6)");
+    await expect(page.getByRole("combobox", { name: "Performance week" })).toHaveText("Latest completed (Week 8)");
     for (const position of ["QB", "RB", "WR", "TE", "K"]) {
       await page.getByRole("button", { name: position, exact: true }).click();
       await expect.poll(() => requests.at(-1)?.searchParams.get("position")).toBe(position);
@@ -627,8 +627,9 @@ for (const width of [320, 390, 1280]) {
     await expect.poll(visibleIds).toEqual([1, 2, 3, 4]);
     await expect(page.getByTestId(`${pointsPrefix}3`)).toHaveText("0.0");
     await expect(page.getByTestId(`${pointsPrefix}4`)).toHaveText("—");
+    await page.screenshot({ path: info.outputPath(`weekly-performance-default-week8-${width}.png`) });
     await page.getByRole("combobox", { name: "Performance week" }).click();
-    await page.getByRole("option", { name: "Week 5", exact: true }).click();
+    await page.getByRole("option", { name: "Week 7", exact: true }).click();
     await expect.poll(visibleIds).toEqual([2, 1, 3, 4]);
     await expect(page.getByTestId(`${pointsPrefix}2`)).toHaveText("35.0");
     expect(requests.at(-1)?.searchParams.get("week")).toBeNull();
@@ -652,7 +653,7 @@ for (const width of [320, 390, 1280]) {
     await page.getByRole("button", { name: "Retry", exact: true }).click();
     await expect.poll(visibleIds).toEqual([6]);
     await page.getByRole("combobox", { name: "Waiver player sort" }).click();
-    await page.getByRole("option", { name: "Week 7 projection", exact: true }).click();
+    await page.getByRole("option", { name: "Week 8 projection", exact: true }).click();
     await expect(page.getByRole("combobox", { name: "Performance week" })).toHaveCount(0);
     await expect(page.getByTestId(`${pointsPrefix}6`)).toHaveText("20.0");
   });

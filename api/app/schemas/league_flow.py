@@ -827,6 +827,8 @@ class LeagueWaiversRead(BaseModel):
     # period, which can advance during Tuesday maintenance.
     week: int
     performance_week: int | None = None
+    # Default results period, independent of the workspace/projection week.
+    latest_performance_week: int | None = None
     fantasy_team_id: int | None = None
     waiver_priority: int | None = None
     faab_remaining: int | None = None

@@ -1120,3 +1120,32 @@ def test_weekly_performance_rejects_future_stats_week(db_session):
     with pytest.raises(HTTPException) as exc:
         build_waivers_view(db_session, league, user, selected_week=2, sort_by="weekly_points", performance_week=3)
     assert exc.value.status_code == 422
+
+
+@pytest.mark.parametrize("position", ["QB", "RB", "WR", "TE", "K"])
+def test_latest_published_results_are_current_before_workspace_rollover(db_session, position):
+    from collegefootballfantasy_api.app.models.player_chart_week import PlayerChartPublicationRun
+    user = User(email=f"latest-{position}@test.com", first_name="Latest", password_hash="test", api_token=f"latest-{position}")
+    db_session.add(user); db_session.flush()
+    league = League(name="Latest results", season_year=2026, commissioner_user_id=user.id)
+    player = canonical_player("Week Eight Leader", position, "USC")
+    game = Game(season=2026, week=8, home_team="USC", away_team="Oregon", schedule_status="final")
+    now = datetime.now(timezone.utc)
+    db_session.add_all([league, player, game, PlayerChartPublicationRun(season=2026, week=8,
+        status="partial", started_at=now, completed_at=now, coverage_json={"metric": "actual"})])
+    db_session.flush()
+    db_session.add(PlayerGameStat(player_id=player.id, game_id=game.id, season=2026, week=8,
+        source="espn_final_boxscore", stats={"receptions": 2, "rush_yards": 100, "fg_made_0_30": 2}))
+    db_session.commit()
+    projection = build_waivers_view(db_session, league, user, selected_week=8)
+    result = build_waivers_view(db_session, league, user, selected_week=8, sort_by="weekly_points", position=position)
+    assert projection.week == result.week == 8
+    assert projection.performance_week is None
+    assert projection.latest_performance_week == result.latest_performance_week == result.performance_week == 8
+    assert result.available_players[0].performance_fantasy_points is not None
+    assert result.available_players[0].availability_state == projection.available_players[0].availability_state
+    old = build_waivers_view(db_session, league, user, selected_week=8, sort_by="weekly_points", performance_week=7)
+    assert old.performance_week == 7 and old.latest_performance_week == 8
+    assert old.available_players[0].performance_fantasy_points is None
+    past_workspace = build_waivers_view(db_session, league, user, selected_week=7, sort_by="weekly_points")
+    assert past_workspace.performance_week == 6  # Future publication cannot leak into a selected earlier workspace.

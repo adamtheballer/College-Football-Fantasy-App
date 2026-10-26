@@ -580,6 +580,7 @@ export interface LeagueWaiverTabResponse {
   /** Public workspace week used for the displayed projections and player board. */
   week: number;
   performance_week?: number | null;
+  latest_performance_week?: number | null;
   fantasy_team_id: number | null;
   waiver_priority: number | null;
   faab_remaining: number | null;

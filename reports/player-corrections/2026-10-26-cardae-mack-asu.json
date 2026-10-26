@@ -1,0 +1,151 @@
+{
+  "date": "2026-10-26",
+  "season": 2026,
+  "effective_week": 8,
+  "owner_requested_order": [
+    "Kyson Brown RB1",
+    "Cardae Mack RB2",
+    "Demarius Robinson RB3"
+  ],
+  "removed_from_active_pool": "Jason Brown Jr.; retained historical foreign keys and existing fantasy records",
+  "bio": {
+    "name": "Cardae Mack",
+    "school": "Arizona State",
+    "position": "RB",
+    "class": "Freshman",
+    "jersey": "25",
+    "height": "5 feet 10 inches",
+    "weight_lbs": 215,
+    "hometown": "Houston, Texas",
+    "high_school": "Atascocita",
+    "major": "Counseling and Applied Psychological Science (Sport and Performance Counseling)",
+    "espn_id": "5209382",
+    "espn_team_id": "9",
+    "portrait": "https://a.espncdn.com/i/headshots/college-football/players/full/5209382.png",
+    "date_of_birth": null,
+    "high_school_background": "Former quarterback and Atascocita career rushing leader; over 4,800 rushing yards and 111 total touchdowns."
+  },
+  "sources": [
+    "https://thesundevils.com/sports/football/roster/player/cardae-mack",
+    "https://thesundevils.com/sports/football/roster?view=table",
+    "https://www.espn.com/college-football/player/_/id/5209382/cardae-mack",
+    "https://thesundevils.com/news/2026/10/25/return-of-the-mack-cardae-with-four-touchdowns-as-sun-devils-top-kansas-state-28-17"
+  ],
+  "projection_policy": "Immutable reviewed ASU RB2/RB3 slot baselines are used for the new order. Future published Week 9 forecasts were regenerated with the existing projection engine; original forecasts and completed-week projections remain intact. No CFB game rating was invented for Mack.",
+  "operation": {
+    "applied": {
+      "player_id": 1890,
+      "active_depth": [
+        {
+          "id": 1689,
+          "name": "Kyson Brown",
+          "slot": "RB1"
+        },
+        {
+          "id": 1890,
+          "name": "Cardae Mack",
+          "slot": "RB2"
+        },
+        {
+          "id": 1690,
+          "name": "Demarius Robinson",
+          "slot": "RB3"
+        }
+      ],
+      "removed_from_active_pool": {
+        "id": 1691,
+        "name": "Jason Brown Jr."
+      },
+      "verified_stat_weeks": [
+        1,
+        2,
+        5,
+        6,
+        7,
+        8
+      ],
+      "future_projection_weeks": [
+        9
+      ],
+      "future_projections": [
+        {
+          "player_id": 1690,
+          "week": 9,
+          "points": 7.88
+        },
+        {
+          "player_id": 1890,
+          "week": 9,
+          "points": 8.04
+        }
+      ],
+      "bio_source": "https://thesundevils.com/sports/football/roster/player/cardae-mack",
+      "espn_id": "5209382",
+      "mode": "applied"
+    },
+    "protected_before": {
+      "player_stats": {
+        "count": 4015,
+        "hash": "93fa62c2d2d5bd93b94efcb744a74f06"
+      },
+      "player_game_stats": {
+        "count": 4225,
+        "hash": "6e75d285c9c59cda04b059b9424a9f30"
+      },
+      "player_week_scores": {
+        "count": 2665,
+        "hash": "57043214a31b49206e4effec93724da0"
+      },
+      "team_week_scores": {
+        "count": 580,
+        "hash": "cda675ab8b1ae39285992d7d07ad55dd"
+      },
+      "matchups": {
+        "count": 395,
+        "hash": "23723eed296195708f5e74f4e2cb45ec"
+      },
+      "weekly_projections": {
+        "count": 12524,
+        "hash": "ddbbf30dfe4da155db104cb628e0d2f9"
+      }
+    },
+    "protected_after": {
+      "player_stats": {
+        "count": 4015,
+        "hash": "93fa62c2d2d5bd93b94efcb744a74f06"
+      },
+      "player_game_stats": {
+        "count": 4225,
+        "hash": "6e75d285c9c59cda04b059b9424a9f30"
+      },
+      "player_week_scores": {
+        "count": 2665,
+        "hash": "57043214a31b49206e4effec93724da0"
+      },
+      "team_week_scores": {
+        "count": 580,
+        "hash": "cda675ab8b1ae39285992d7d07ad55dd"
+      },
+      "matchups": {
+        "count": 395,
+        "hash": "23723eed296195708f5e74f4e2cb45ec"
+      },
+      "weekly_projections": {
+        "count": 12524,
+        "hash": "ddbbf30dfe4da155db104cb628e0d2f9"
+      }
+    },
+    "protected_unchanged": true
+  },
+  "waiver_root_cause": "Default performance period was workspace week minus one. The workspace remains on Week 8 after results are published, leaving the default incorrectly at Week 7.",
+  "waiver_contract": "latest_performance_week comes from existing finalized publication receipts, capped at the selected workspace week. performance_week defaults to that value while explicit historical selections remain respected. Locks, opponents, availability, and operational waiver periods retain their current workspace week.",
+  "verification": {
+    "targeted_backend": "40 passed",
+    "frontend": "46 passed",
+    "typecheck": "passed",
+    "build": "passed",
+    "full_backend": "1375 passed, 7 skipped; two loopback tests blocked by sandbox binding restrictions passed when rerun with local socket permission",
+    "browser": "PASS: Chromium at 320, 390 and 1280px; Week 8 default, all five positions, Week 7 manual selection, search, missing/zero scores, request failure and recovery verified",
+    "public_api": "Mack bio and six stat weeks verified; Jason card returns 410; active ASU RB list contains only Kyson, Mack and Robinson"
+  }
+}
