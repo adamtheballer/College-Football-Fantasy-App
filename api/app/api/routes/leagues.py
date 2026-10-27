@@ -209,13 +209,19 @@ def get_league_matchup_tab_endpoint(
         )
         if matchup_exists is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="matchup not found in this league and week")
-    return build_matchup_tab_view(
+    result = build_matchup_tab_view(
         db,
         league,
         current_user,
         selected_week=week,
         matchup_id=matchup_id,
     )
+    from collegefootballfantasy_api.app.services.membership import rollout_active, pro_period, utcnow
+    from datetime import timedelta
+    if rollout_active() and league.season_year >= 2027:
+        result.viewer_refresh_seconds = 15 if pro_period(db, current_user)[0] else 180
+        result.viewer_next_refresh_at = utcnow() + timedelta(seconds=result.viewer_refresh_seconds)
+    return result
 
 
 @router.get("/{league_id}/players/{player_id}/history", response_model=LeaguePlayerHistoryRead)

@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { AuthProvider } from "@/hooks/use-auth";
+import { MembershipProvider } from "@/hooks/use-membership";
 import { AppErrorBoundary } from "@/components/AppErrorBoundary";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { SkeletonState } from "@/components/states";
@@ -18,6 +19,7 @@ import Layout from "./components/Layout";
 
 const Index = lazyWithRouteRecovery(() => import("./pages/Index"));
 const DynastyPreview = lazyWithRouteRecovery(() => import("./pages/DynastyPreview"));
+const Membership = lazyWithRouteRecovery(() => import("./pages/Membership"));
 const DynastyDraft = lazyWithRouteRecovery(() => import("./pages/DynastyDraft"));
 const NotFound = lazyWithRouteRecovery(() => import("./pages/NotFound"));
 const Leagues = lazyWithRouteRecovery(() => import("./pages/Leagues"));
@@ -64,7 +66,7 @@ const TermsOfUse = lazyWithRouteRecovery(() => import("./pages/TermsOfUse"));
 const ProviderDisclosure = lazyWithRouteRecovery(() => import("./pages/ProviderDisclosure"));
 const Support = lazyWithRouteRecovery(() => import("./pages/Support"));
 
-const NON_RETRYABLE_STATUSES = new Set([401, 403, 404]);
+const NON_RETRYABLE_STATUSES = new Set([401, 402, 403, 404]);
 
 const shouldRetryQuery = (failureCount: number, error: unknown) => {
   if (error instanceof ApiError && NON_RETRYABLE_STATUSES.has(error.status)) {
@@ -98,6 +100,7 @@ const LegacyPlayoffsRedirect = () => {
 const ApplicationRoutes = () => (
   <RuntimeCompatibilityGate>
     <AuthProvider>
+      <MembershipProvider>
       <PushNotificationCoordinator />
       <TooltipProvider>
         <Toaster />
@@ -113,6 +116,7 @@ const ApplicationRoutes = () => (
                     <Route path="/labs/dynasty/:leagueId/draft" element={<ProtectedRoute><DynastyDraft /></ProtectedRoute>} />
                   </>
                 )}
+                {import.meta.env.VITE_MEMBERSHIP_ENABLED === "true" && <Route path="/membership" element={<ProtectedRoute><Membership /></ProtectedRoute>} />}
                 <Route path="/leagues" element={<Leagues />} />
                 <Route
                   path="/leagues/create"
@@ -275,6 +279,7 @@ const ApplicationRoutes = () => (
           </Layout>
         </AppErrorBoundary>
       </TooltipProvider>
+      </MembershipProvider>
     </AuthProvider>
   </RuntimeCompatibilityGate>
 );

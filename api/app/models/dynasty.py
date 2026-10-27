@@ -34,8 +34,8 @@ class DynastyLeague(TimestampMixin, Base):
     )
     league_id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(80))
-    commissioner_user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="RESTRICT")
+    commissioner_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     max_teams: Mapped[int] = mapped_column(Integer)
     invite_code: Mapped[str] = mapped_column(String(30), unique=True)
@@ -61,8 +61,8 @@ class DynastyFranchise(TimestampMixin, Base):
         ForeignKey("dynasty_leagues.league_id", ondelete="CASCADE"), index=True
     )
     name: Mapped[str] = mapped_column(String(80))
-    owner_user_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="RESTRICT")
+    owner_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
 

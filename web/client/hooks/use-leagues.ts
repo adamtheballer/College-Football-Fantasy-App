@@ -228,7 +228,7 @@ export function hasUpcomingRosteredKickoff(data: LeagueMatchupTabResponse | unde
 
 /** The server worker's durable next poll deadline for this matchup. */
 export function matchupNextRefreshAt(data: LeagueMatchupTabResponse | undefined) {
-  const value = data?.next_refresh_at;
+  const value = data?.viewer_next_refresh_at ?? data?.next_refresh_at;
   if (!value) return null;
   const timestamp = new Date(value).getTime();
   return Number.isFinite(timestamp) ? timestamp : null;
@@ -240,6 +240,9 @@ export function matchupRefreshInterval(data: LeagueMatchupTabResponse | undefine
   // not contribute to the matchup total, but their live game still needs the
   // same visible, recurring refresh cycle as every other rostered player.
   if (hasLiveRosteredPlayer(data, now) || status === "live" || status === "delayed") {
+    if (data?.viewer_refresh_seconds && data.viewer_refresh_seconds >= 1) {
+      return data.viewer_refresh_seconds * 1000;
+    }
     const scheduledRefreshAt = matchupNextRefreshAt(data);
     if (scheduledRefreshAt !== null) {
       // Do not restart a full three-minute cycle when a manager reopens the

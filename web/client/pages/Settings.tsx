@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/hooks/use-auth";
 import { useNameChangeEligibility } from "@/hooks/use-name-change-eligibility";
@@ -674,6 +674,7 @@ export default function Settings() {
               </div>
             </div>
             <div className="rounded-lg border border-red-500/35 bg-red-500/5 p-4">
+              {import.meta.env.VITE_MEMBERSHIP_ENABLED === "true" && <div className="mb-6 space-y-2"><h3 className="cfb-section-title">CFFB Pro membership</h3><p>$10 USD/year from the 2027 season: unlimited leagues, faster scoring refresh, player pictures, dynasty and weekly challenges.</p><Button asChild variant="outline"><Link to="/membership">View or manage membership</Link></Button><p className="text-sm">Web renewal is cancelled when you delete your account. App Store subscriptions must be managed with Apple.</p></div>}
               <h3 className="text-sm font-black uppercase tracking-[0.16em] text-red-200">Delete Account</h3>
               <p className="mt-2 text-sm font-medium leading-relaxed text-muted-foreground">
                 Permanently delete your account, profile, sign-in sessions, saved preferences, and personal content. League history remains anonymized for other managers. This cannot be undone.

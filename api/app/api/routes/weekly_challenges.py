@@ -24,6 +24,9 @@ def mutation_limit(request: Request, db: Session = Depends(get_db), user: User =
     enforce_auth_rate_limit(db, action="weekly_challenge_mutation", identifier=str(user.id), request=request, limit=60, window_seconds=60, include_ip=False)
     # Count unsuccessful requests too. No domain mutation has happened yet.
     db.commit()
+    from collegefootballfantasy_api.app.services.membership import rollout_active, lock_user
+    if rollout_active():
+        lock_user(db, user)
     return user
 
 

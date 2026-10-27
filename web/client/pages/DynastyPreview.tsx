@@ -1,3 +1,5 @@
+import { useMembership } from "@/hooks/use-membership";
+import { MembershipGate } from "@/components/MembershipGate";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -66,7 +68,8 @@ export default function DynastyPreview() {
   const commissioner = state?.commissioner_user_id === user?.id;
   const teamName = (id: number) =>
     state?.teams.find((t) => t.id === id)?.name ?? `Team ${id}`;
-  const busy = mutation.isPending;
+  const membership = useMembership();
+  const busy = mutation.isPending || membership.loading || Boolean(membership.data?.enforcement_active && !membership.data.features.dynasty);
 
   if (capability.isPending)
     return <p role="status">Loading dynasty preview…</p>;
@@ -98,6 +101,7 @@ export default function DynastyPreview() {
           Values are provisional.
         </p>
       </header>
+      <MembershipGate feature="dynasty"><></></MembershipGate>
       {mutation.error && (
         <p role="alert" className="text-destructive">
           {errorMessage(mutation.error)}

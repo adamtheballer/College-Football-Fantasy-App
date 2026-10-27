@@ -259,6 +259,8 @@ def create_league(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="beta scoring acknowledgment is required before creating a league",
         )
+    from collegefootballfantasy_api.app.services.membership import require_league_slot
+    require_league_slot(db, current_user, season=payload.basics.season_year)
     payload.basics.name = moderate_user_text(
         db, actor_user_id=current_user.id, field_name="league_name", value=payload.basics.name, required=True
     ) or ""
@@ -384,6 +386,9 @@ def create_league(
 
 
 def join_league(db: Session, league: League, current_user: User) -> LeagueDetailRead:
+    from collegefootballfantasy_api.app.services.membership import lock_user, rollout_active, require_league_slot
+    if rollout_active():
+        lock_user(db, current_user)
     # The membership count is a capacity invariant, not advisory UI state.
     # Lock the single league row before reading it so two final-seat requests
     # cannot both observe the same available slot and overfill the league.
@@ -400,6 +405,7 @@ def join_league(db: Session, league: League, current_user: User) -> LeagueDetail
     if existing:
         return get_league_detail(db, league, viewer=current_user)
 
+    require_league_slot(db, current_user, season=league.season_year)
     member_count = db.query(LeagueMember).filter(LeagueMember.league_id == league.id).count()
     if member_count >= league.max_teams:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="league is full")

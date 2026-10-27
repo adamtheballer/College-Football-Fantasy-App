@@ -791,6 +791,8 @@ def persist_observed_locks(db, c):
 
 
 def save_entry(db, c, user, p):
+    from collegefootballfantasy_api.app.services.weekly_challenges import require_participation
+    require_participation(db, c, user)
     try:
         return _save_entry(db, c, user, p)
     except HTTPException:

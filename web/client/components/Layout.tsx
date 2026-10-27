@@ -8,6 +8,7 @@ import React, {
 import { useLocation, useNavigate, useNavigationType } from "react-router-dom";
 
 import { AppOnboardingTour } from "./AppOnboardingTour";
+import { LeagueMembershipNotice } from "./LeagueMembershipNotice";
 import { AppUpdateExperience } from "./AppUpdateExperience";
 import { AppShell } from "./app-shell/AppShell";
 import { LeagueSectionFrame } from "./league/LeagueSectionFrame";
@@ -181,6 +182,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             sessionReady={sessionReady}
             fullWidth={isLeagueMatchupPage}
           >
+            <LeagueMembershipNotice />
             {children}
           </LeagueSectionFrame>
         ) : (

@@ -127,6 +127,9 @@ def mint_picks(db: Session, config: DynastyLeague, teams: list[DynastyFranchise]
 
 
 def create_league(db: Session, user: User, payload: DynastyCreate):
+    from collegefootballfantasy_api.app.services.membership import require_feature, require_league_slot
+    require_feature(db, user, "dynasty", season=payload.season)
+    require_league_slot(db, user, season=payload.season)
     name = payload.name.strip()
     if len(name) < 3:
         fail("league name is too short", 422)
@@ -162,6 +165,9 @@ def create_league(db: Session, user: User, payload: DynastyCreate):
 
 
 def join_league(db: Session, user: User, invite_code: str, name: str):
+    from collegefootballfantasy_api.app.services.membership import lock_user, rollout_active
+    if rollout_active():
+        lock_user(db, user)
     league = db.scalar(
         select(DynastyLeague).where(
             DynastyLeague.invite_code == invite_code.strip().upper(),
@@ -184,6 +190,9 @@ def join_league(db: Session, user: User, invite_code: str, name: str):
         )
     ):
         return league.league_id
+    from collegefootballfantasy_api.app.services.membership import require_feature, require_league_slot
+    require_feature(db, user, "dynasty", season=config.current_season)
+    require_league_slot(db, user, season=config.current_season)
     season = db.get(DynastySeason, (league.league_id, config.current_season))
     teams = franchises(db, league.league_id)
     if season.status != "scheduled" or season.draft_kind != "startup":

@@ -25,6 +25,7 @@ def ensure_models_registered() -> None:
         draft,
         draft_pick,
         dynasty,
+        membership,
         game,
         game_odds,
         historical_stats,

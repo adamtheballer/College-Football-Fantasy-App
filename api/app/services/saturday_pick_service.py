@@ -406,6 +406,8 @@ def synchronize_lock(contest: SaturdayPickContest) -> None:
 
 
 def save_entry(db: Session, contest: SaturdayPickContest, user: User, selected_pick_player_id: int) -> SaturdayPickEntry:
+    from collegefootballfantasy_api.app.services.membership import require_feature
+    require_feature(db, user, "weekly challenges", season=contest.season)
     synchronize_lock(contest)
     if contest.status != "OPEN" or utc_now() >= as_utc(contest.lock_at):
         raise ValueError("Saturday Pick 6 is locked.")

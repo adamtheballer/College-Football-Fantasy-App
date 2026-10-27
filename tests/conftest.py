@@ -23,6 +23,7 @@ from collegefootballfantasy_api.app.models import (  # noqa: F401
     draft,
     draft_pick,
     dynasty,
+    membership,
     game,
     injury,
     injury_impact,

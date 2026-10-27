@@ -1,3 +1,5 @@
+import { MembershipGate } from "@/components/MembershipGate";
+import { useMembership } from "@/hooks/use-membership";
 import { isExperience } from "@/hooks/use-challenge-experiences";
 import { WeeklyChallengeSponsor } from "@/components/challenges/WeeklyChallengeSponsor";
 import { useEffect, useState } from "react";
@@ -369,6 +371,8 @@ export function EntryForm({
 
 function Duels({ challenge: c }: { challenge: Challenge }) {
   const { user } = useAuth();
+  const membership = useMembership();
+  const paidBlocked = membership.enabled && (!membership.data || (membership.data.enforcement_active && !membership.data.features.weekly_challenges));
   const client = useQueryClient();
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
@@ -446,7 +450,7 @@ function Duels({ challenge: c }: { challenge: Challenge }) {
             d.invitee.user_id === user?.id && (
               <div className="flex gap-3">
                 <Button
-                  disabled={mutate.isPending || c.entry?.status !== "submitted"}
+                  disabled={paidBlocked || mutate.isPending || c.entry?.status !== "submitted"}
                   onClick={() => mutate.mutate({ id: d.id, action: "accept" })}
                 >
                   Accept Duel
@@ -506,7 +510,7 @@ function Duels({ challenge: c }: { challenge: Challenge }) {
               </Link>
               <Button
                 variant="outline"
-                disabled={mutate.isPending || c.entry?.status !== "submitted"}
+                disabled={paidBlocked || mutate.isPending || c.entry?.status !== "submitted"}
                 onClick={() =>
                   mutate.mutate({ id: p.user_id, action: "invite" })
                 }
@@ -688,7 +692,7 @@ export default function WeeklyChallengeDetail() {
           )}
           {c.state === "Open" && user && (
             <SurfaceCard>
-              <EntryForm
+              <MembershipGate feature="weekly_challenges"><EntryForm
                 key={`${user.id}:${c.id}`}
                 challenge={c}
                 accountId={user.id}
@@ -697,7 +701,7 @@ export default function WeeklyChallengeDetail() {
                     queryKey: ["weekly-challenges"],
                   });
                 }}
-              />
+              /></MembershipGate>
             </SurfaceCard>
           )}
           {c.kind === "duels" && <Duels challenge={c} />}

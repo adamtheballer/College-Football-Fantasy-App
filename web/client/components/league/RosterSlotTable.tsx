@@ -1,3 +1,4 @@
+import { usePlayerPictures } from "@/hooks/use-membership";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Lock, UserRound } from "lucide-react";
@@ -172,6 +173,7 @@ const getPositionStyle = () => rosterRowStyle;
 type RosterSlotTableTone = "default" | "bench";
 
 function RosterPlayerPortrait({ imageUrl, name }: { imageUrl?: string | null; name: string }) {
+  const picturesAllowed = usePlayerPictures();
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => setImageFailed(false), [imageUrl]);
@@ -183,7 +185,7 @@ function RosterPlayerPortrait({ imageUrl, name }: { imageUrl?: string | null; na
       data-roster-player-portrait
       className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-cfb-surface-raised shadow-[0_5px_14px_rgba(2,6,23,0.24)] ring-1 ring-white/10 md:h-11 md:w-11"
     >
-      {imageUrl && !imageFailed ? (
+      {picturesAllowed && imageUrl && !imageFailed ? (
         <img
           src={imageUrl}
           alt=""

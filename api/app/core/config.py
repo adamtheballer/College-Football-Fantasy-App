@@ -1,7 +1,8 @@
 from pathlib import Path
+from datetime import datetime
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -26,6 +27,23 @@ TRUSTED_NATIVE_CORS_ORIGINS = frozenset({"capacitor://localhost"})
 
 
 class Settings(BaseSettings):
+    membership_enabled: bool = False
+    membership_launch_at: datetime | None = None
+    membership_purchases_enabled: bool = False
+    stripe_secret_key: SecretStr | None = None
+    stripe_webhook_secret: SecretStr | None = None
+    stripe_annual_price_id: str | None = None
+    appstore_product_id: str | None = None
+    appstore_bundle_id: str = "org.collegefantasyfootball.app"
+    appstore_app_id: int | None = None
+    appstore_environment: Literal["Production", "Sandbox"] = "Production"
+
+    @field_validator("membership_launch_at")
+    @classmethod
+    def future_membership_launch(cls, value):
+        if value is not None and (value.year < 2027 or value.tzinfo is None):
+            raise ValueError("Membership launch must be timezone-aware and in 2027 or later")
+        return value
     # Future-only preview. Production is also denied before the 2027 season.
     dynasty_preview_enabled: bool = False
     # Combined New Build release only. Never resets an account's consumed claim.

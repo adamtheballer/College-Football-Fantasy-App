@@ -1,0 +1,20 @@
+meta {
+  name: Membership Status
+  type: http
+  seq: 1
+}
+get {
+  url: {{base_url}}/membership
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+assert {
+  res.status: eq 200
+  res.body.amount_cents: eq 1000
+  res.body.currency: eq usd
+}
+docs {
+  Authenticated server entitlements. Disabled rollout preserves 2026 access.
+  See docs/operations/annual-membership.md. Never infer Pro from redirect query parameters.
+}

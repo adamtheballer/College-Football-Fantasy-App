@@ -1,3 +1,4 @@
+from pydantic import field_serializer
 from datetime import datetime
 from typing import Literal
 import re
@@ -111,6 +112,13 @@ class TradeOfferItemRead(BaseModel):
     # the existing player-card image policy. Historical offer snapshots never
     # persist a third-party image URL.
     player_image_url: str | None = None
+
+    @field_serializer("player_image_url")
+    def membership_picture(self, value):
+        from collegefootballfantasy_api.app.services.membership import rollout_active
+        from collegefootballfantasy_api.app.core.player_picture_access import player_pictures_allowed
+        return None if rollout_active() and not player_pictures_allowed() else value
+
 
 
 class TradeReviewRead(BaseModel):
