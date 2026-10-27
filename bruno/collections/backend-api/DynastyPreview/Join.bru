@@ -1,0 +1,22 @@
+meta {
+  name: Dynasty Join
+  type: http
+  seq: 4
+}
+post {
+  url: {{base_url}}/dynasty/join
+  body: json
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+body:json {
+{
+  "invite_code": "{{dynasty_invite_code}}",
+  "team_name": "Rivals"
+}
+}
+docs {
+  Local isolated preview only. See docs/operations/dynasty-preview.md.
+  Requires explicit server gate; use IDs from actual responses and the correct owner token.
+}

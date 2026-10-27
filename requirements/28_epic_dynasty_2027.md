@@ -6,6 +6,10 @@ Build a separate, disabled-by-default 2027 dynasty preview. Do not merge or depl
 this work into the 2026 release. Existing redraft, scoring, player values, drafts,
 trade workers and normal league-creation UI remain unchanged.
 
+Dynasty leagues, franchises and rosters use separate tables. Only account and
+player identities are shared; no regular League, Team, Draft or RosterEntry is
+created. Existing workers and normal league endpoints cannot operate on them.
+
 Managers retain the full roster between seasons. The startup draft includes all
 reviewed eligible college players in randomized snake order. Each subsequent
 offseason has a snake draft containing only reviewed incoming freshmen. There is
@@ -43,6 +47,12 @@ no recruiting-class-rights mode. Future draft picks are transferable assets.
 
 Each story must have a matching GitHub issue referencing this file.
 
+Published tracking: [epic #420](https://github.com/adamtheballer/College-Football-Fantasy-App/issues/420),
+[persistence #421](https://github.com/adamtheballer/College-Football-Fantasy-App/issues/421),
+[drafts #422](https://github.com/adamtheballer/College-Football-Fantasy-App/issues/422),
+[assets #423](https://github.com/adamtheballer/College-Football-Fantasy-App/issues/423),
+[React #424](https://github.com/adamtheballer/College-Football-Fantasy-App/issues/424).
+
 ## API specs
 
 All routes are under `/dynasty`, use existing bearer authentication and league
@@ -53,10 +63,14 @@ Disabled mode returns 404. Production with current season before 2027 returns
 - `POST /leagues`: create a new preview league; no existing-league conversion.
 - `POST /join`: join an unstarted league using its invite code.
 - `GET /leagues`, `GET /leagues/{id}`: member-only list/state, bounded collections.
+- `GET /capabilities`: authenticated server preview gate.
+- `GET /leagues/{id}/history/{season}`: closed results and roster snapshot.
 - `POST /catalog`: administrator-only reviewed season facts with source URLs.
 - `GET /leagues/{id}/pool`: paginated eligible players and separate dynasty value.
 - `POST /leagues/{id}/start`: commissioner locks a complete league's draft order.
 - `POST /leagues/{id}/picks/{pick_id}`: current asset owner selects a player.
+- `POST /leagues/{id}/rosters/{entry_id}/drop`: owner makes roster space; dropped
+  players cannot be selected twice in the same draft.
 - `POST /leagues/{id}/trades`, `/trades/{trade_id}/accept`, `/cancel`, `/reject`:
   propose and settle scoped player/pick packages.
 - `POST /leagues/{id}/close`: commissioner submits complete reviewed season
