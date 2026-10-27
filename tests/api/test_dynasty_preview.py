@@ -559,3 +559,36 @@ def test_trade_capacity_failure_preserves_all_assets(preview):
         next(p for p in current["picks"] if p["id"] == ap["id"])["owner_team_id"] == a
     )
     assert current["trades"][0]["status"] == "pending"
+
+
+def test_shared_draft_board_keeps_selected_players_and_stable_ranks(preview):
+    client, headers, ids = preview
+    state = post(preview, full(preview), "start")
+    path = f'/dynasty/leagues/{state["league_id"]}/pool?available_only=false'
+    before = client.get(path, headers=headers[0]).json()
+    first = before["data"][0]
+    asset = next(p for p in state["picks"] if p["id"] == state["next_pick_id"])
+    owner = 0 if asset["owner_team_id"] == state["teams"][0]["id"] else 1
+    state = post(
+        preview,
+        state,
+        f'picks/{asset["id"]}',
+        owner=owner,
+        payload={"player_id": first["player_id"]},
+    )
+    after = client.get(path, headers=headers[0]).json()
+    assert [(p["player_id"], p["draft_rank"]) for p in after["data"]] == [
+        (p["player_id"], p["draft_rank"]) for p in before["data"]
+    ]
+    assert state["draft_picks"][0]["player_name"] == first["name"]
+    assert state["draft_picks"][0]["team_id"] == asset["owner_team_id"]
+    entry = next(r for r in state["rosters"] if r["player_id"] == first["player_id"])
+    state = post(preview, state, f'rosters/{entry["id"]}/drop', owner=owner)
+    assert state["draft_picks"][0]["player_name"] == first["name"]
+    assert first["player_id"] in [
+        p["player_id"] for p in client.get(path, headers=headers[0]).json()["data"]
+    ]
+    available = client.get(
+        f'/dynasty/leagues/{state["league_id"]}/pool', headers=headers[0]
+    ).json()
+    assert first["player_id"] not in [p["player_id"] for p in available["data"]]

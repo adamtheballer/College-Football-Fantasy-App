@@ -1,15 +1,9 @@
 // @vitest-environment jsdom
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import DynastyPreview from "./DynastyPreview";
+import { MemoryRouter } from "react-router-dom";
 import { ApiError } from "@/lib/api";
 import { dynastyApi, type DynastyState } from "@/lib/dynasty";
 
@@ -32,7 +26,10 @@ vi.mock("@/lib/dynasty", () => ({
     history: vi.fn(),
   },
 }));
-const state: DynastyState = {
+export const state: DynastyState = {
+  team_count: 2,
+  server_time: "2026-10-27T05:00:00Z",
+  draft_picks: [],
   league_id: 1,
   name: "Future league",
   commissioner_user_id: 11,
@@ -74,7 +71,9 @@ function open() {
   });
   render(
     <QueryClientProvider client={cache}>
-      <DynastyPreview />
+      <MemoryRouter>
+        <DynastyPreview />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -87,31 +86,6 @@ beforeEach(() => {
   });
   vi.mocked(dynastyApi.list).mockResolvedValue({ data: [state] });
   vi.mocked(dynastyApi.detail).mockResolvedValue(state);
-  vi.mocked(dynastyApi.pool).mockResolvedValue({
-    total: 1,
-    offset: 0,
-    limit: 50,
-    data: [
-      {
-        player_id: 77,
-        name: "Reviewed prospect",
-        school: "Arizona State",
-        position: "RB",
-        entry_season: 2027,
-        source_url: "https://example.edu/roster",
-        value: {
-          policy_version: "dynasty_preview_v1",
-          provisional: true,
-          base_value: null,
-          academic_class: "FR",
-          class_factor: 1.2,
-          age: null,
-          age_factor: 1,
-          estimate: null,
-        },
-      },
-    ],
-  });
 });
 afterEach(() => {
   cleanup();
@@ -150,51 +124,14 @@ describe("isolated dynasty preview", () => {
     expect(dynastyApi.list).not.toHaveBeenCalled();
     expect(screen.queryByText("Create preview league")).toBeNull();
   });
-  it("uses nullable age/value honestly and submits the on-clock pick once", async () => {
-    vi.mocked(dynastyApi.pick).mockRejectedValue(
-      new ApiError(409, "roster is full"),
-    );
+  it("opens the existing draft room and has no alternate table or pick controls", async () => {
     open();
-    expect(await screen.findByText("FR / Unknown")).toBeTruthy();
-    expect(screen.getByText("Unrated")).toBeTruthy();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Draft Reviewed prospect" }),
-    );
-    await waitFor(() => expect(dynastyApi.pick).toHaveBeenCalledWith(1, 5, 77));
-    expect(await screen.findByRole("alert")).toHaveProperty(
-      "textContent",
-      "roster is full",
-    );
-    expect(dynastyApi.pick).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText("Saved.")).toBeNull();
-    expect(document.body.textContent).not.toContain("recruiting-class rights");
-  });
-  it("disables selection when another team owns the pick", async () => {
-    vi.mocked(dynastyApi.detail).mockResolvedValue({
-      ...state,
-      picks: [{ ...state.picks[0], owner_team_id: 2 }],
-    });
-    open();
-    const button = await screen.findByRole("button", {
-      name: "Draft Reviewed prospect",
-    });
-    expect((button as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(button);
+    const entry = await screen.findByRole("link", { name: "Enter draft room" });
+    expect(entry.getAttribute("href")).toBe("/labs/dynasty/1/draft");
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Draft / })).toBeNull();
+    expect(dynastyApi.pool).not.toHaveBeenCalled();
     expect(dynastyApi.pick).not.toHaveBeenCalled();
-  });
-  it("keeps API failure distinct from an empty reviewed player pool", async () => {
-    vi.mocked(dynastyApi.pool).mockRejectedValue(
-      new ApiError(503, "Catalog unavailable"),
-    );
-    open();
-    expect(await screen.findByRole("alert")).toHaveProperty(
-      "textContent",
-      "Catalog unavailable Retry players",
-    );
-    expect(
-      screen.queryByText(
-        "No reviewed eligible players are available for this draft.",
-      ),
-    ).toBeNull();
+    expect(dynastyApi.start).not.toHaveBeenCalled();
   });
 });

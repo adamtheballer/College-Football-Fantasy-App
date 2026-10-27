@@ -1,4 +1,5 @@
 import { apiGet, apiPost } from "./api";
+import type { DraftRoomPick } from "@/types/draft";
 
 export type DynastyAsset = { kind: "player" | "pick"; id: number };
 export type DynastyTeam = {
@@ -23,6 +24,9 @@ export type DynastyTrade = {
   assets_json: (DynastyAsset & { from_team_id: number })[];
 };
 export type DynastyState = {
+  team_count: number;
+  server_time: string;
+  draft_picks: DraftRoomPick[];
   league_id: number;
   name: string;
   commissioner_user_id: number | null;
@@ -62,6 +66,7 @@ export type DynastyPool = {
   limit: number;
   offset: number;
   data: {
+    draft_rank: number;
     player_id: number;
     name: string;
     school: string;
@@ -103,10 +108,18 @@ export const dynastyApi = {
       "/dynasty/capabilities",
     ),
   list: () => apiGet<{ data: DynastyState[] }>("/dynasty/leagues"),
-  detail: (id: number) => apiGet<DynastyState>(`/dynasty/leagues/${id}`),
-  pool: (id: number, offset: number) =>
+  detail: (id: number, signal?: AbortSignal) =>
+    apiGet<DynastyState>(`/dynasty/leagues/${id}`, undefined, signal),
+  pool: (
+    id: number,
+    offset: number,
+    availableOnly = true,
+    signal?: AbortSignal,
+  ) =>
     apiGet<DynastyPool>(
-      `/dynasty/leagues/${id}/pool?limit=50&offset=${offset}`,
+      `/dynasty/leagues/${id}/pool?limit=50&offset=${offset}&available_only=${availableOnly}`,
+      undefined,
+      signal,
     ),
   create: (data: DynastyCreate) =>
     apiPost<DynastyState>("/dynasty/leagues", data),

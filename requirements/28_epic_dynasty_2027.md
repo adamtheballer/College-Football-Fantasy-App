@@ -42,7 +42,7 @@ no recruiting-class-rights mode. Future draft picks are transferable assets.
    trades; both parties consent; atomic, ownership-checked, retry-safe settlement;
    player/pick package support; separate age/class value breakdown.
 4. **React preview and contracts:** authenticated, unlisted `/labs/dynasty` page,
-   typed API, creation/join, pool/draft/rosters/picks/trades/season controls; gated
+   typed API, creation/join, shared draft room/rosters/picks/trades/season controls; gated
    in both browser and server; Bruno and browser verification.
 
 Each story must have a matching GitHub issue referencing this file.
@@ -67,6 +67,10 @@ Disabled mode returns 404. Production with current season before 2027 returns
 - `GET /leagues/{id}/history/{season}`: closed results and roster snapshot.
 - `POST /catalog`: administrator-only reviewed season facts with source URLs.
 - `GET /leagues/{id}/pool`: paginated eligible players and separate dynasty value.
+  `available_only=false` supplies the complete locked draft board, including
+  selected players, with stable `draft_rank` values; no returning players are
+  added to annual freshman drafts. State includes current draft selection
+  history, server time and configured team count for the shared draft screen.
 - `POST /leagues/{id}/start`: commissioner locks a complete league's draft order.
 - `POST /leagues/{id}/picks/{pick_id}`: current asset owner selects a player.
 - `POST /leagues/{id}/rosters/{entry_id}/drop`: owner makes roster space; dropped
@@ -91,9 +95,22 @@ explicit frontend flag and the server capability gate, has no normal navigation
 entry, and is absent from normal 2026 league creation. Show loading, denied,
 empty, error, retry, draft-turn and roster-capacity states honestly.
 
+**User correction: preserve the normal draft UI.** Both startup and annual
+drafts render the existing `web/client/pages/Draft.tsx` at the gated
+`/labs/dynasty/{leagueId}/draft` route. Keep its layout, styling, board, search,
+queue, roster/history tabs and pick confirmation. Adapt the dynasty data and
+actions underneath it; do not create a second player table or redesign the
+draft room. Annual drafts change the player pool to reviewed incoming freshmen.
+The management dashboard links to this room and has no separate pick controls.
+Preview picks remain untimed; show a dash in the existing timer slot and retain
+normal timer-expiry behavior for regular drafts.
+
 ## Acceptance criteria
 
 - Default deployment cannot use dynasty routes or expose a creation option.
+- Dynasty draft layout is the canonical normal draft screen; the dashboard has
+  no alternate drafting table. Startup keeps the full eligible pool; annual
+  drafts contain only incoming freshmen. Normal drafts retain existing behavior.
 - A 2026 league cannot be created or converted through dynasty endpoints.
 - Startup randomness is materialized once; reopening/retrying cannot reroll it.
 - Round two reverses round one. A traded pick selects for its current owner.

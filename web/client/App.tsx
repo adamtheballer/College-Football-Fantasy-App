@@ -18,6 +18,7 @@ import Layout from "./components/Layout";
 
 const Index = lazyWithRouteRecovery(() => import("./pages/Index"));
 const DynastyPreview = lazyWithRouteRecovery(() => import("./pages/DynastyPreview"));
+const DynastyDraft = lazyWithRouteRecovery(() => import("./pages/DynastyDraft"));
 const NotFound = lazyWithRouteRecovery(() => import("./pages/NotFound"));
 const Leagues = lazyWithRouteRecovery(() => import("./pages/Leagues"));
 const Settings = lazyWithRouteRecovery(() => import("./pages/Settings"));
@@ -107,7 +108,10 @@ const ApplicationRoutes = () => (
               <Routes>
                 <Route path="/" element={<Index />} />
                 {import.meta.env.VITE_DYNASTY_PREVIEW_ENABLED === "true" && (
-                  <Route path="/labs/dynasty" element={<ProtectedRoute><DynastyPreview /></ProtectedRoute>} />
+                  <>
+                    <Route path="/labs/dynasty" element={<ProtectedRoute><DynastyPreview /></ProtectedRoute>} />
+                    <Route path="/labs/dynasty/:leagueId/draft" element={<ProtectedRoute><DynastyDraft /></ProtectedRoute>} />
+                  </>
                 )}
                 <Route path="/leagues" element={<Leagues />} />
                 <Route

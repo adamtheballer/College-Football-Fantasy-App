@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { ApiError } from "@/lib/api";
@@ -19,8 +20,11 @@ const errorMessage = (error: unknown) =>
 export default function DynastyPreview() {
   const { user } = useAuth();
   const cache = useQueryClient();
-  const [leagueId, setLeagueId] = useState<number | null>(null);
-  const [offset, setOffset] = useState(0);
+  const [params] = useSearchParams();
+  const [leagueId, setLeagueId] = useState<number | null>(() => {
+    const id = Number(params.get("league"));
+    return Number.isInteger(id) && id > 0 ? id : null;
+  });
   const [notice, setNotice] = useState("");
   const capability = useQuery({
     queryKey: ["dynasty", "capability"],
@@ -38,18 +42,6 @@ export default function DynastyPreview() {
     enabled: !!leagueId && capability.data?.enabled === true,
     refetchInterval: 5000,
   });
-  const pool = useQuery({
-    queryKey: [
-      "dynasty",
-      leagueId,
-      "pool",
-      league.data?.current_season,
-      offset,
-    ],
-    queryFn: () => dynastyApi.pool(leagueId!, offset),
-    enabled: !!league.data && capability.data?.enabled === true,
-    refetchInterval: 5000,
-  });
   const mutation = useMutation({
     mutationFn: (action: () => Promise<DynastyState>) => action(),
     retry: false,
@@ -65,7 +57,6 @@ export default function DynastyPreview() {
     if (!leagueId && list.data?.data.length)
       setLeagueId(list.data.data[0].league_id);
   }, [list.data, leagueId]);
-  useEffect(() => setOffset(0), [leagueId, league.data?.current_season]);
   const run = (fn: () => Promise<DynastyState>) => {
     setNotice("");
     mutation.mutate(fn);
@@ -73,7 +64,6 @@ export default function DynastyPreview() {
   const state = league.data;
   const mine = state?.teams.find((t) => t.owner_user_id === user?.id);
   const commissioner = state?.commissioner_user_id === user?.id;
-  const next = state?.picks.find((p) => p.id === state.next_pick_id);
   const teamName = (id: number) =>
     state?.teams.find((t) => t.id === id)?.name ?? `Team ${id}`;
   const busy = mutation.isPending;
@@ -261,133 +251,15 @@ export default function DynastyPreview() {
             {state.order.length > 0 && (
               <p>Round one: {state.order.map(teamName).join(" → ")}</p>
             )}
-            {next && (
-              <p role="status">
-                On the clock: {teamName(next.owner_team_id)} · Pick{" "}
-                {next.overall_pick} · Origin: {teamName(next.original_team_id)}
-              </p>
-            )}
-            {commissioner && state.status === "scheduled" && (
-              <Button
-                disabled={busy}
-                onClick={() => run(() => dynastyApi.start(state.league_id))}
-              >
-                Start {state.draft_kind} draft
-              </Button>
-            )}
+            <Button asChild>
+              <Link to={`/labs/dynasty/${state.league_id}/draft`}>
+                Enter draft room
+              </Link>
+            </Button>
             <p className="text-sm text-muted-foreground">
               Fill all teams and make enough roster space before starting. Every
               player needs reviewed eligibility for this season.
             </p>
-          </section>
-          <section className={panel}>
-            <h2 className="text-xl font-semibold">
-              {state.draft_kind === "startup"
-                ? "Eligible player pool"
-                : "Incoming freshmen"}
-            </h2>
-            {pool.isPending && <p role="status">Loading players…</p>}
-            {pool.error && (
-              <p role="alert">
-                {errorMessage(pool.error)}{" "}
-                <Button onClick={() => pool.refetch()}>Retry players</Button>
-              </p>
-            )}
-            {pool.data?.total === 0 && (
-              <p>No reviewed eligible players are available for this draft.</p>
-            )}
-            {pool.data && (
-              <>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead>
-                      <tr>
-                        <th>Player</th>
-                        <th>Class / age</th>
-                        <th>Dynasty estimate</th>
-                        <th>Draft</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pool.data.data.map((p) => (
-                        <tr key={p.player_id} className="border-t">
-                          <td className="py-3">
-                            <a
-                              href={p.source_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="underline"
-                            >
-                              {p.name}
-                            </a>
-                            <p>
-                              {p.position} · {p.school}
-                            </p>
-                          </td>
-                          <td>
-                            {p.value.academic_class} /{" "}
-                            {p.value.age ?? "Unknown"}
-                          </td>
-                          <td>
-                            {p.value.estimate ?? "Unrated"}
-                            <p className="text-xs text-muted-foreground">
-                              Base {p.value.base_value ?? "—"} × class{" "}
-                              {p.value.class_factor} × age {p.value.age_factor}
-                            </p>
-                          </td>
-                          <td>
-                            <Button
-                              size="sm"
-                              disabled={
-                                busy ||
-                                !next ||
-                                next.owner_team_id !== mine?.id ||
-                                state.rosters.filter(
-                                  (r) => r.team_id === mine?.id,
-                                ).length >= state.roster_limit
-                              }
-                              onClick={() =>
-                                next &&
-                                run(() =>
-                                  dynastyApi.pick(
-                                    state.league_id,
-                                    next.id,
-                                    p.player_id,
-                                  ),
-                                )
-                              }
-                            >
-                              Draft {p.name}
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="outline"
-                    disabled={offset === 0 || pool.isFetching}
-                    onClick={() => setOffset(Math.max(0, offset - 50))}
-                  >
-                    Previous
-                  </Button>
-                  <span>
-                    {pool.data.total ? offset + 1 : 0}–
-                    {Math.min(offset + 50, pool.data.total)} of{" "}
-                    {pool.data.total}
-                  </span>
-                  <Button
-                    variant="outline"
-                    disabled={offset + 50 >= pool.data.total || pool.isFetching}
-                    onClick={() => setOffset(offset + 50)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              </>
-            )}
           </section>
           <section className={panel}>
             <h2 className="text-xl font-semibold">Persistent rosters</h2>

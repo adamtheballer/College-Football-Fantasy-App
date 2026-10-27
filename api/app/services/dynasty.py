@@ -268,7 +268,13 @@ def dynasty_value(fact: DynastyPlayerSeason) -> dict:
     }
 
 
-def pool(db: Session, config: DynastyLeague, season: DynastySeason):
+def pool(
+    db: Session,
+    config: DynastyLeague,
+    season: DynastySeason,
+    *,
+    available_only: bool = True,
+):
     owned = select(DynastyRoster.player_id).where(
         DynastyRoster.league_id == config.league_id
     )
@@ -285,10 +291,12 @@ def pool(db: Session, config: DynastyLeague, season: DynastySeason):
             DynastyPlayerSeason.eligible.is_(True),
             DynastyPlayerSeason.reviewed.is_(True),
             Player.position.in_(ELIGIBLE_FANTASY_POSITIONS),
-            Player.id.not_in(owned),
-            Player.id.not_in(consumed),
         )
     )
+    if available_only or season.status == "scheduled":
+        query = query.where(Player.id.not_in(owned))
+    if available_only:
+        query = query.where(Player.id.not_in(consumed))
     if season.draft_kind == "freshman":
         query = query.where(
             DynastyPlayerSeason.entry_season == season.season,
@@ -308,7 +316,7 @@ def pool(db: Session, config: DynastyLeague, season: DynastySeason):
         }
         for p, f in db.execute(query)
     ]
-    return sorted(
+    result = sorted(
         result,
         key=lambda r: (
             r["value"]["estimate"] is None,
@@ -317,6 +325,10 @@ def pool(db: Session, config: DynastyLeague, season: DynastySeason):
             r["player_id"],
         ),
     )
+    ranks = {row["player_id"]: i + 1 for i, row in enumerate(season.pool_json)}
+    for i, row in enumerate(result):
+        row["draft_rank"] = ranks.get(row["player_id"], i + 1)
+    return sorted(result, key=lambda row: row["draft_rank"])
 
 
 def annual_order(results: list[dict]) -> list[int]:
@@ -677,6 +689,40 @@ def drop(db, config, season, entry_id, user):
 
 def state(db: Session, league_id: int, user: User) -> DynastyState:
     config, league, season = context(db, league_id, user)
+    teams = franchises(db, league_id)
+    team_by_id = {t.id: t for t in teams}
+    draft_picks = [
+        {
+            "id": asset.id,
+            "overall_pick": asset.overall_pick,
+            "round_number": asset.round_number,
+            "round_pick": (asset.overall_pick - 1) % len(teams) + 1,
+            "team_id": asset.owner_team_id,
+            "team_name": team_by_id[asset.owner_team_id].name,
+            "player_id": p.id,
+            "player_name": p.name,
+            "player_position": p.position,
+            "player_school": fact.school if fact else p.school,
+            "made_by_user_id": team_by_id[asset.owner_team_id].owner_user_id,
+            "auto_pick": False,
+            "created_at": asset.picked_at or asset.created_at,
+        }
+        for asset, p, fact in db.execute(
+            select(DynastyPickAsset, Player, DynastyPlayerSeason)
+            .join(Player, Player.id == DynastyPickAsset.player_id)
+            .outerjoin(
+                DynastyPlayerSeason,
+                (DynastyPlayerSeason.player_id == Player.id)
+                & (DynastyPlayerSeason.season == season.season),
+            )
+            .where(
+                DynastyPickAsset.league_id == league_id,
+                DynastyPickAsset.season == season.season,
+                DynastyPickAsset.overall_pick.is_not(None),
+            )
+            .order_by(DynastyPickAsset.overall_pick)
+        )
+    ]
     picks = db.scalars(
         select(DynastyPickAsset)
         .where(
@@ -720,6 +766,9 @@ def state(db: Session, league_id: int, user: User) -> DynastyState:
         )
     ]
     return DynastyState(
+        team_count=config.max_teams,
+        server_time=datetime.now(timezone.utc),
+        draft_picks=draft_picks,
         league_id=league_id,
         name=league.name,
         commissioner_user_id=league.commissioner_user_id,

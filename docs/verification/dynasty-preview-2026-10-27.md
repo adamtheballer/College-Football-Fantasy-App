@@ -1,5 +1,8 @@
 # Dynasty preview verification — October 27, 2026
 
+The draft interface described in this initial run was superseded by the user's
+request to reuse the normal draft screen. See [shared draft UI verification](dynasty-shared-draft-ui-2026-10-27.md).
+
 Verdict: **PASS for the isolated draft/roster preview scope.** This is not a
 scoring-season certification or a 2027 release authorization.
 

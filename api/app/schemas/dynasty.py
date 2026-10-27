@@ -1,7 +1,8 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
+from collegefootballfantasy_api.app.schemas.draft_room import DraftRoomPickRead
 
 
 class DynastyCreate(BaseModel):
@@ -94,6 +95,7 @@ class DynastyValue(BaseModel):
 
 
 class DynastyPoolPlayer(BaseModel):
+    draft_rank: int
     player_id: int
     name: str
     school: str
@@ -147,6 +149,9 @@ class DynastyTradeRead(BaseModel):
 
 
 class DynastyState(BaseModel):
+    team_count: int
+    server_time: datetime
+    draft_picks: list[DraftRoomPickRead]
     league_id: int
     name: str
     commissioner_user_id: int | None

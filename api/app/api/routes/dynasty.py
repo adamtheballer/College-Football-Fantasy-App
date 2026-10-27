@@ -143,11 +143,12 @@ def pool(
     league_id: int,
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    available_only: bool = True,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     config, _, season = service.context(db, league_id, user)
-    rows = service.pool(db, config, season)
+    rows = service.pool(db, config, season, available_only=available_only)
     return DynastyPool(
         data=rows[offset : offset + limit], total=len(rows), limit=limit, offset=offset
     )
