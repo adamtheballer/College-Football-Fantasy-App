@@ -28,6 +28,19 @@ def permanently_delete_user_account(db: Session, *, user: User) -> None:
     transaction so an API failure cannot leave a half-deleted account.
     """
 
+    from collegefootballfantasy_api.app.services.membership_billing import cancel_for_account_deletion
+    from collegefootballfantasy_api.app.services.membership import lock_user
+    lock_user(db, user)
+    cancel_for_account_deletion(db, user)
+    from collegefootballfantasy_api.app.models.dynasty import DynastyFranchise, DynastyLeague
+    for franchise in db.query(DynastyFranchise).filter(DynastyFranchise.owner_user_id == user.id):
+        franchise.owner_user_id = None
+        franchise.name = f"Vacant Team {franchise.id}"
+    db.query(DynastyLeague).filter(DynastyLeague.commissioner_user_id == user.id).update({DynastyLeague.commissioner_user_id: None}, synchronize_session=False)
+    from collegefootballfantasy_api.app.models.membership import MembershipAccount, MembershipSubscription, MembershipEvent
+    db.query(MembershipSubscription).filter(MembershipSubscription.user_id == user.id).update({MembershipSubscription.user_id: None}, synchronize_session=False)
+    db.query(MembershipEvent).filter(MembershipEvent.user_id == user.id).update({MembershipEvent.user_id: None}, synchronize_session=False)
+    db.query(MembershipAccount).filter(MembershipAccount.user_id == user.id).delete(synchronize_session=False)
     user_id = user.id
 
     # A contest is shared public data. Keep the contest for all entrants but

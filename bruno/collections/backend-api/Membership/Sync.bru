@@ -1,0 +1,15 @@
+meta {
+  name: Reconcile Web Membership
+  type: http
+  seq: 3
+}
+post {
+  url: {{base_url}}/membership/sync
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+docs {
+  Re-fetch the authenticated customer's provider authority. Never accepts a customer or user ID.
+  Provider outage returns 503 without erasing previous paid-through access.
+}

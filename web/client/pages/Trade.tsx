@@ -1,3 +1,4 @@
+import { usePlayerPictures } from "@/hooks/use-membership";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -366,6 +367,7 @@ function TradePlayerAvatar({
   name: string;
   imageUrl?: string | null;
 }) {
+  const picturesAllowed = usePlayerPictures();
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [imageUrl]);
   const initials = name
@@ -375,7 +377,7 @@ function TradePlayerAvatar({
     .slice(0, 2)
     .toUpperCase();
 
-  if (imageUrl && !failed) {
+  if (picturesAllowed && imageUrl && !failed) {
     return (
       <img
         src={imageUrl}

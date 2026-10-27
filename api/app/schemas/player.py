@@ -1,3 +1,5 @@
+from pydantic import field_serializer
+from collegefootballfantasy_api.app.core.player_picture_access import player_pictures_allowed
 from datetime import datetime
 
 import math
@@ -74,7 +76,7 @@ class PlayerRead(PlayerBase):
     @field_serializer("image_url")
     def serialize_player_image_url(self, value: str | None) -> str | None:
         """Preserve the nullable contract while withholding unlicensed portraits."""
-        return value if settings.player_headshots_enabled else None
+        return value if player_pictures_allowed() else None
 
     @field_serializer("school")
     def serialize_school(self, value: str) -> str:
@@ -107,6 +109,13 @@ class PlayerCardAboutRead(BaseModel):
     headshot_url: str | None = None
     source: str = "local"
     message: str | None = None
+
+    @field_serializer("headshot_url")
+    def membership_picture(self, value):
+        from collegefootballfantasy_api.app.services.membership import rollout_active
+        from collegefootballfantasy_api.app.core.player_picture_access import player_pictures_allowed
+        return None if rollout_active() and not player_pictures_allowed() else value
+
 
 
 class PlayerCardInjuryRead(BaseModel):

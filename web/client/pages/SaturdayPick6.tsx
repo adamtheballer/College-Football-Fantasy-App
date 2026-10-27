@@ -1,3 +1,5 @@
+import { MembershipGate } from "@/components/MembershipGate";
+import { useMembership } from "@/hooks/use-membership";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Check, CircleX, Clock3, Copy, Lock, Radio, Trophy, UserRound } from "lucide-react";
@@ -116,6 +118,8 @@ export default function SaturdayPick6({ embedded = false }: SaturdayPick6Props) 
     setSubmitError(null);
     setResultDialogOpen(false);
   }, [contest?.id]);
+  const membership = useMembership();
+  const membershipBlocked = membership.enabled && (membership.loading || !!membership.error || Boolean(membership.data?.enforcement_active && !membership.data.features.weekly_challenges));
   const isOpen = contest?.status === "OPEN" && !countdown.expired;
   const isResults = Boolean(contest && ["SCORING", "PROVISIONAL", "FINAL"].includes(contest.status));
   const winnerIds = useMemo(() => new Set(contest?.winning_player_ids ?? []), [contest?.winning_player_ids]);
@@ -236,7 +240,8 @@ export default function SaturdayPick6({ embedded = false }: SaturdayPick6Props) 
         })}
       </section>
 
-      {isOpen ? <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-cfb-border-subtle bg-cfb-surface p-5"><div><p className="text-sm font-black text-cfb-text-primary">{selectedPlayer ? `You selected ${selectedPlayer.player_name}. Lock it in to follow them this Saturday.` : `Choose one featured ${positionLabel(contest.contest_position)}.`}</p><p className="mt-1 text-sm font-bold text-cfb-text-secondary">{lockDeadlineMessage(lockPlayerName, contest.lock_at)}</p>{submitError ? <p role="alert" className="mt-3 text-sm font-bold text-red-300">{submitError}</p> : null}</div><Button type="button" disabled={!selectedPickId || savePick.isPending} onClick={submit}>{savePick.isPending ? "Saving…" : contest.entry ? "Update Pick" : "Lock In Pick"}</Button></section> : null}
+      <MembershipGate feature="weekly_challenges"><></></MembershipGate>
+      {isOpen ? <section className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-cfb-border-subtle bg-cfb-surface p-5"><div><p className="text-sm font-black text-cfb-text-primary">{selectedPlayer ? `You selected ${selectedPlayer.player_name}. Lock it in to follow them this Saturday.` : `Choose one featured ${positionLabel(contest.contest_position)}.`}</p><p className="mt-1 text-sm font-bold text-cfb-text-secondary">{lockDeadlineMessage(lockPlayerName, contest.lock_at)}</p>{submitError ? <p role="alert" className="mt-3 text-sm font-bold text-red-300">{submitError}</p> : null}</div><Button type="button" disabled={membershipBlocked || !selectedPickId || savePick.isPending} onClick={submit}>{savePick.isPending ? "Saving…" : contest.entry ? "Update Pick" : "Lock In Pick"}</Button></section> : null}
       </> : null}
 
       <Dialog open={resultDialogOpen} onOpenChange={setResultDialogOpen}>

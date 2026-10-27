@@ -386,6 +386,8 @@ export interface LeagueMatchupTabResponse {
   projection_updated_at?: string | null;
   provider_snapshot_at?: string | null;
   next_refresh_at?: string | null;
+  viewer_refresh_seconds?: number | null;
+  viewer_next_refresh_at?: string | null;
   message?: string | null;
   postseason?: {
     bracket_id: number;

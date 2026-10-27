@@ -1,0 +1,16 @@
+meta {
+  name: Membership Checkout
+  type: http
+  seq: 2
+}
+post {
+  url: {{base_url}}/membership/checkout
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+docs {
+  Isolated Stripe test environment only. Creates or reuses an owned Checkout session.
+  Expected 409 before launch, 503 without configuration, 409 if already subscribed.
+  No charge occurs until a separate real payment in Stripe Checkout.
+}

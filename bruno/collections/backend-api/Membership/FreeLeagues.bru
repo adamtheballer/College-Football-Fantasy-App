@@ -1,0 +1,21 @@
+meta {
+  name: Select Two Free Leagues
+  type: http
+  seq: 6
+}
+post {
+  url: {{base_url}}/membership/free-leagues
+  body: json
+}
+headers {
+  Authorization: Bearer {{access_token}}
+  Content-Type: application/json
+}
+body:json {
+  {"league_ids": [{{free_league_1}}, {{free_league_2}}]}
+}
+docs {
+  Local QA only. Choose owned current-season regular leagues, max two.
+  A free manager cannot rotate retained choices after saving them for the season.
+  Reads and automated scoring for other leagues remain available.
+}

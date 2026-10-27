@@ -21,6 +21,8 @@ dependencies = [
   "bcrypt>=4.1.0",
   "email-validator>=2.3,<3",
   "disposable-email-domains>=0.0.269,<0.1",
+  "stripe>=16.0.1",
+  "app-store-server-library>=3.1.2",
 ]
 
 [tool.uv]

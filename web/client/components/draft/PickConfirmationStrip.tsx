@@ -1,3 +1,4 @@
+import { usePlayerPictures } from "@/hooks/use-membership";
 import { useEffect, useState } from "react";
 import { CheckCircle2, UserRound } from "lucide-react";
 import { PICK_BANNER_MOTION, type ConfirmedDraftPick } from "@/hooks/use-pick-confirmation";
@@ -11,6 +12,7 @@ type Props = {
 
 function Announcement({ pick, onFinish }: { pick: ConfirmedDraftPick; onFinish: Props["onFinish"] }) {
   const [phase, setPhase] = useState<"enter" | "hold" | "exit">("enter");
+  const picturesAllowed = usePlayerPictures();
   const [brokenImage, setBrokenImage] = useState(false);
   const [reduced] = useState(() => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false);
   useEffect(() => {
@@ -33,7 +35,7 @@ function Announcement({ pick, onFinish }: { pick: ConfirmedDraftPick; onFinish: 
     >
       <div className="mx-auto flex h-full w-full max-w-3xl items-center gap-3 px-4 sm:gap-4 sm:px-6">
         <div aria-hidden="true" className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md border border-primary/45 bg-primary/10 shadow-none sm:h-[4.25rem] sm:w-[4.25rem]">
-          {pick.imageUrl && !brokenImage
+          {picturesAllowed && pick.imageUrl && !brokenImage
             ? <img src={pick.imageUrl} alt="" className="h-full w-full object-cover object-top" onError={() => setBrokenImage(true)} />
             : <UserRound className="h-8 w-8 text-primary/90 sm:h-9 sm:w-9" />}
           <span className="absolute bottom-1 right-1 rounded-md border border-cfb-surface-raised bg-primary px-1.5 py-0.5 text-[8px] font-black leading-none text-slate-950 shadow-sm">#{pick.number}</span>

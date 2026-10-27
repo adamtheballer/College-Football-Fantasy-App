@@ -1,0 +1,21 @@
+meta {
+  name: Verify App Store Membership
+  type: http
+  seq: 5
+}
+post {
+  url: {{base_url}}/membership/apple/verify
+  body: json
+}
+headers {
+  Authorization: Bearer {{access_token}}
+  Content-Type: application/json
+}
+body:json {
+  {"signed_transaction": "{{apple_signed_transaction}}"}
+}
+docs {
+  Use a genuine sandbox StoreKit JWS bound to this user's server-generated appAccountToken.
+  Keep receipts in an untracked local environment. Never commit them to the collection.
+  Invalid signatures/products return 400, other-account receipts 409, provider verification outage 503.
+}

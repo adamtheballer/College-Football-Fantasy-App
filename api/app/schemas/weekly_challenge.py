@@ -1,3 +1,4 @@
+from pydantic import field_serializer
 from datetime import datetime
 from typing import Literal
 
@@ -52,6 +53,13 @@ class PoolPlayer(BaseModel):
     school: str
     position: str
     image_url: str | None
+
+    @field_serializer("image_url")
+    def membership_picture(self, value):
+        from collegefootballfantasy_api.app.services.membership import rollout_active
+        from collegefootballfantasy_api.app.core.player_picture_access import player_pictures_allowed
+        return None if rollout_active() and not player_pictures_allowed() else value
+
 
 
 class ChallengeSponsorRead(BaseModel):

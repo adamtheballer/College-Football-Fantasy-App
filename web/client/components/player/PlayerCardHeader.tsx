@@ -1,3 +1,4 @@
+import { usePlayerPictures } from "@/hooks/use-membership";
 import { useEffect, useState } from "react";
 import { UserRound, X } from "lucide-react";
 
@@ -62,7 +63,8 @@ export function PlayerCardHeader({
   position: string;
   title: string;
 }) {
-  const headshotUrl = card?.about.headshot_url ?? card?.player.image_url ?? player.imageUrl;
+  const picturesAllowed = usePlayerPictures();
+  const headshotUrl = picturesAllowed ? (card?.about.headshot_url ?? card?.player.image_url ?? player.imageUrl) : undefined;
   const [headshotFailed, setHeadshotFailed] = useState(false);
   useEffect(() => setHeadshotFailed(false), [headshotUrl]);
   const playerStatus = resolvePlayerCardStatus(card, player.status);

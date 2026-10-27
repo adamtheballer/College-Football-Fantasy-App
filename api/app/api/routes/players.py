@@ -1,3 +1,4 @@
+from collegefootballfantasy_api.app.core.player_picture_access import player_pictures_allowed
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -170,7 +171,7 @@ def _map_espn_about(
             position=player.position,
             team=player.school,
             headshot_url=(stored_player.espn_headshot_url or player.image_url)
-            if settings.player_headshots_enabled
+            if player_pictures_allowed()
             else None,
             source=_about_source(stored_player),
             message=message,
@@ -192,7 +193,7 @@ def _map_espn_about(
         headshot_url=(
             _profile_text(headshot.get("href")) or stored_player.espn_headshot_url or player.image_url
         )
-        if settings.player_headshots_enabled
+        if player_pictures_allowed()
         else None,
         source="espn",
         message=message,

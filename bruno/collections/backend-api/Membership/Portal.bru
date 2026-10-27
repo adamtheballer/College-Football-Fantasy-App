@@ -1,0 +1,15 @@
+meta {
+  name: Manage Web Membership
+  type: http
+  seq: 4
+}
+post {
+  url: {{base_url}}/membership/portal
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+docs {
+  Opens management for the authenticated customer's existing membership only.
+  Stays available when new purchases are paused. A returned URL is not a paid grant.
+}

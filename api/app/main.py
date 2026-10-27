@@ -21,6 +21,7 @@ from collegefootballfantasy_api.app.api.routes import (
     admin_moderation,
     chats,
     dynasty,
+    membership,
     health,
     insights,
     injuries,
@@ -51,6 +52,8 @@ configure_logging(settings.api_log_level)
 logger = logging.getLogger("collegefootballfantasy_api.runtime")
 
 app = FastAPI(title="CollegeFootballFantasy API")
+from collegefootballfantasy_api.app.core.membership_middleware import membership_picture_context
+app.middleware("http")(membership_picture_context)
 app.middleware("http")(request_context_middleware)
 app.middleware("http")(security_headers_middleware)
 
@@ -84,6 +87,7 @@ def log_runtime_identity_on_startup() -> None:
 
 
 app.include_router(health.router)
+app.include_router(membership.router, prefix="/membership", tags=["membership"])
 app.include_router(dynasty.router, prefix="/dynasty", tags=["dynasty-preview"], include_in_schema=False)
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(app_review.router, prefix="/app-review", tags=["app-review"])

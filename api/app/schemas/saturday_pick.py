@@ -1,3 +1,4 @@
+from collegefootballfantasy_api.app.core.player_picture_access import player_pictures_allowed
 from datetime import datetime
 from typing import Literal
 
@@ -73,7 +74,7 @@ class SaturdayPickPlayerRead(BaseModel):
     @field_serializer("image_url")
     def serialize_player_image_url(self, value: str | None) -> str | None:
         """Never expose third-party player portraits while beta compliance is active."""
-        return value if settings.player_headshots_enabled else None
+        return value if player_pictures_allowed() else None
 
 
 class SaturdayPickLockPlayerRead(BaseModel):

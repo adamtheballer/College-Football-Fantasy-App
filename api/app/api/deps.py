@@ -85,6 +85,10 @@ def require_league_member(db: Session, league_id: int, current_user: User) -> Le
     membership = get_league_membership(db, league_id, current_user.id)
     if not membership:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="league membership required")
+    from collegefootballfantasy_api.app.core.player_picture_access import membership_mutation_actor
+    if membership_mutation_actor.get() == current_user.id:
+        from collegefootballfantasy_api.app.services.membership import require_league_participation
+        require_league_participation(db, current_user, league_id)
     return membership
 
 

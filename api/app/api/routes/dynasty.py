@@ -156,6 +156,9 @@ def pool(
 
 def mutate(db, lid, user, action):
     def operation():
+        from collegefootballfantasy_api.app.services.membership import require_feature
+        # User before league: the same lock order as billing and account deletion.
+        require_feature(db, user, "dynasty")
         config, league, season = service.context(db, lid, user, write=True)
         action(config, league, season)
 

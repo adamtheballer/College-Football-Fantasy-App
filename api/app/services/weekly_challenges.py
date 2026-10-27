@@ -354,9 +354,17 @@ def validate_entry(db, c, payload, complete):
     return selections
 
 
+def require_participation(db, challenge, user):
+    from collegefootballfantasy_api.app.services.membership import rollout_active, require_feature
+    if rollout_active():
+        r = db.get(ChallengeRound, challenge.round_id)
+        require_feature(db, user, "weekly challenges", season=r.season)
+
+
 def save_entry(db, c, user, payload: EntryWrite):
     from . import challenge_experiences as experiences
     if c.kind in experiences.KINDS: return experiences.save_entry(db, c, user, payload)
+    require_participation(db, c, user)
     assert_open(db, c)
     selections = validate_entry(db, c, payload, payload.submit)
     entry = entry_for(db, c, user.id)
@@ -381,6 +389,7 @@ def save_entry(db, c, user, payload: EntryWrite):
 
 
 def invite_duel(db, c, user, invitee_id):
+    require_participation(db, c, user)
     assert_open(db, c)
     if c.kind != "duels": fail("INVALID_ENTRY", "Invitations belong to Rivalry Duels only.", 422, c)
     target = db.get(User, invitee_id)
@@ -402,6 +411,7 @@ def respond_duel(db, c, user, duel_id, accept):
     if not d or d.invitee_id != user.id: fail("UNAUTHORIZED", "Only the invited manager can respond.", 403, c)
     if d.status != "pending": fail("VERSION_CONFLICT", "This invitation has already been answered.", challenge=c)
     if accept:
+        require_participation(db, c, user)
         # Challenge lock serializes cross-role accepts; the unique seat constraint
         # is the database's independent last line of defense.
         ids = [d.low_user_id, d.high_user_id]

@@ -6,6 +6,7 @@ import Capacitor
 class CFFBBridgeViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         bridge?.registerPluginInstance(AppReviewPlugin())
+        bridge?.registerPluginInstance(ProMembershipPlugin())
         bridge?.registerPluginInstance(PushRuntimePlugin())
     }
 }

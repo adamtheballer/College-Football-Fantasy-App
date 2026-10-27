@@ -128,6 +128,10 @@ def _member_or_404(db: Session, league_id: int, user_id: int) -> LeagueMember:
     )
     if not member:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="not a league member")
+    from collegefootballfantasy_api.app.core.player_picture_access import membership_mutation_actor
+    if membership_mutation_actor.get() == user_id:
+        from collegefootballfantasy_api.app.services.membership import require_league_participation
+        require_league_participation(db, db.get(User, user_id), league_id)
     return member
 
 

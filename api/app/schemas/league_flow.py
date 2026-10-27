@@ -685,6 +685,13 @@ class RosterTabEntryRead(BaseModel):
     acquisition_type: str = "ROSTER"
     draft_pick_id: int | None = None
 
+    @field_serializer("image_url")
+    def membership_picture(self, value):
+        from collegefootballfantasy_api.app.services.membership import rollout_active
+        from collegefootballfantasy_api.app.core.player_picture_access import player_pictures_allowed
+        return None if rollout_active() and not player_pictures_allowed() else value
+
+
 
 class LeagueRosterTeamRead(BaseModel):
     team: RosterTabTeamRead
@@ -750,6 +757,8 @@ class PostseasonMatchupContextRead(BaseModel):
 
 
 class LeagueMatchupTabRead(BaseModel):
+    viewer_refresh_seconds: int | None = None
+    viewer_next_refresh_at: datetime | None = None
     league_id: int
     season: int
     week: int
