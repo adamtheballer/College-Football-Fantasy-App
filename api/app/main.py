@@ -20,6 +20,7 @@ from collegefootballfantasy_api.app.api.routes import (
     admin_schedule,
     admin_moderation,
     chats,
+    dynasty,
     health,
     insights,
     injuries,
@@ -83,6 +84,7 @@ def log_runtime_identity_on_startup() -> None:
 
 
 app.include_router(health.router)
+app.include_router(dynasty.router, prefix="/dynasty", tags=["dynasty-preview"], include_in_schema=False)
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(app_review.router, prefix="/app-review", tags=["app-review"])
 app.include_router(release_notice.router, prefix="/release-notes", tags=["release-notes"])

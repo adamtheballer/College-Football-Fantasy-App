@@ -26,6 +26,8 @@ TRUSTED_NATIVE_CORS_ORIGINS = frozenset({"capacitor://localhost"})
 
 
 class Settings(BaseSettings):
+    # Future-only preview. Production is also denied before the 2027 season.
+    dynasty_preview_enabled: bool = False
     # Combined New Build release only. Never resets an account's consumed claim.
     ios_app_review_enabled: bool = False
     # Server-controlled first public challenge round. Later weeks continue to

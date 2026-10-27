@@ -1,0 +1,38 @@
+meta {
+  name: Dynasty Close
+  type: http
+  seq: 15
+}
+post {
+  url: {{base_url}}/dynasty/leagues/{{dynasty_league_id}}/close
+  body: json
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+body:json {
+{
+  "results": [
+    {
+      "team_id": {{dynasty_from_team_id}},
+      "wins": 3,
+      "losses": 7,
+      "ties": 0,
+      "points_for": 600,
+      "playoff_finish": null
+    },
+    {
+      "team_id": {{dynasty_to_team_id}},
+      "wins": 7,
+      "losses": 3,
+      "ties": 0,
+      "points_for": 800,
+      "playoff_finish": 1
+    }
+  ]
+}
+}
+docs {
+  Local isolated preview only. See docs/operations/dynasty-preview.md.
+  Requires explicit server gate; use IDs from actual responses and the correct owner token.
+}
