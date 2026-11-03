@@ -9899,7 +9899,12 @@
       "source": null,
       "source_url": null,
       "published_at": null,
-      "effective_until_week": null
+      "effective_until_week": null,
+      "audit_recheck_urls": [
+        "https://www.dailygamecock.com/article/2026/08/receivers-jayden-sellers-jayden-gibson-out-for-the-season-sports-davis",
+        "https://www.live5news.com/2026/08/16/gamecocks-receivers-sellers-gibson-miss-entire-season/"
+      ],
+      "audit_note": "Existing designation retained after source recheck; source fields above reflect the existing database record and are not fabricated."
     },
     {
       "id": 1615,
