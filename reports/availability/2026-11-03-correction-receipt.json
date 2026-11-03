@@ -1,0 +1,326 @@
+{
+  "summary": {
+    "applied": 12,
+    "players_audited": 815,
+    "repeat_seeded": 0,
+    "protected_data_unchanged": true,
+    "protected_data_unchanged_through_challenge_refresh": true
+  },
+  "at": "2026-11-03 22:49:04.804734+00:00",
+  "job": {
+    "seeded": 12,
+    "projections_corrected": 14,
+    "players_audited": 815,
+    "correction_errors": [],
+    "conferences": {
+      "BIG10": {
+        "players": 216,
+        "current_designations": 8,
+        "unreported": 208
+      },
+      "ACC": {
+        "players": 204,
+        "current_designations": 4,
+        "unreported": 200
+      },
+      "BIG12": {
+        "players": 192,
+        "current_designations": 3,
+        "unreported": 189
+      },
+      "SEC": {
+        "players": 191,
+        "current_designations": 6,
+        "unreported": 185
+      },
+      "INDEPENDENT": {
+        "players": 12,
+        "current_designations": 1,
+        "unreported": 11
+      }
+    }
+  },
+  "repeat": {
+    "seeded": 0,
+    "projections_corrected": 14,
+    "players_audited": 815,
+    "correction_errors": [],
+    "conferences": {
+      "BIG10": {
+        "players": 216,
+        "current_designations": 8,
+        "unreported": 208
+      },
+      "ACC": {
+        "players": 204,
+        "current_designations": 4,
+        "unreported": 200
+      },
+      "BIG12": {
+        "players": 192,
+        "current_designations": 3,
+        "unreported": 189
+      },
+      "SEC": {
+        "players": 191,
+        "current_designations": 6,
+        "unreported": 185
+      },
+      "INDEPENDENT": {
+        "players": 12,
+        "current_designations": 1,
+        "unreported": 11
+      }
+    }
+  },
+  "protected_before": {
+    "player_stats": {
+      "rows": 4462,
+      "fingerprint": "ba8729641e04dd15b33c27566d1c9a7a"
+    },
+    "player_game_stats": {
+      "rows": 4672,
+      "fingerprint": "db9e4270e8bf6dab2e818d919c27c06e"
+    },
+    "player_week_scores": {
+      "rows": 3395,
+      "fingerprint": "279dc8edce9fa27abd87bc4134e80b8d"
+    },
+    "team_week_scores": {
+      "rows": 784,
+      "fingerprint": "1ce824c083b024c5c04cbd02a9b3c8e5"
+    },
+    "matchups": {
+      "rows": 439,
+      "fingerprint": "cae7bfee6f3ea15da7244d5a80991d9d"
+    }
+  },
+  "protected_after": {
+    "player_stats": {
+      "rows": 4462,
+      "fingerprint": "ba8729641e04dd15b33c27566d1c9a7a"
+    },
+    "player_game_stats": {
+      "rows": 4672,
+      "fingerprint": "db9e4270e8bf6dab2e818d919c27c06e"
+    },
+    "player_week_scores": {
+      "rows": 3395,
+      "fingerprint": "279dc8edce9fa27abd87bc4134e80b8d"
+    },
+    "team_week_scores": {
+      "rows": 784,
+      "fingerprint": "1ce824c083b024c5c04cbd02a9b3c8e5"
+    },
+    "matchups": {
+      "rows": 439,
+      "fingerprint": "cae7bfee6f3ea15da7244d5a80991d9d"
+    }
+  },
+  "events": [
+    {
+      "player_id": 1594,
+      "player": "Ahmad Hardy",
+      "school": "Missouri",
+      "status": "FULL",
+      "source": "manual_corroborated_availability_report",
+      "source_url": "https://mutigers.com/news/2026/11/01/no-23-football-runs-past-arkansas-secures-battle-line-rivalry-trophy",
+      "published_at": "2026-11-01 02:31:00+00:00",
+      "effective_until_week": 10,
+      "reviewed": true
+    },
+    {
+      "player_id": 1580,
+      "player": "KaMario Taylor",
+      "school": "Mississippi State",
+      "status": "OUT_FOR_SEASON",
+      "source": "manual_corroborated_availability_report",
+      "source_url": "https://hailstate.com/news/2026/10/27/football-statements-on-status-of-quarterback-kamario-taylor",
+      "published_at": "2026-10-28 17:51:00+00:00",
+      "effective_until_week": 15,
+      "reviewed": true
+    },
+    {
+      "player_id": 1333,
+      "player": "Duce Robinson",
+      "school": "Florida State",
+      "status": "OUT_FOR_SEASON",
+      "source": "manual_corroborated_availability_report",
+      "source_url": "https://www.on3.com/teams/florida-state-seminoles/news/breaking-fsu-wr-duce-robinson-to-miss-rest-of-2026-season-with-injury/",
+      "published_at": "2026-11-03 17:04:00+00:00",
+      "effective_until_week": 15,
+      "reviewed": true
+    },
+    {
+      "player_id": 1184,
+      "player": "Dante Moore",
+      "school": "Oregon",
+      "status": "OUT_FOR_SEASON",
+      "source": "manual_corroborated_availability_report",
+      "source_url": "https://www.elevenwarriors.com/college-football/2026/10/164881/oregon-quarterback-dante-moore-out-for-the-season",
+      "published_at": "2026-10-27 02:52:00+00:00",
+      "effective_until_week": 15,
+      "reviewed": true
+    },
+    {
+      "player_id": 1795,
+      "player": "Avery Johnson",
+      "school": "Kansas State",
+      "status": "DOUBTFUL",
+      "source": "manual_corroborated_availability_report",
+      "source_url": "https://www.aol.com/articles/kansas-state-qb-avery-johnson-174056000.html",
+      "published_at": "2026-11-02 18:46:00+00:00",
+      "effective_until_week": 10,
+      "reviewed": true
+    },
+    {
+      "player_id": 1713,
+      "player": "LJ Martin",
+      "school": "BYU",
+      "status": "TBD",
+      "source": "manual_corroborated_availability_report",
+      "source_url": "https://www.deseret.com/sports/2026/11/02/byu-football-rivalry-game-monday-press-briefing-sitake-scalley-relationship/",
+      "published_at": "2026-11-02 22:38:00+00:00",
+      "effective_until_week": 10,
+      "reviewed": true
+    },
+    {
+      "player_id": 1570,
+      "player": "Kewan Lacy",
+      "school": "Ole Miss",
+      "status": "DOUBTFUL",
+      "source": "manual_corroborated_availability_report",
+      "source_url": "https://www.aol.com/articles/kewan-lacy-injury-ole-miss-182636000.html",
+      "published_at": "2026-11-02 18:26:00+00:00",
+      "effective_until_week": 10,
+      "reviewed": true
+    },
+    {
+      "player_id": 1306,
+      "player": "Gideon Davidson",
+      "school": "Clemson",
+      "status": "OUT",
+      "source": "manual_corroborated_availability_report",
+      "source_url": "https://www.theclemsoninsider.com/2026/11/02/bad-news-on-starting-running-back/",
+      "published_at": "2026-11-03 04:02:00+00:00",
+      "effective_until_week": 10,
+      "reviewed": true
+    },
+    {
+      "player_id": 1490,
+      "player": "Ryan Coleman-Williams",
+      "school": "Alabama",
+      "status": "TBD",
+      "source": "manual_corroborated_availability_report",
+      "source_url": "https://athlonsports.com/college-football/alabamas-kalen-deboer-reveals-ryan-coleman-williams-update-before-lsu-game",
+      "published_at": "2026-11-02 18:30:00+00:00",
+      "effective_until_week": 10,
+      "reviewed": true
+    },
+    {
+      "player_id": 1201,
+      "player": "Chase Sowell",
+      "school": "Penn State",
+      "status": "PROBABLE",
+      "source": "manual_corroborated_availability_report",
+      "source_url": "https://sports.yahoo.com/articles/injury-two-penn-state-football-175549369.html",
+      "published_at": "2026-11-03 17:55:00+00:00",
+      "effective_until_week": 10,
+      "reviewed": true
+    },
+    {
+      "player_id": 1203,
+      "player": "Koby Howard",
+      "school": "Penn State",
+      "status": "QUESTIONABLE",
+      "source": "manual_corroborated_availability_report",
+      "source_url": "https://sports.yahoo.com/articles/injury-two-penn-state-football-175549369.html",
+      "published_at": "2026-11-03 17:55:00+00:00",
+      "effective_until_week": 10,
+      "reviewed": true
+    },
+    {
+      "player_id": 1617,
+      "player": "Matt Fuller",
+      "school": "South Carolina",
+      "status": "OUT",
+      "source": "manual_corroborated_availability_report",
+      "source_url": "https://sportstalksc.com/usc/sunday-conference-call-south-carolina-coach-shane-beamer-reflects-on-the-win-at-oklahoma-updates-injuries-from-the-game/",
+      "published_at": "2026-11-01 22:35:00+00:00",
+      "effective_until_week": 10,
+      "reviewed": true
+    }
+  ],
+  "public_player_card_readback": [
+    {
+      "id": 1594,
+      "status": "FULL"
+    },
+    {
+      "id": 1580,
+      "status": "OUT_FOR_SEASON"
+    },
+    {
+      "id": 1333,
+      "status": "OUT_FOR_SEASON"
+    },
+    {
+      "id": 1184,
+      "status": "OUT_FOR_SEASON"
+    },
+    {
+      "id": 1795,
+      "status": "DOUBTFUL"
+    },
+    {
+      "id": 1306,
+      "status": "OUT"
+    },
+    {
+      "id": 1617,
+      "status": "OUT"
+    },
+    {
+      "id": 1713,
+      "status": "TBD"
+    },
+    {
+      "id": 1490,
+      "status": "TBD"
+    },
+    {
+      "id": 1201,
+      "status": "PROBABLE"
+    },
+    {
+      "id": 1203,
+      "status": "QUESTIONABLE"
+    },
+    {
+      "id": 1570,
+      "status": "DOUBTFUL"
+    }
+  ],
+  "protected_final": {
+    "player_stats": {
+      "rows": 4462,
+      "fingerprint": "ba8729641e04dd15b33c27566d1c9a7a"
+    },
+    "player_game_stats": {
+      "rows": 4672,
+      "fingerprint": "db9e4270e8bf6dab2e818d919c27c06e"
+    },
+    "player_week_scores": {
+      "rows": 3395,
+      "fingerprint": "279dc8edce9fa27abd87bc4134e80b8d"
+    },
+    "team_week_scores": {
+      "rows": 784,
+      "fingerprint": "1ce824c083b024c5c04cbd02a9b3c8e5"
+    },
+    "matchups": {
+      "rows": 439,
+      "fingerprint": "cae7bfee6f3ea15da7244d5a80991d9d"
+    }
+  }
+}

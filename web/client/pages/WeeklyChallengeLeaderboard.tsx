@@ -153,7 +153,7 @@ export default function WeeklyChallengeLeaderboard() {
             </Button>
           </div>
           <SurfaceCard>
-            <h2 className="cfb-section-title mb-3">Top 5</h2>
+            <h2 className="cfb-section-title mb-3">Top {CHALLENGE_LEADERBOARD_LIMIT}</h2>
             {query.data?.provisional && (
               <p className="mb-4 text-sm text-amber-300">
                 Provisional weekly standings — some challenges are still

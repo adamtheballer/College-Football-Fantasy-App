@@ -39,7 +39,7 @@ export function ExperienceLeaderboard({
     <SurfaceCard className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="cfb-section-title text-xl">
-          {c.kind === "fanwars" ? "Top 5 Schools" : "Top 5"}
+          {`Top ${CHALLENGE_LEADERBOARD_LIMIT}${c.kind === "fanwars" ? " Schools" : ""}`}
         </h2>
         {q.data && (
           <span className="text-xs">

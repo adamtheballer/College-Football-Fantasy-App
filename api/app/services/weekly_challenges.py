@@ -35,7 +35,7 @@ from collegefootballfantasy_api.app.services.fantasy_game_selection import schoo
 from collegefootballfantasy_api.app.services.injury_status import confirmed_nonparticipant_ids
 from collegefootballfantasy_api.app.services.weekly_challenge_sponsors import weekly_challenge_sponsor
 
-LEADERBOARD_LIMIT = 5
+LEADERBOARD_LIMIT = 3
 KINDS = {"slate12": "Slate 12", "upset": "Upset Hunter", "fantasy5": "Fantasy Five", "lock": "Lock of the Week", "duels": "Rivalry Duels"}
 RULES = {
     "slate12": "Pick all 12 straight-up winners: 1 point per correct pick. Predict the featured game's combined score; smallest absolute error breaks placement ties, without extra season points. Exact ties share rank.",
@@ -627,7 +627,11 @@ def results(db, c, user, limit, offset):
             "challenge_points": a.points if a and s and s.status in {"final", "no_contest"} else None, "rank": s.rank if s else None,
             "status": s.status if s else "pending", "tiebreaker_error": s.tiebreaker_error if s else None,
             "selections": e.selections if closed or e.user_id == user.id else None}
-    data = [result_read(row) for row in query.order_by(ChallengeScore.rank.asc().nullslast(), User.id).limit(limit).offset(offset)]
+    # Older clients can request larger pages; pagination must never expose a
+    # fourth leader. Keep the independent own-result contract for other views.
+    limit = min(limit, LEADERBOARD_LIMIT)
+    visible_count = max(0, min(limit, LEADERBOARD_LIMIT - offset))
+    data = [result_read(row) for row in query.order_by(ChallengeScore.rank.asc().nullslast(), User.id).limit(visible_count).offset(offset)]
     mine = query.filter(ChallengeEntry.user_id == user.id).first()
     return {"challenge_id": c.id, "state": experiences.state(db, c, r) if c.kind in experiences.KINDS else challenge_state(c, r, games_for(db, c), utcnow()), "data": data, "total": count, "limit": limit, "offset": offset, "my_result": result_read(mine) if mine else None}
 

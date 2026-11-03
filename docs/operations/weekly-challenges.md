@@ -137,11 +137,13 @@ rows retain prior/new awards, reasons and source snapshots. No client submits
 winners, raw scores or points.
 
 Weekly and season leaderboards rank the entire eligible population using a database
-window function before limiting to ten rows. Ties share rank; user ID provides only
-stable display order. A separate Your Rank row covers an entrant outside the Top
-10. Season totals exclude unfinalized challenges; weekly views label partial
-standings Provisional. A distinct Your Result summary is returned independently
-of result-page pagination. Per-challenge winners receive cosmetic recognition;
+window function before limiting to three rows. Ties share rank; user ID provides only
+stable display order and does not expand the three-row cutoff. Weekly, season and
+per-challenge leaderboard views show only these three leaders by points; there is
+no outside-cutoff Your Rank or Your Result row and no pagination in those views.
+Season totals exclude unfinalized challenges; weekly views label partial standings
+Provisional. The result API retains its independent personal-result contract for
+other consumers. Per-challenge winners receive cosmetic recognition;
 overall weekly-winner badges appear only once all five instances are final,
 no-contest or canceled. Corrections revoke obsolete recognition without erasing
 the audit trail.
@@ -155,7 +157,7 @@ Public authenticated prefix `/weekly-challenges`:
 - `PUT /challenges/{id}/entry` with expected revision, submit flag, selections and
   the Slate 12 tiebreaker. Format-specific extra fields are rejected.
 - `GET/POST /challenges/{id}/duels`; `POST .../duels/{id}/accept|decline`.
-- `GET /challenges/{id}/results?limit=25&offset=0` (bounded at 100, includes own result).
+- `GET /challenges/{id}/results?limit=3&offset=0` (accepts legacy page sizes but caps visible rows at the first three positions; includes the independent own-result contract).
 - `GET /leaderboard?season=...&round_id=...` for weekly; omit round for season.
 - `GET /participants?q=...` (20 public matches), `/participants/{id}`.
 

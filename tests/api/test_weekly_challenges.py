@@ -304,6 +304,30 @@ def test_shared_calendar_dst_and_tuesday_review_boundary():
     assert matchup_display_rollover_at(2026,10).hour==5  # Eastern standard time after Nov 1
 
 
+def test_result_pages_never_expose_a_fourth_leader_to_older_clients(world):
+    w = world
+    c = publish(w, 'lock')
+    for index in range(6):
+        manager = User(email=f'result-leader-{index}@example.com', first_name=f'Result {index}', password_hash='unused', api_token=f'result-test-{index}', is_active=True)
+        w['db'].add(manager)
+        w['db'].flush()
+        entry = ChallengeEntry(challenge_id=c['id'], user_id=manager.id, status='submitted', selections=[], revision=1)
+        w['db'].add(entry)
+        w['db'].flush()
+        w['db'].add(ChallengeScore(entry_id=entry.id, raw_points=100-index, rank=index+1, status='final', source_hash='fixture', details={}))
+    w['db'].commit()
+    w['clock'][0] = KICKOFF + timedelta(minutes=1)
+    path = f'{BASE}/challenges/{c["id"]}/results'
+    headers = w['accounts'][1][1]
+    first = w['client'].get(path, params={'limit': 25}, headers=headers).json()
+    assert first['total'] == 6 and first['limit'] == 3
+    assert [row['rank'] for row in first['data']] == [1, 2, 3]
+    tail = w['client'].get(path, params={'limit': 100, 'offset': 1}, headers=headers).json()
+    assert [row['rank'] for row in tail['data']] == [2, 3]
+    for offset in (3, 25):
+        assert w['client'].get(path, params={'limit': 25, 'offset': offset}, headers=headers).json()['data'] == []
+
+
 def test_cancel_withdraws_awards_without_deleting_audit(world):
     w=world;c=publish(w,'lock');submit(w,'lock');finalize(w,'lock')
     r=w['client'].post(f'{ADMIN}/challenges/{c["id"]}/cancel',headers=w['accounts'][0][1],json={'expected_version':c['version'],'reason':'Source game was invalid'})
@@ -312,7 +336,7 @@ def test_cancel_withdraws_awards_without_deleting_audit(world):
     assert w['db'].query(ChallengeEntry).count()==1 and w['db'].query(ChallengeAudit).count()>=4
 
 
-def test_leaderboard_only_returns_top_five_without_an_extra_personal_rank(world):
+def test_leaderboard_only_returns_top_three_without_an_extra_personal_rank(world):
     w=world;c=publish(w,'lock');finalize(w,'lock')
     for i in range(15):
         u=User(email=f'leader{i}@example.com',first_name=f'Leader {i}',password_hash='unused',api_token=f'leader-test-{i}',is_active=True)
@@ -324,10 +348,10 @@ def test_leaderboard_only_returns_top_five_without_an_extra_personal_rank(world)
     w['db'].add(mine);w['db'].flush();w['db'].add(ChallengeAward(entry_id=mine.id,round_id=w['round']['id'],user_id=mine.user_id,points=1,source_hash='fixture',revision=1));w['db'].commit()
     r=w['client'].get(f'{BASE}/leaderboard?season=2026&round_id={w["round"]["id"]}',headers=w['accounts'][1][1])
     assert r.status_code==200,r.text
-    value=r.json();assert len(value['data'])==5 and value['your_rank'] is None
+    value=r.json();assert len(value['data'])==3 and value['your_rank'] is None
     assert value['provisional']
     assert value['week']==1
-    assert [(row['display_name'],row['points']) for row in value['data']]==[(f'Leader {i}',15-i) for i in range(5)]
+    assert [(row['display_name'],row['points']) for row in value['data']]==[(f'Leader {i}',15-i) for i in range(3)]
     top_user=w['db'].get(User,value['data'][0]['user_id']);top_user.first_name='Updated Leader';w['db'].commit()
     refreshed=w['client'].get(f'{BASE}/leaderboard?season=2026&round_id={w["round"]["id"]}',headers=w['accounts'][1][1]).json()
     assert refreshed['data'][0]['display_name']=='Updated Leader'

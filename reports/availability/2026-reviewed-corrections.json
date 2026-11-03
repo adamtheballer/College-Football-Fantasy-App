@@ -304,5 +304,209 @@
       "https://sports.yahoo.com/articles/kewan-lacy-shoulder-injury-wont-100223088.html",
       "https://www.aol.com/articles/kewan-lacy-injury-ole-miss-021311000.html"
     ]
+  },
+  {
+    "player": "Ahmad Hardy",
+    "school": "Missouri",
+    "position": "RB",
+    "season": 2026,
+    "week": 10,
+    "status": "FULL",
+    "injury": "Returned from prior gunshot injuries",
+    "return_timeline": "Returned Oct. 31; workload may remain limited",
+    "effective_until_week": 10,
+    "published_at": "2026-11-01T02:31:00+00:00",
+    "notes": "Missouri confirmed Hardy returned against Arkansas on Oct. 31. This clears the prior absence; it does not promise a full workload or establish a practice participation level.",
+    "source_url": [
+      "https://mutigers.com/news/2026/11/01/no-23-football-runs-past-arkansas-secures-battle-line-rivalry-trophy",
+      "https://www.saturdaydownsouth.com/news/college-football/ahmad-hardy-makes-long-awaited-return-in-mizzou-arkansas-game/"
+    ]
+  },
+  {
+    "player": "KaMario Taylor",
+    "school": "Mississippi State",
+    "position": "QB",
+    "season": 2026,
+    "week": 10,
+    "status": "OUT_FOR_SEASON",
+    "injury": "Foot/toe injury requiring surgery",
+    "return_timeline": "Out for the 2026 season",
+    "effective_until_week": 15,
+    "published_at": "2026-10-28T17:51:00+00:00",
+    "notes": "The program announced on Oct. 27 that Taylor will miss the remainder of the 2026 season. The subsequent surgery update corroborates the absence.",
+    "source_url": [
+      "https://hailstate.com/news/2026/10/27/football-statements-on-status-of-quarterback-kamario-taylor",
+      "https://sports.yahoo.com/articles/jeff-lebby-gives-kamario-taylor-175156854.html"
+    ]
+  },
+  {
+    "player": "Duce Robinson",
+    "school": "Florida State",
+    "position": "WR",
+    "season": 2026,
+    "week": 10,
+    "status": "OUT_FOR_SEASON",
+    "injury": "Torn ACL",
+    "return_timeline": "Out for the 2026 season",
+    "effective_until_week": 15,
+    "published_at": "2026-11-03T17:04:00+00:00",
+    "notes": "Warchant confirmed a season-ending ACL tear following the Oct. 31 Clemson game; independent reporting also confirms the season-ending injury.",
+    "source_url": [
+      "https://www.on3.com/teams/florida-state-seminoles/news/breaking-fsu-wr-duce-robinson-to-miss-rest-of-2026-season-with-injury/",
+      "https://sports.yahoo.com/college-football/article/florida-state-wr-duce-robinson-reportedly-out-for-season-after-tearing-acl-170215939.html"
+    ]
+  },
+  {
+    "player": "Dante Moore",
+    "school": "Oregon",
+    "position": "QB",
+    "season": 2026,
+    "week": 10,
+    "status": "OUT_FOR_SEASON",
+    "injury": "Concussion; not medically cleared",
+    "return_timeline": "Not expected to return in the 2026 season",
+    "effective_until_week": 15,
+    "published_at": "2026-10-27T02:52:00+00:00",
+    "notes": "Dan Lanning said on Oct. 26 that Moore is not medically cleared and is not expected to play again this season. Scout-team participation does not establish game clearance.",
+    "source_url": [
+      "https://www.elevenwarriors.com/college-football/2026/10/164881/oregon-quarterback-dante-moore-out-for-the-season",
+      "https://sports.yahoo.com/articles/oregon-qb-dante-moore-season-021254287.html"
+    ]
+  },
+  {
+    "player": "Avery Johnson",
+    "school": "Kansas State",
+    "position": "QB",
+    "season": 2026,
+    "week": 10,
+    "status": "DOUBTFUL",
+    "injury": "Undisclosed injury",
+    "return_timeline": "Unlikely for Nov. 7; no confirmed return date",
+    "effective_until_week": 10,
+    "published_at": "2026-11-02T18:46:00+00:00",
+    "notes": "Collin Klein described only an outside chance of a return and named Blake Barnett the starter. This is a bounded Week 10 doubtful designation, not a confirmed season-ending absence. Reports disagree on injury location, so no location is asserted.",
+    "source_url": [
+      "https://www.aol.com/articles/kansas-state-qb-avery-johnson-174056000.html",
+      "https://sports.yahoo.com/articles/k-state-names-qb-starter-184625831.html"
+    ]
+  },
+  {
+    "player": "LJ Martin",
+    "school": "BYU",
+    "position": "RB",
+    "season": 2026,
+    "week": 10,
+    "status": "TBD",
+    "injury": "Ankle injury",
+    "return_timeline": "Under evaluation; Nov. 7 availability unconfirmed",
+    "effective_until_week": 10,
+    "published_at": "2026-11-02T22:38:00+00:00",
+    "notes": "Kalani Sitake said on Nov. 2 that Martin will be evaluated over the next 48 hours after missing four games. A possible return is not a clearance; the previous OUT is not carried forward as a new official ruling.",
+    "source_url": [
+      "https://www.deseret.com/sports/2026/11/02/byu-football-rivalry-game-monday-press-briefing-sitake-scalley-relationship/",
+      "https://sports.yahoo.com/articles/byu-lj-martin-injury-reveals-211011113.html"
+    ]
+  },
+  {
+    "player": "Kewan Lacy",
+    "school": "Ole Miss",
+    "position": "RB",
+    "season": 2026,
+    "week": 10,
+    "status": "DOUBTFUL",
+    "injury": "Shoulder injury",
+    "return_timeline": "Not expected against Georgia; return unconfirmed",
+    "effective_until_week": 10,
+    "published_at": "2026-11-02T18:26:00+00:00",
+    "notes": "Pete Golding said on Nov. 2 that he is not expecting Lacy this week while Lacy continues rehabilitation. This is doubtful for Week 10 rather than a fabricated official OUT or season-ending ruling.",
+    "source_url": [
+      "https://www.aol.com/articles/kewan-lacy-injury-ole-miss-182636000.html",
+      "https://www.rotowire.com/cfootball/headlines/kewan-lacy-injury-not-expected-to-play-vs-georgia-238068"
+    ]
+  },
+  {
+    "player": "Gideon Davidson",
+    "school": "Clemson",
+    "position": "RB",
+    "season": 2026,
+    "week": 10,
+    "status": "OUT",
+    "injury": "Ankle injury",
+    "return_timeline": "Out Nov. 7; subsequent return remains uncertain",
+    "effective_until_week": 10,
+    "published_at": "2026-11-03T04:02:00+00:00",
+    "notes": "Dabo Swinney said Davidson will miss at least this week after his injury against Florida State. A possible second missed week is not stored as a confirmed future absence.",
+    "source_url": [
+      "https://www.theclemsoninsider.com/2026/11/02/bad-news-on-starting-running-back/",
+      "https://www.tigernet.com/clemson-football/news/swinney-says-multiple-starters-are-slated-to-be-out-for-syracuse-game-50020"
+    ]
+  },
+  {
+    "player": "Ryan Coleman-Williams",
+    "school": "Alabama",
+    "position": "WR",
+    "season": 2026,
+    "week": 10,
+    "status": "TBD",
+    "injury": "Knee injury following arthroscopic surgery",
+    "return_timeline": "Working back; Nov. 7 game clearance unconfirmed",
+    "effective_until_week": 10,
+    "published_at": "2026-11-02T18:30:00+00:00",
+    "notes": "Kalen DeBoer said Coleman-Williams is doing on-field work after missing two games, but did not confirm clearance for LSU. Practice progress is not represented as healthy or a guaranteed return.",
+    "source_url": [
+      "https://athlonsports.com/college-football/alabamas-kalen-deboer-reveals-ryan-coleman-williams-update-before-lsu-game",
+      "https://tigerbait.com/s/8818/watch-alabamas-kalen-deboer-previews-showdown-with-lane-kiffin-lsu"
+    ]
+  },
+  {
+    "player": "Chase Sowell",
+    "school": "Penn State",
+    "position": "WR",
+    "season": 2026,
+    "week": 10,
+    "status": "PROBABLE",
+    "injury": "Undisclosed injury",
+    "return_timeline": "Probable for Nov. 7 at Washington",
+    "effective_until_week": 10,
+    "published_at": "2026-11-03T17:55:00+00:00",
+    "notes": "Matt Campbell described Sowell as probable at the Nov. 3 press conference. This is the coach's Tuesday assessment, subject to the subsequent conference report.",
+    "source_url": [
+      "https://sports.yahoo.com/articles/injury-two-penn-state-football-175549369.html",
+      "https://www.rotowire.com/cfootball/headlines/chase-sowell-injury-probable-for-saturday-238294"
+    ]
+  },
+  {
+    "player": "Koby Howard",
+    "school": "Penn State",
+    "position": "WR",
+    "season": 2026,
+    "week": 10,
+    "status": "QUESTIONABLE",
+    "injury": "Undisclosed injury",
+    "return_timeline": "Questionable for Nov. 7 at Washington",
+    "effective_until_week": 10,
+    "published_at": "2026-11-03T17:55:00+00:00",
+    "notes": "Matt Campbell said Howard remains uncertain while returning from an extended absence. The corroborating headline and Seattle context identify Washington; its stray Auburn reference is a source copy error and is not imported.",
+    "source_url": [
+      "https://sports.yahoo.com/articles/injury-two-penn-state-football-175549369.html",
+      "https://www.rotowire.com/cfootball/headlines/koby-howard-injury-looks-questionable-for-washington-game-238295"
+    ]
+  },
+  {
+    "player": "Matt Fuller",
+    "school": "South Carolina",
+    "position": "RB",
+    "season": 2026,
+    "week": 10,
+    "status": "OUT",
+    "injury": "Foot/lower-leg fracture following surgery",
+    "return_timeline": "At least a month of recovery; possible postseason return",
+    "effective_until_week": 10,
+    "published_at": "2026-11-01T22:35:00+00:00",
+    "notes": "Shane Beamer reported successful Nov. 1 surgery and at least a month of recovery. A possible postseason return means this is OUT for Week 10, not a confirmed season-ending designation. Recheck the next weekly report.",
+    "source_url": [
+      "https://sportstalksc.com/usc/sunday-conference-call-south-carolina-coach-shane-beamer-reflects-on-the-win-at-oklahoma-updates-injuries-from-the-game/",
+      "https://www.saturdaydownsouth.com/news/college-football/shane-beamer-provides-injury-timetable-for-rb-matt-fuller/"
+    ]
   }
 ]
