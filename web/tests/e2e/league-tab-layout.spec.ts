@@ -503,7 +503,7 @@ for (const path of ["/league/42/chat", "/chats?leagueId=42"]) {
   });
 }
 
-test("weekly leaderboard refresh changes the round and shows current names and points for only the top 5", async ({
+test("weekly leaderboard refresh changes the round and shows current names and points for only the top 3", async ({
   page,
 }, info) => {
   await leagueShell(page);
@@ -557,8 +557,8 @@ test("weekly leaderboard refresh changes the round and shows current names and p
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: /Week 7 manager \d/ }),
-  ).toHaveCount(5);
-  await expect(page.getByText("Week 7 manager 6", { exact: true })).toHaveCount(0);
+  ).toHaveCount(3);
+  await expect(page.getByText("Week 7 manager 4", { exact: true })).toHaveCount(0);
   week = 8;
   await page.clock.fastForward(31_000);
   await expect(
@@ -566,8 +566,8 @@ test("weekly leaderboard refresh changes the round and shows current names and p
   ).toBeVisible();
   await expect(
     page.getByRole("link", { name: /Week 8 manager \d/ }),
-  ).toHaveCount(5);
-  await expect(page.getByText("Week 8 manager 6", { exact: true })).toHaveCount(0);
+  ).toHaveCount(3);
+  await expect(page.getByText("Week 8 manager 4", { exact: true })).toHaveCount(0);
   await expect(
     page.getByRole("link", { name: /Week 8 manager 1 92 points/ }),
   ).toBeVisible();
@@ -575,7 +575,7 @@ test("weekly leaderboard refresh changes the round and shows current names and p
     0,
   );
   await expect(page.getByText(/2026 · Week 8/)).toBeVisible();
-  await page.screenshot({ path: info.outputPath("week-8-top-5.png") });
+  await page.screenshot({ path: info.outputPath("week-8-top-3.png") });
 });
 
 for (const width of [320, 390, 1280]) {
