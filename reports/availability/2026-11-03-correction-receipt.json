@@ -254,63 +254,51 @@
   "public_player_card_readback": [
     {
       "id": 1594,
-      "status": "FULL",
-      "injury": null
+      "status": "FULL"
     },
     {
       "id": 1580,
-      "status": "OUT_FOR_SEASON",
-      "injury": null
+      "status": "OUT_FOR_SEASON"
     },
     {
       "id": 1333,
-      "status": "OUT_FOR_SEASON",
-      "injury": null
+      "status": "OUT_FOR_SEASON"
     },
     {
       "id": 1184,
-      "status": "OUT_FOR_SEASON",
-      "injury": null
+      "status": "OUT_FOR_SEASON"
     },
     {
       "id": 1795,
-      "status": "DOUBTFUL",
-      "injury": null
+      "status": "DOUBTFUL"
     },
     {
       "id": 1306,
-      "status": "OUT",
-      "injury": null
+      "status": "OUT"
     },
     {
       "id": 1617,
-      "status": "OUT",
-      "injury": null
+      "status": "OUT"
     },
     {
       "id": 1713,
-      "status": "TBD",
-      "injury": null
+      "status": "TBD"
     },
     {
       "id": 1490,
-      "status": "TBD",
-      "injury": null
+      "status": "TBD"
     },
     {
       "id": 1201,
-      "status": "PROBABLE",
-      "injury": null
+      "status": "PROBABLE"
     },
     {
       "id": 1203,
-      "status": "QUESTIONABLE",
-      "injury": null
+      "status": "QUESTIONABLE"
     },
     {
       "id": 1570,
-      "status": "DOUBTFUL",
-      "injury": null
+      "status": "DOUBTFUL"
     }
   ],
   "protected_final": {

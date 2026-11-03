@@ -157,7 +157,7 @@ Public authenticated prefix `/weekly-challenges`:
 - `PUT /challenges/{id}/entry` with expected revision, submit flag, selections and
   the Slate 12 tiebreaker. Format-specific extra fields are rejected.
 - `GET/POST /challenges/{id}/duels`; `POST .../duels/{id}/accept|decline`.
-- `GET /challenges/{id}/results?limit=25&offset=0` (bounded at 100, includes own result).
+- `GET /challenges/{id}/results?limit=3&offset=0` (accepts legacy page sizes but caps visible rows at the first three positions; includes the independent own-result contract).
 - `GET /leaderboard?season=...&round_id=...` for weekly; omit round for season.
 - `GET /participants?q=...` (20 public matches), `/participants/{id}`.
 

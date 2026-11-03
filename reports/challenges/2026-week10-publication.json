@@ -1876,5 +1876,22 @@
     },
     "reason": "Week 9 Survivor was never published or opened. Owner-requested weekly refresh: record this missing operating week as canceled and void-advance existing series enrollments. No user prediction, win, championship points, or new enrollment is invented.",
     "at": "2026-11-03 22:52:16.842763+00:00"
+  },
+  "read_only_rollover_check": {
+    "summary": {
+      "read_only_rollover_check": true,
+      "opens_at": "2026-11-04T05:00:00+00:00",
+      "competitions_open": 8
+    },
+    "states": {
+      "slate12": "Open",
+      "upset": "Open",
+      "lock": "Open",
+      "duels": "Open",
+      "millionaire": "Open",
+      "survivor": "Open",
+      "fantasy5": "Open",
+      "fanwars": "Open"
+    }
   }
 }

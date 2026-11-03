@@ -304,6 +304,30 @@ def test_shared_calendar_dst_and_tuesday_review_boundary():
     assert matchup_display_rollover_at(2026,10).hour==5  # Eastern standard time after Nov 1
 
 
+def test_result_pages_never_expose_a_fourth_leader_to_older_clients(world):
+    w = world
+    c = publish(w, 'lock')
+    for index in range(6):
+        manager = User(email=f'result-leader-{index}@example.com', first_name=f'Result {index}', password_hash='unused', api_token=f'result-test-{index}', is_active=True)
+        w['db'].add(manager)
+        w['db'].flush()
+        entry = ChallengeEntry(challenge_id=c['id'], user_id=manager.id, status='submitted', selections=[], revision=1)
+        w['db'].add(entry)
+        w['db'].flush()
+        w['db'].add(ChallengeScore(entry_id=entry.id, raw_points=100-index, rank=index+1, status='final', source_hash='fixture', details={}))
+    w['db'].commit()
+    w['clock'][0] = KICKOFF + timedelta(minutes=1)
+    path = f'{BASE}/challenges/{c["id"]}/results'
+    headers = w['accounts'][1][1]
+    first = w['client'].get(path, params={'limit': 25}, headers=headers).json()
+    assert first['total'] == 6 and first['limit'] == 3
+    assert [row['rank'] for row in first['data']] == [1, 2, 3]
+    tail = w['client'].get(path, params={'limit': 100, 'offset': 1}, headers=headers).json()
+    assert [row['rank'] for row in tail['data']] == [2, 3]
+    for offset in (3, 25):
+        assert w['client'].get(path, params={'limit': 25, 'offset': offset}, headers=headers).json()['data'] == []
+
+
 def test_cancel_withdraws_awards_without_deleting_audit(world):
     w=world;c=publish(w,'lock');submit(w,'lock');finalize(w,'lock')
     r=w['client'].post(f'{ADMIN}/challenges/{c["id"]}/cancel',headers=w['accounts'][0][1],json={'expected_version':c['version'],'reason':'Source game was invalid'})
