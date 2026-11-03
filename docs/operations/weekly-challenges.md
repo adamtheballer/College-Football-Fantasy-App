@@ -137,11 +137,13 @@ rows retain prior/new awards, reasons and source snapshots. No client submits
 winners, raw scores or points.
 
 Weekly and season leaderboards rank the entire eligible population using a database
-window function before limiting to ten rows. Ties share rank; user ID provides only
-stable display order. A separate Your Rank row covers an entrant outside the Top
-10. Season totals exclude unfinalized challenges; weekly views label partial
-standings Provisional. A distinct Your Result summary is returned independently
-of result-page pagination. Per-challenge winners receive cosmetic recognition;
+window function before limiting to three rows. Ties share rank; user ID provides only
+stable display order and does not expand the three-row cutoff. Weekly, season and
+per-challenge leaderboard views show only these three leaders by points; there is
+no outside-cutoff Your Rank or Your Result row and no pagination in those views.
+Season totals exclude unfinalized challenges; weekly views label partial standings
+Provisional. The result API retains its independent personal-result contract for
+other consumers. Per-challenge winners receive cosmetic recognition;
 overall weekly-winner badges appear only once all five instances are final,
 no-contest or canceled. Corrections revoke obsolete recognition without erasing
 the audit trail.

@@ -35,7 +35,7 @@ from collegefootballfantasy_api.app.services.fantasy_game_selection import schoo
 from collegefootballfantasy_api.app.services.injury_status import confirmed_nonparticipant_ids
 from collegefootballfantasy_api.app.services.weekly_challenge_sponsors import weekly_challenge_sponsor
 
-LEADERBOARD_LIMIT = 5
+LEADERBOARD_LIMIT = 3
 KINDS = {"slate12": "Slate 12", "upset": "Upset Hunter", "fantasy5": "Fantasy Five", "lock": "Lock of the Week", "duels": "Rivalry Duels"}
 RULES = {
     "slate12": "Pick all 12 straight-up winners: 1 point per correct pick. Predict the featured game's combined score; smallest absolute error breaks placement ties, without extra season points. Exact ties share rank.",

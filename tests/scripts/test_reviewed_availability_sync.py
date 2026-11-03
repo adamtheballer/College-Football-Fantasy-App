@@ -73,7 +73,7 @@ def test_audit_manifest_seeds_exact_identity_and_explicit_return_once(db_session
     from scripts import apply_injury_projection_correction as correction
     monkeypatch.setattr(job, "SessionLocal", TestingSessionLocal)
     monkeypatch.setattr(correction, "SessionLocal", TestingSessionLocal)
-    records = json.loads(job.MANIFEST.read_text())[5:]
+    records = [r for r in json.loads(job.MANIFEST.read_text())[5:] if r["week"] == 8]
     players = [Player(name=r["player"], school=r["school"], position=r["position"]) for r in records]
     other = Player(name="Jordan Washington", school="North Carolina", position="TE")
     db_session.add_all([*players, other])
@@ -92,3 +92,36 @@ def test_audit_manifest_seeds_exact_identity_and_explicit_return_once(db_session
     assert db_session.query(Injury).filter_by(player_id=green.id, week=8).one().status == "FULL"
     assert db_session.query(PlayerAvailabilityEvent).count() == len(records)
     assert db_session.query(PlayerNewsEvent).count() == len(records)
+
+
+def test_week10_manifest_clears_old_absence_and_expires_uncertain_reports(db_session, monkeypatch, tmp_path):
+    from conftest import TestingSessionLocal
+    from scripts import sync_reviewed_availability as job
+    from scripts import apply_injury_projection_correction as correction
+    from collegefootballfantasy_api.app.services.injury_status import reviewed_injuries_for_week
+
+    monkeypatch.setattr(job, "SessionLocal", TestingSessionLocal)
+    monkeypatch.setattr(correction, "SessionLocal", TestingSessionLocal)
+    records = [r for r in json.loads(job.MANIFEST.read_text()) if r["week"] == 10]
+    players = {r["player"]: Player(name=r["player"], school=r["school"], position=r["position"]) for r in records}
+    db_session.add_all(players.values())
+    db_session.flush()
+    db_session.add(Injury(player_id=players["Ahmad Hardy"].id, season=2026, week=9, status="OUT"))
+    db_session.commit()
+    manifest = tmp_path / "week10.json"
+    manifest.write_text(json.dumps(records))
+    monkeypatch.setattr(job, "MANIFEST", manifest)
+
+    result = job.sync_reviewed_reports(season=2026, week=10)
+    assert result["correction_errors"] == []
+    assert result["seeded"] == len(records)
+    assert job.sync_reviewed_reports(season=2026, week=10)["seeded"] == 0
+    db_session.expire_all()
+    ids = {p.id for p in players.values()}
+    current = reviewed_injuries_for_week(db_session, season=2026, week=10, player_ids=ids)
+    assert current[players["Ahmad Hardy"].id].status == "FULL"
+    assert current[players["Avery Johnson"].id].status == "DOUBTFUL"
+    assert current[players["Matt Fuller"].id].status == "OUT"
+    future = reviewed_injuries_for_week(db_session, season=2026, week=11, player_ids=ids)
+    assert {p.name for p in players.values() if p.id in future} == {"KaMario Taylor", "Dante Moore", "Duce Robinson"}
+    assert all(r.status == "OUT_FOR_SEASON" for r in future.values())

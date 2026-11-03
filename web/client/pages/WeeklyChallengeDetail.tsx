@@ -544,7 +544,7 @@ export function ChallengeResults({ challenge: c }: { challenge: Challenge }) {
   });
   return (
     <SurfaceCard className="space-y-4">
-      <h2 className="cfb-section-title text-xl">Top 5</h2>
+      <h2 className="cfb-section-title text-xl">Top {CHALLENGE_LEADERBOARD_LIMIT}</h2>
       <p className="text-sm text-muted-foreground">
         {c.state === "Open"
           ? "Only your own entry is visible before the deadline."

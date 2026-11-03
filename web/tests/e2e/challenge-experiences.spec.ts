@@ -10,7 +10,7 @@ import type { Challenge } from "../../client/hooks/use-weekly-challenges";
 
 async function setup(
   page: Page,
-  { locked = false, offline = false, loggedOut = false, topFive = false } = {},
+  { locked = false, offline = false, loggedOut = false, topThree = false } = {},
 ) {
   const challenges = structuredClone(fixture.challenges) as Challenge[];
   let writes = 0;
@@ -159,7 +159,7 @@ async function setup(
         submitted_at: c.server_now,
       };
     }
-    if (topFive && (path.endsWith("/leaderboard") || path.endsWith("/results"))) {
+    if (topThree && (path.endsWith("/leaderboard") || path.endsWith("/results"))) {
       const rows = Array.from({ length: 10 }, (_, i) => ({
         user_id: i + 1, display_name: `Point Leader ${i + 1}`, username: null,
         avatar_url: null, profile_url: `/managers/${i + 1}`, rank: i + 1,
@@ -183,25 +183,25 @@ async function setup(
   });
   return { challenges, writes: () => writes };
 }
-test("top five leaderboards never show extra point leaders or personal-rank rows", async ({ page }, info) => {
-  await setup(page, { locked: true, topFive: true });
+test("top three leaderboards never show extra point leaders or personal-rank rows", async ({ page }, info) => {
+  await setup(page, { locked: true, topThree: true });
   for (const mode of ["overall", "millionaire", "fanwars", "existing"]) {
     await page.goto(`/weekly-challenges/leaderboard?mode=${mode}`);
-    await expect(page.getByRole("link", { name: /Point Leader 5\b/ })).toBeVisible();
-    await expect(page.getByRole("link", { name: /Point Leader \d/ })).toHaveCount(5);
-    await expect(page.getByText(/Point Leader (6|7|8|9|10)\b|Outside cutoff|Your Rank|Your rank|Your Result|Top 10/)).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /Point Leader 3\b/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Point Leader \d/ })).toHaveCount(3);
+    await expect(page.getByText(/Point Leader (4|5|6|7|8|9|10)\b|Outside cutoff|Your Rank|Your rank|Your Result|Top 10/)).toHaveCount(0);
     await expect(page.getByRole("button", { name: /^(Next|Previous)$/ })).toHaveCount(0);
     if (mode === "fanwars") {
-      await expect(page.getByRole("cell", { name: /^School 5/ })).toBeVisible();
-      await expect(page.getByRole("cell", { name: /^School 6/ })).toHaveCount(0);
+      await expect(page.getByRole("cell", { name: /^School 3/ })).toBeVisible();
+      await expect(page.getByRole("cell", { name: /^School 4/ })).toHaveCount(0);
     }
     if (mode === "overall") {
       await page.getByRole("button", { name: "Season", exact: true }).click();
       await expect(page.getByRole("heading", { name: "Season Championship" })).toBeVisible();
-      await expect(page.getByRole("link", { name: /Point Leader \d/ })).toHaveCount(5);
+      await expect(page.getByRole("link", { name: /Point Leader \d/ })).toHaveCount(3);
     }
   }
-  await page.screenshot({ path: info.outputPath("top-five-only.png"), fullPage: true });
+  await page.screenshot({ path: info.outputPath("top-three-only.png"), fullPage: true });
 });
 for (const width of [320, 390, 1280]) {
   test(`unified hub preserves all nine challenges and navigation at ${width}px`, async ({

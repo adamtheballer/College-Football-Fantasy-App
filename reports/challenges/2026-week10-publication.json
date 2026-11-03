@@ -1,0 +1,1880 @@
+{
+  "summary": {
+    "round_id": 5,
+    "week": 10,
+    "competitions": 8,
+    "all_valid": true,
+    "fantasy5_players": 258,
+    "millionaire_players": 258,
+    "upset_games": 7,
+    "published_competitions": 8,
+    "public_states": {
+      "Upcoming": 8
+    }
+  },
+  "at": "2026-11-03 22:50:53.661638+00:00",
+  "validations": [
+    {
+      "id": 24,
+      "kind": "slate12",
+      "version": 1,
+      "status": "draft",
+      "issues": [],
+      "games": 12,
+      "players": 0
+    },
+    {
+      "id": 25,
+      "kind": "upset",
+      "version": 1,
+      "status": "draft",
+      "issues": [],
+      "games": 7,
+      "players": 0
+    },
+    {
+      "id": 26,
+      "kind": "fantasy5",
+      "version": 1,
+      "status": "draft",
+      "issues": [],
+      "games": 12,
+      "players": 258
+    },
+    {
+      "id": 27,
+      "kind": "lock",
+      "version": 1,
+      "status": "draft",
+      "issues": [],
+      "games": 12,
+      "players": 0
+    },
+    {
+      "id": 28,
+      "kind": "duels",
+      "version": 1,
+      "status": "draft",
+      "issues": [],
+      "games": 5,
+      "players": 0
+    },
+    {
+      "id": 29,
+      "kind": "fanwars",
+      "version": 1,
+      "status": "draft",
+      "issues": [],
+      "games": 12,
+      "players": 0
+    },
+    {
+      "id": 30,
+      "kind": "millionaire",
+      "version": 1,
+      "status": "draft",
+      "issues": [],
+      "games": 12,
+      "players": 258
+    },
+    {
+      "id": 31,
+      "kind": "survivor",
+      "version": 1,
+      "status": "draft",
+      "issues": [],
+      "games": 12,
+      "players": 0
+    }
+  ],
+  "challenges": [
+    {
+      "id": 24,
+      "kind": "slate12",
+      "status": "published",
+      "version": 2,
+      "lock_at": "2026-11-07 16:55:00+00:00",
+      "published_at": "2026-11-03 22:50:53.315532+00:00",
+      "game_ids": [
+        340,
+        397,
+        94,
+        107,
+        268,
+        213,
+        308,
+        301,
+        194,
+        53,
+        407,
+        175
+      ],
+      "players": 0
+    },
+    {
+      "id": 25,
+      "kind": "upset",
+      "status": "published",
+      "version": 2,
+      "lock_at": "2026-11-07 16:55:00+00:00",
+      "published_at": "2026-11-03 22:50:53.347173+00:00",
+      "game_ids": [
+        340,
+        397,
+        94,
+        107,
+        268,
+        407,
+        175
+      ],
+      "players": 0
+    },
+    {
+      "id": 26,
+      "kind": "fantasy5",
+      "status": "published",
+      "version": 2,
+      "lock_at": "2026-11-07 16:55:00+00:00",
+      "published_at": "2026-11-03 22:50:53.441116+00:00",
+      "game_ids": [
+        340,
+        397,
+        94,
+        107,
+        268,
+        213,
+        308,
+        301,
+        194,
+        53,
+        407,
+        175
+      ],
+      "players": 258
+    },
+    {
+      "id": 27,
+      "kind": "lock",
+      "status": "published",
+      "version": 2,
+      "lock_at": "2026-11-07 16:55:00+00:00",
+      "published_at": "2026-11-03 22:50:53.482212+00:00",
+      "game_ids": [
+        340,
+        397,
+        94,
+        107,
+        268,
+        213,
+        308,
+        301,
+        194,
+        53,
+        407,
+        175
+      ],
+      "players": 0
+    },
+    {
+      "id": 28,
+      "kind": "duels",
+      "status": "published",
+      "version": 2,
+      "lock_at": "2026-11-07 16:55:00+00:00",
+      "published_at": "2026-11-03 22:50:53.495171+00:00",
+      "game_ids": [
+        340,
+        397,
+        94,
+        268,
+        213
+      ],
+      "players": 0
+    },
+    {
+      "id": 29,
+      "kind": "fanwars",
+      "status": "published",
+      "version": 2,
+      "lock_at": "2026-11-08 00:45:00+00:00",
+      "published_at": "2026-11-03 22:50:53.513014+00:00",
+      "game_ids": [
+        340,
+        397,
+        94,
+        107,
+        268,
+        213,
+        308,
+        301,
+        194,
+        53,
+        407,
+        175
+      ],
+      "players": 0
+    },
+    {
+      "id": 30,
+      "kind": "millionaire",
+      "status": "published",
+      "version": 2,
+      "lock_at": "2026-11-07 17:00:00+00:00",
+      "published_at": "2026-11-03 22:50:53.612929+00:00",
+      "game_ids": [
+        340,
+        397,
+        94,
+        107,
+        268,
+        213,
+        308,
+        301,
+        194,
+        53,
+        407,
+        175
+      ],
+      "players": 258
+    },
+    {
+      "id": 31,
+      "kind": "survivor",
+      "status": "published",
+      "version": 2,
+      "lock_at": "2026-11-07 17:00:00+00:00",
+      "published_at": "2026-11-03 22:50:53.648584+00:00",
+      "game_ids": [
+        340,
+        397,
+        94,
+        107,
+        268,
+        213,
+        308,
+        301,
+        194,
+        53,
+        407,
+        175
+      ],
+      "players": 0
+    }
+  ],
+  "salary_policy": {
+    "rule": "clamp(floor(0.8 * authoritative published projection + 0.5),1,30)",
+    "source": "canonical current_published_projections_query, season 2026 week 10",
+    "reviewed_forecasts": [
+      {
+        "player_id": 1520,
+        "points": 17.6,
+        "salary": 14
+      },
+      {
+        "player_id": 1594,
+        "points": 22.54,
+        "salary": 18
+      },
+      {
+        "player_id": 1774,
+        "points": 12.87,
+        "salary": 10
+      },
+      {
+        "player_id": 1488,
+        "points": 10.24,
+        "salary": 8
+      },
+      {
+        "player_id": 1352,
+        "points": 18.87,
+        "salary": 15
+      },
+      {
+        "player_id": 1136,
+        "points": 18.31,
+        "salary": 15
+      },
+      {
+        "player_id": 1197,
+        "points": 7.86,
+        "salary": 6
+      },
+      {
+        "player_id": 1530,
+        "points": 4.17,
+        "salary": 3
+      },
+      {
+        "player_id": 1129,
+        "points": 17.48,
+        "salary": 14
+      },
+      {
+        "player_id": 1194,
+        "points": 4.21,
+        "salary": 3
+      },
+      {
+        "player_id": 1206,
+        "points": 5.93,
+        "salary": 5
+      },
+      {
+        "player_id": 1869,
+        "points": 15.86,
+        "salary": 13
+      },
+      {
+        "player_id": 1639,
+        "points": 25.27,
+        "salary": 20
+      },
+      {
+        "player_id": 1485,
+        "points": 8.2,
+        "salary": 7
+      },
+      {
+        "player_id": 1592,
+        "points": 21.22,
+        "salary": 17
+      },
+      {
+        "player_id": 1711,
+        "points": 19.69,
+        "salary": 16
+      },
+      {
+        "player_id": 1205,
+        "points": 6.95,
+        "salary": 6
+      },
+      {
+        "player_id": 1868,
+        "points": 7.73,
+        "salary": 6
+      },
+      {
+        "player_id": 1067,
+        "points": 20.62,
+        "salary": 16
+      },
+      {
+        "player_id": 1849,
+        "points": 12.64,
+        "salary": 10
+      },
+      {
+        "player_id": 1578,
+        "points": 4.96,
+        "salary": 4
+      },
+      {
+        "player_id": 1072,
+        "points": 17.46,
+        "salary": 14
+      },
+      {
+        "player_id": 1140,
+        "points": 8.38,
+        "salary": 7
+      },
+      {
+        "player_id": 1145,
+        "points": 6.36,
+        "salary": 5
+      },
+      {
+        "player_id": 1202,
+        "points": 12.74,
+        "salary": 10
+      },
+      {
+        "player_id": 1601,
+        "points": 7.44,
+        "salary": 6
+      },
+      {
+        "player_id": 1260,
+        "points": 7.51,
+        "salary": 6
+      },
+      {
+        "player_id": 1373,
+        "points": 5.98,
+        "salary": 5
+      },
+      {
+        "player_id": 1125,
+        "points": 22.95,
+        "salary": 18
+      },
+      {
+        "player_id": 1128,
+        "points": 8.16,
+        "salary": 7
+      },
+      {
+        "player_id": 1144,
+        "points": 9.34,
+        "salary": 7
+      },
+      {
+        "player_id": 1844,
+        "points": 7.36,
+        "salary": 6
+      },
+      {
+        "player_id": 1559,
+        "points": 15.69,
+        "salary": 13
+      },
+      {
+        "player_id": 1702,
+        "points": 12.47,
+        "salary": 10
+      },
+      {
+        "player_id": 1598,
+        "points": 13.92,
+        "salary": 11
+      },
+      {
+        "player_id": 1644,
+        "points": 19.68,
+        "salary": 16
+      },
+      {
+        "player_id": 1138,
+        "points": 13.51,
+        "salary": 11
+      },
+      {
+        "player_id": 1576,
+        "points": 10.71,
+        "salary": 9
+      },
+      {
+        "player_id": 1773,
+        "points": 13.19,
+        "salary": 11
+      },
+      {
+        "player_id": 1137,
+        "points": 8.97,
+        "salary": 7
+      },
+      {
+        "player_id": 1348,
+        "points": 9.82,
+        "salary": 8
+      },
+      {
+        "player_id": 1875,
+        "points": 9.8,
+        "salary": 8
+      },
+      {
+        "player_id": 1198,
+        "points": 17.72,
+        "salary": 14
+      },
+      {
+        "player_id": 1777,
+        "points": 12.33,
+        "salary": 10
+      },
+      {
+        "player_id": 1599,
+        "points": 16.86,
+        "salary": 13
+      },
+      {
+        "player_id": 1492,
+        "points": 12.9,
+        "salary": 10
+      },
+      {
+        "player_id": 1343,
+        "points": 10.9,
+        "salary": 9
+      },
+      {
+        "player_id": 1201,
+        "points": 15.85,
+        "salary": 13
+      },
+      {
+        "player_id": 1535,
+        "points": 13.2,
+        "salary": 11
+      },
+      {
+        "player_id": 1361,
+        "points": 6.1,
+        "salary": 5
+      },
+      {
+        "player_id": 1071,
+        "points": 13.9,
+        "salary": 11
+      },
+      {
+        "player_id": 1143,
+        "points": 10.82,
+        "salary": 9
+      },
+      {
+        "player_id": 1264,
+        "points": 10.35,
+        "salary": 8
+      },
+      {
+        "player_id": 1781,
+        "points": 3.96,
+        "salary": 3
+      },
+      {
+        "player_id": 1388,
+        "points": 20.7,
+        "salary": 17
+      },
+      {
+        "player_id": 1319,
+        "points": 11.09,
+        "salary": 9
+      },
+      {
+        "player_id": 1867,
+        "points": 20.14,
+        "salary": 16
+      },
+      {
+        "player_id": 1540,
+        "points": 11.8,
+        "salary": 9
+      },
+      {
+        "player_id": 1718,
+        "points": 15.35,
+        "salary": 12
+      },
+      {
+        "player_id": 1776,
+        "points": 14.19,
+        "salary": 11
+      },
+      {
+        "player_id": 1346,
+        "points": 13.1,
+        "salary": 10
+      },
+      {
+        "player_id": 1876,
+        "points": 4.91,
+        "salary": 4
+      },
+      {
+        "player_id": 1850,
+        "points": 13.59,
+        "salary": 11
+      },
+      {
+        "player_id": 1188,
+        "points": 7.32,
+        "salary": 6
+      },
+      {
+        "player_id": 1190,
+        "points": 20.02,
+        "salary": 16
+      },
+      {
+        "player_id": 1525,
+        "points": 12.22,
+        "salary": 10
+      },
+      {
+        "player_id": 1847,
+        "points": 8.57,
+        "salary": 7
+      },
+      {
+        "player_id": 1486,
+        "points": 15.57,
+        "salary": 12
+      },
+      {
+        "player_id": 1317,
+        "points": 6.42,
+        "salary": 5
+      },
+      {
+        "player_id": 1536,
+        "points": 8.87,
+        "salary": 7
+      },
+      {
+        "player_id": 1340,
+        "points": 22.91,
+        "salary": 18
+      },
+      {
+        "player_id": 1574,
+        "points": 14.22,
+        "salary": 11
+      },
+      {
+        "player_id": 1365,
+        "points": 7.12,
+        "salary": 6
+      },
+      {
+        "player_id": 1391,
+        "points": 13.23,
+        "salary": 11
+      },
+      {
+        "player_id": 1701,
+        "points": 13.59,
+        "salary": 11
+      },
+      {
+        "player_id": 1265,
+        "points": 6.12,
+        "salary": 5
+      },
+      {
+        "player_id": 1256,
+        "points": 22.22,
+        "salary": 18
+      },
+      {
+        "player_id": 1573,
+        "points": 14.08,
+        "salary": 11
+      },
+      {
+        "player_id": 1569,
+        "points": 10.14,
+        "salary": 8
+      },
+      {
+        "player_id": 1073,
+        "points": 8.53,
+        "salary": 7
+      },
+      {
+        "player_id": 1843,
+        "points": 23.27,
+        "salary": 19
+      },
+      {
+        "player_id": 1263,
+        "points": 9.79,
+        "salary": 8
+      },
+      {
+        "player_id": 1187,
+        "points": 8.64,
+        "salary": 7
+      },
+      {
+        "player_id": 1560,
+        "points": 7.02,
+        "salary": 6
+      },
+      {
+        "player_id": 1699,
+        "points": 23.14,
+        "salary": 19
+      },
+      {
+        "player_id": 1597,
+        "points": 13.05,
+        "salary": 10
+      },
+      {
+        "player_id": 1705,
+        "points": 14.98,
+        "salary": 12
+      },
+      {
+        "player_id": 1185,
+        "points": 8.69,
+        "salary": 7
+      },
+      {
+        "player_id": 1257,
+        "points": 6.99,
+        "salary": 6
+      },
+      {
+        "player_id": 1349,
+        "points": 7.41,
+        "salary": 6
+      },
+      {
+        "player_id": 1646,
+        "points": 15.61,
+        "salary": 12
+      },
+      {
+        "player_id": 1526,
+        "points": 13.16,
+        "salary": 11
+      },
+      {
+        "player_id": 1779,
+        "points": 8.42,
+        "salary": 7
+      },
+      {
+        "player_id": 1523,
+        "points": 11.95,
+        "salary": 10
+      },
+      {
+        "player_id": 1189,
+        "points": 17.75,
+        "salary": 14
+      },
+      {
+        "player_id": 1141,
+        "points": 13.74,
+        "salary": 11
+      },
+      {
+        "player_id": 1192,
+        "points": 8.97,
+        "salary": 7
+      },
+      {
+        "player_id": 1706,
+        "points": 15.71,
+        "salary": 13
+      },
+      {
+        "player_id": 1362,
+        "points": 3.77,
+        "salary": 3
+      },
+      {
+        "player_id": 1353,
+        "points": 7.48,
+        "salary": 6
+      },
+      {
+        "player_id": 1532,
+        "points": 18.97,
+        "salary": 15
+      },
+      {
+        "player_id": 1558,
+        "points": 15.8,
+        "salary": 13
+      },
+      {
+        "player_id": 1613,
+        "points": 7.92,
+        "salary": 6
+      },
+      {
+        "player_id": 1134,
+        "points": 4.36,
+        "salary": 3
+      },
+      {
+        "player_id": 1641,
+        "points": 17.16,
+        "salary": 14
+      },
+      {
+        "player_id": 1852,
+        "points": 7.8,
+        "salary": 6
+      },
+      {
+        "player_id": 1366,
+        "points": 22.31,
+        "salary": 18
+      },
+      {
+        "player_id": 1357,
+        "points": 14.66,
+        "salary": 12
+      },
+      {
+        "player_id": 1611,
+        "points": 17.45,
+        "salary": 14
+      },
+      {
+        "player_id": 1068,
+        "points": 7.81,
+        "salary": 6
+      },
+      {
+        "player_id": 1537,
+        "points": 15.79,
+        "salary": 13
+      },
+      {
+        "player_id": 1562,
+        "points": 14.46,
+        "salary": 12
+      },
+      {
+        "player_id": 1522,
+        "points": 15.9,
+        "salary": 13
+      },
+      {
+        "player_id": 1542,
+        "points": 4.08,
+        "salary": 3
+      },
+      {
+        "player_id": 1707,
+        "points": 8.65,
+        "salary": 7
+      },
+      {
+        "player_id": 1130,
+        "points": 12.41,
+        "salary": 10
+      },
+      {
+        "player_id": 1360,
+        "points": 7.51,
+        "salary": 6
+      },
+      {
+        "player_id": 1324,
+        "points": 8.33,
+        "salary": 7
+      },
+      {
+        "player_id": 1374,
+        "points": 4.02,
+        "salary": 3
+      },
+      {
+        "player_id": 1595,
+        "points": 9.69,
+        "salary": 8
+      },
+      {
+        "player_id": 1132,
+        "points": 5.53,
+        "salary": 4
+      },
+      {
+        "player_id": 1193,
+        "points": 7.59,
+        "salary": 6
+      },
+      {
+        "player_id": 1877,
+        "points": 2.51,
+        "salary": 2
+      },
+      {
+        "player_id": 1199,
+        "points": 10.04,
+        "salary": 8
+      },
+      {
+        "player_id": 1643,
+        "points": 5.14,
+        "salary": 4
+      },
+      {
+        "player_id": 1321,
+        "points": 13.14,
+        "salary": 11
+      },
+      {
+        "player_id": 1322,
+        "points": 9.91,
+        "salary": 8
+      },
+      {
+        "player_id": 1887,
+        "points": 5.47,
+        "salary": 4
+      },
+      {
+        "player_id": 1561,
+        "points": 16.7,
+        "salary": 13
+      },
+      {
+        "player_id": 1390,
+        "points": 14.31,
+        "salary": 11
+      },
+      {
+        "player_id": 1775,
+        "points": 4.79,
+        "salary": 4
+      },
+      {
+        "player_id": 1258,
+        "points": 12.25,
+        "salary": 10
+      },
+      {
+        "player_id": 1323,
+        "points": 7.6,
+        "salary": 6
+      },
+      {
+        "player_id": 1358,
+        "points": 12.73,
+        "salary": 10
+      },
+      {
+        "player_id": 1771,
+        "points": 22.43,
+        "salary": 18
+      },
+      {
+        "player_id": 1494,
+        "points": 4.08,
+        "salary": 3
+      },
+      {
+        "player_id": 1139,
+        "points": 7.99,
+        "salary": 6
+      },
+      {
+        "player_id": 1325,
+        "points": 6.97,
+        "salary": 6
+      },
+      {
+        "player_id": 1191,
+        "points": 9.7,
+        "salary": 8
+      },
+      {
+        "player_id": 1070,
+        "points": 21.66,
+        "salary": 17
+      },
+      {
+        "player_id": 1612,
+        "points": 9.96,
+        "salary": 8
+      },
+      {
+        "player_id": 1131,
+        "points": 11.46,
+        "salary": 9
+      },
+      {
+        "player_id": 1604,
+        "points": 20.75,
+        "salary": 17
+      },
+      {
+        "player_id": 1575,
+        "points": 14.74,
+        "salary": 12
+      },
+      {
+        "player_id": 1717,
+        "points": 14.51,
+        "salary": 12
+      },
+      {
+        "player_id": 1392,
+        "points": 6.31,
+        "salary": 5
+      },
+      {
+        "player_id": 1359,
+        "points": 7.89,
+        "salary": 6
+      },
+      {
+        "player_id": 1872,
+        "points": 13.65,
+        "salary": 11
+      },
+      {
+        "player_id": 1126,
+        "points": 14.38,
+        "salary": 12
+      },
+      {
+        "player_id": 1186,
+        "points": 11.93,
+        "salary": 10
+      },
+      {
+        "player_id": 1602,
+        "points": 4.09,
+        "salary": 3
+      },
+      {
+        "player_id": 1396,
+        "points": 10.52,
+        "salary": 8
+      },
+      {
+        "player_id": 1572,
+        "points": 7.9,
+        "salary": 6
+      },
+      {
+        "player_id": 1715,
+        "points": 7.77,
+        "salary": 6
+      },
+      {
+        "player_id": 1354,
+        "points": 17.51,
+        "salary": 14
+      },
+      {
+        "player_id": 1266,
+        "points": 4.1,
+        "salary": 3
+      },
+      {
+        "player_id": 1146,
+        "points": 3.26,
+        "salary": 3
+      },
+      {
+        "player_id": 1493,
+        "points": 7.19,
+        "salary": 6
+      },
+      {
+        "player_id": 1640,
+        "points": 6.85,
+        "salary": 5
+      },
+      {
+        "player_id": 1871,
+        "points": 6.2,
+        "salary": 5
+      },
+      {
+        "player_id": 1484,
+        "points": 21.4,
+        "salary": 17
+      },
+      {
+        "player_id": 1394,
+        "points": 13.91,
+        "salary": 11
+      },
+      {
+        "player_id": 1600,
+        "points": 7.08,
+        "salary": 6
+      },
+      {
+        "player_id": 1487,
+        "points": 10.35,
+        "salary": 8
+      },
+      {
+        "player_id": 1570,
+        "points": 19.05,
+        "salary": 15
+      },
+      {
+        "player_id": 1367,
+        "points": 9.16,
+        "salary": 7
+      },
+      {
+        "player_id": 1142,
+        "points": 10.3,
+        "salary": 8
+      },
+      {
+        "player_id": 1203,
+        "points": 9.29,
+        "salary": 7
+      },
+      {
+        "player_id": 1716,
+        "points": 13.85,
+        "salary": 11
+      },
+      {
+        "player_id": 1557,
+        "points": 7.82,
+        "salary": 6
+      },
+      {
+        "player_id": 1848,
+        "points": 12.99,
+        "salary": 10
+      },
+      {
+        "player_id": 1370,
+        "points": 16.22,
+        "salary": 13
+      },
+      {
+        "player_id": 1541,
+        "points": 7.2,
+        "salary": 6
+      },
+      {
+        "player_id": 1885,
+        "points": 5.27,
+        "salary": 4
+      },
+      {
+        "player_id": 1364,
+        "points": 22.0,
+        "salary": 18
+      },
+      {
+        "player_id": 1713,
+        "points": 18.65,
+        "salary": 15
+      },
+      {
+        "player_id": 1608,
+        "points": 8.41,
+        "salary": 7
+      },
+      {
+        "player_id": 1538,
+        "points": 10.69,
+        "salary": 9
+      },
+      {
+        "player_id": 1524,
+        "points": 5.45,
+        "salary": 4
+      },
+      {
+        "player_id": 1491,
+        "points": 16.07,
+        "salary": 13
+      },
+      {
+        "player_id": 1704,
+        "points": 13.38,
+        "salary": 11
+      },
+      {
+        "player_id": 1350,
+        "points": 4.0,
+        "salary": 3
+      },
+      {
+        "player_id": 1529,
+        "points": 6.25,
+        "salary": 5
+      },
+      {
+        "player_id": 1577,
+        "points": 9.04,
+        "salary": 7
+      },
+      {
+        "player_id": 1341,
+        "points": 7.42,
+        "salary": 6
+      },
+      {
+        "player_id": 1571,
+        "points": 8.1,
+        "salary": 6
+      },
+      {
+        "player_id": 1355,
+        "points": 9.98,
+        "salary": 8
+      },
+      {
+        "player_id": 1566,
+        "points": 3.97,
+        "salary": 3
+      },
+      {
+        "player_id": 1345,
+        "points": 21.63,
+        "salary": 17
+      },
+      {
+        "player_id": 1564,
+        "points": 9.02,
+        "salary": 7
+      },
+      {
+        "player_id": 1342,
+        "points": 18.33,
+        "salary": 15
+      },
+      {
+        "player_id": 1368,
+        "points": 5.1,
+        "salary": 4
+      },
+      {
+        "player_id": 1075,
+        "points": 4.29,
+        "salary": 3
+      },
+      {
+        "player_id": 1709,
+        "points": 3.92,
+        "salary": 3
+      },
+      {
+        "player_id": 1649,
+        "points": 4.17,
+        "salary": 3
+      },
+      {
+        "player_id": 1703,
+        "points": 5.27,
+        "salary": 4
+      },
+      {
+        "player_id": 1874,
+        "points": 9.43,
+        "salary": 8
+      },
+      {
+        "player_id": 1700,
+        "points": 7.95,
+        "salary": 6
+      },
+      {
+        "player_id": 1534,
+        "points": 15.32,
+        "salary": 12
+      },
+      {
+        "player_id": 1326,
+        "points": 3.1,
+        "salary": 2
+      },
+      {
+        "player_id": 1074,
+        "points": 6.53,
+        "salary": 5
+      },
+      {
+        "player_id": 1318,
+        "points": 19.54,
+        "salary": 16
+      },
+      {
+        "player_id": 1593,
+        "points": 8.04,
+        "salary": 6
+      },
+      {
+        "player_id": 1648,
+        "points": 7.83,
+        "salary": 6
+      },
+      {
+        "player_id": 1853,
+        "points": 3.75,
+        "salary": 3
+      },
+      {
+        "player_id": 1489,
+        "points": 13.71,
+        "salary": 11
+      },
+      {
+        "player_id": 1870,
+        "points": 6.85,
+        "salary": 5
+      },
+      {
+        "player_id": 1778,
+        "points": 11.02,
+        "salary": 9
+      },
+      {
+        "player_id": 1610,
+        "points": 11.26,
+        "salary": 9
+      },
+      {
+        "player_id": 1397,
+        "points": 5.63,
+        "salary": 5
+      },
+      {
+        "player_id": 1200,
+        "points": 6.32,
+        "salary": 5
+      },
+      {
+        "player_id": 1642,
+        "points": 14.46,
+        "salary": 12
+      },
+      {
+        "player_id": 1262,
+        "points": 10.71,
+        "salary": 9
+      },
+      {
+        "player_id": 1196,
+        "points": 20.08,
+        "salary": 16
+      },
+      {
+        "player_id": 1614,
+        "points": 5.67,
+        "salary": 5
+      },
+      {
+        "player_id": 1721,
+        "points": 4.15,
+        "salary": 3
+      },
+      {
+        "player_id": 1490,
+        "points": 16.36,
+        "salary": 13
+      },
+      {
+        "player_id": 1533,
+        "points": 8.43,
+        "salary": 7
+      },
+      {
+        "player_id": 1645,
+        "points": 13.26,
+        "salary": 11
+      },
+      {
+        "player_id": 1539,
+        "points": 7.55,
+        "salary": 6
+      },
+      {
+        "player_id": 1556,
+        "points": 23.45,
+        "salary": 19
+      },
+      {
+        "player_id": 1127,
+        "points": 9.24,
+        "salary": 7
+      },
+      {
+        "player_id": 1714,
+        "points": 8.89,
+        "salary": 7
+      },
+      {
+        "player_id": 1647,
+        "points": 7.2,
+        "salary": 6
+      },
+      {
+        "player_id": 1846,
+        "points": 7.95,
+        "salary": 6
+      },
+      {
+        "player_id": 1066,
+        "points": 8.73,
+        "salary": 7
+      },
+      {
+        "player_id": 1395,
+        "points": 9.85,
+        "salary": 8
+      },
+      {
+        "player_id": 1372,
+        "points": 7.28,
+        "salary": 6
+      },
+      {
+        "player_id": 1719,
+        "points": 7.74,
+        "salary": 6
+      },
+      {
+        "player_id": 1528,
+        "points": 6.71,
+        "salary": 5
+      },
+      {
+        "player_id": 1851,
+        "points": 8.24,
+        "salary": 7
+      },
+      {
+        "player_id": 1708,
+        "points": 7.56,
+        "salary": 6
+      },
+      {
+        "player_id": 1607,
+        "points": 9.7,
+        "salary": 8
+      },
+      {
+        "player_id": 1521,
+        "points": 9.51,
+        "salary": 8
+      },
+      {
+        "player_id": 1356,
+        "points": 4.69,
+        "salary": 4
+      },
+      {
+        "player_id": 1609,
+        "points": 13.14,
+        "salary": 11
+      },
+      {
+        "player_id": 1369,
+        "points": 16.37,
+        "salary": 13
+      },
+      {
+        "player_id": 1565,
+        "points": 9.23,
+        "salary": 7
+      },
+      {
+        "player_id": 1371,
+        "points": 8.99,
+        "salary": 7
+      },
+      {
+        "player_id": 1712,
+        "points": 7.76,
+        "salary": 6
+      },
+      {
+        "player_id": 1568,
+        "points": 26.06,
+        "salary": 21
+      },
+      {
+        "player_id": 1780,
+        "points": 8.01,
+        "salary": 6
+      },
+      {
+        "player_id": 1398,
+        "points": 3.48,
+        "salary": 3
+      },
+      {
+        "player_id": 1347,
+        "points": 8.76,
+        "salary": 7
+      },
+      {
+        "player_id": 1527,
+        "points": 14.4,
+        "salary": 12
+      },
+      {
+        "player_id": 1393,
+        "points": 13.73,
+        "salary": 11
+      },
+      {
+        "player_id": 1316,
+        "points": 17.28,
+        "salary": 14
+      },
+      {
+        "player_id": 1720,
+        "points": 8.1,
+        "salary": 6
+      },
+      {
+        "player_id": 1845,
+        "points": 15.22,
+        "salary": 12
+      },
+      {
+        "player_id": 1605,
+        "points": 7.86,
+        "salary": 6
+      },
+      {
+        "player_id": 1320,
+        "points": 4.46,
+        "salary": 4
+      },
+      {
+        "player_id": 1389,
+        "points": 6.39,
+        "salary": 5
+      },
+      {
+        "player_id": 1563,
+        "points": 14.07,
+        "salary": 11
+      },
+      {
+        "player_id": 1596,
+        "points": 4.56,
+        "salary": 4
+      },
+      {
+        "player_id": 1606,
+        "points": 14.55,
+        "salary": 12
+      },
+      {
+        "player_id": 1133,
+        "points": 5.53,
+        "salary": 4
+      },
+      {
+        "player_id": 1772,
+        "points": 7.73,
+        "salary": 6
+      },
+      {
+        "player_id": 1204,
+        "points": 4.78,
+        "salary": 4
+      }
+    ]
+  },
+  "sources": {
+    "season": 2026,
+    "week": 10,
+    "verified_at": "2026-11-03T22:41:22.609222+00:00",
+    "games": [
+      {
+        "id": 340,
+        "external_id": "401856743",
+        "home": "Missouri",
+        "away": "Texas",
+        "start": "2026-11-07 17:00:00+00:00",
+        "status": "scheduled",
+        "season": 2026,
+        "week": 10,
+        "provider_name": "Texas Longhorns at Missouri Tigers",
+        "source_url": "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=20261107&groups=80&limit=1000",
+        "provider_status": "STATUS_SCHEDULED"
+      },
+      {
+        "id": 397,
+        "external_id": "401856849",
+        "home": "Utah",
+        "away": "BYU",
+        "start": "2026-11-07 17:00:00+00:00",
+        "status": "scheduled",
+        "season": 2026,
+        "week": 10,
+        "provider_name": "BYU Cougars at Utah Utes",
+        "source_url": "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=20261107&groups=80&limit=1000",
+        "provider_status": "STATUS_SCHEDULED"
+      },
+      {
+        "id": 94,
+        "external_id": "401858514",
+        "home": "Ohio State",
+        "away": "Oregon",
+        "start": "2026-11-07 20:30:00+00:00",
+        "status": "scheduled",
+        "season": 2026,
+        "week": 10,
+        "provider_name": "Oregon Ducks at Ohio State Buckeyes",
+        "source_url": "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=20261107&groups=80&limit=1000",
+        "provider_status": "STATUS_SCHEDULED"
+      },
+      {
+        "id": 107,
+        "external_id": "401858516",
+        "home": "Washington",
+        "away": "Penn State",
+        "start": "2026-11-07 20:30:00+00:00",
+        "status": "scheduled",
+        "season": 2026,
+        "week": 10,
+        "provider_name": "Penn State Nittany Lions at Washington Huskies",
+        "source_url": "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=20261107&groups=80&limit=1000",
+        "provider_status": "STATUS_SCHEDULED"
+      },
+      {
+        "id": 268,
+        "external_id": "401856740",
+        "home": "LSU",
+        "away": "Alabama",
+        "start": "2026-11-07 20:30:00+00:00",
+        "status": "scheduled",
+        "season": 2026,
+        "week": 10,
+        "provider_name": "Alabama Crimson Tide at LSU Tigers",
+        "source_url": "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=20261107&groups=80&limit=1000",
+        "provider_status": "STATUS_SCHEDULED"
+      },
+      {
+        "id": 213,
+        "external_id": "401858291",
+        "home": "Notre Dame",
+        "away": "Miami",
+        "start": "2026-11-08 00:30:00+00:00",
+        "status": "scheduled",
+        "season": 2026,
+        "week": 10,
+        "provider_name": "Miami Hurricanes at Notre Dame Fighting Irish",
+        "source_url": "https://site.api.espn.com/apis/site/v2/sports/football/college-football/summary?event=401858291",
+        "provider_status": "STATUS_SCHEDULED"
+      },
+      {
+        "id": 308,
+        "external_id": "401856741",
+        "home": "Ole Miss",
+        "away": "Georgia",
+        "start": "2026-11-08 00:30:00+00:00",
+        "status": "scheduled",
+        "season": 2026,
+        "week": 10,
+        "provider_name": "Georgia Bulldogs at Ole Miss Rebels",
+        "source_url": "https://site.api.espn.com/apis/site/v2/sports/football/college-football/summary?event=401856741",
+        "provider_status": "STATUS_SCHEDULED"
+      },
+      {
+        "id": 301,
+        "external_id": "401856739",
+        "home": "Florida",
+        "away": "Oklahoma",
+        "start": "2026-11-08 00:45:00+00:00",
+        "status": "scheduled",
+        "season": 2026,
+        "week": 10,
+        "provider_name": "Oklahoma Sooners at Florida Gators",
+        "source_url": "https://site.api.espn.com/apis/site/v2/sports/football/college-football/summary?event=401856739",
+        "provider_status": "STATUS_SCHEDULED"
+      },
+      {
+        "id": 194,
+        "external_id": "401858287",
+        "home": "Georgia Tech",
+        "away": "Louisville",
+        "start": "2026-11-08 00:30:00+00:00",
+        "status": "scheduled",
+        "season": 2026,
+        "week": 10,
+        "provider_name": "Louisville Cardinals at Georgia Tech Yellow Jackets",
+        "source_url": "https://site.api.espn.com/apis/site/v2/sports/football/college-football/summary?event=401858287",
+        "provider_status": "STATUS_SCHEDULED"
+      },
+      {
+        "id": 53,
+        "external_id": "401858511",
+        "home": "Michigan",
+        "away": "Michigan State",
+        "start": "2026-11-08 00:30:00+00:00",
+        "status": "scheduled",
+        "season": 2026,
+        "week": 10,
+        "provider_name": "Michigan State Spartans at Michigan Wolverines",
+        "source_url": "https://site.api.espn.com/apis/site/v2/sports/football/college-football/summary?event=401858511",
+        "provider_status": "STATUS_SCHEDULED"
+      },
+      {
+        "id": 407,
+        "external_id": "401856853",
+        "home": "Baylor",
+        "away": "Iowa State",
+        "start": "2026-11-07 17:00:00+00:00",
+        "status": "scheduled",
+        "season": 2026,
+        "week": 10,
+        "provider_name": "Iowa State Cyclones at Baylor Bears",
+        "source_url": "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=20261107&groups=80&limit=1000",
+        "provider_status": "STATUS_SCHEDULED"
+      },
+      {
+        "id": 175,
+        "external_id": "401858286",
+        "home": "NC State",
+        "away": "Duke",
+        "start": "2026-11-07 17:30:00+00:00",
+        "status": "scheduled",
+        "season": 2026,
+        "week": 10,
+        "provider_name": "Duke Blue Devils at NC State Wolfpack",
+        "source_url": "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=20261107&groups=80&limit=1000",
+        "provider_status": "STATUS_SCHEDULED"
+      }
+    ],
+    "source_urls": [
+      "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=20261106&groups=80&limit=1000",
+      "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=20261107&groups=80&limit=1000",
+      "https://site.api.espn.com/apis/site/v2/sports/football/college-football/summary?event=401858291",
+      "https://site.api.espn.com/apis/site/v2/sports/football/college-football/summary?event=401856741",
+      "https://site.api.espn.com/apis/site/v2/sports/football/college-football/summary?event=401856739",
+      "https://site.api.espn.com/apis/site/v2/sports/football/college-football/summary?event=401858287",
+      "https://site.api.espn.com/apis/site/v2/sports/football/college-football/summary?event=401858511"
+    ],
+    "featured_game_id": 213,
+    "duel_game_ids": [
+      340,
+      397,
+      94,
+      268,
+      213
+    ],
+    "underdogs": [
+      {
+        "game_id": 340,
+        "team": "Missouri",
+        "points": 1
+      },
+      {
+        "game_id": 397,
+        "team": "BYU",
+        "points": 2
+      },
+      {
+        "game_id": 94,
+        "team": "Oregon",
+        "points": 3
+      },
+      {
+        "game_id": 107,
+        "team": "Penn State",
+        "points": 1
+      },
+      {
+        "game_id": 268,
+        "team": "Alabama",
+        "points": 2
+      },
+      {
+        "game_id": 407,
+        "team": "Iowa State",
+        "points": 3
+      },
+      {
+        "game_id": 175,
+        "team": "NC State",
+        "points": 2
+      }
+    ]
+  },
+  "readback": [
+    {
+      "id": 24,
+      "kind": "slate12",
+      "status": "published",
+      "state": "Upcoming",
+      "version": 2,
+      "lock_at": "2026-11-07 16:55:00+00:00",
+      "published_at": "2026-11-03 22:50:53.315532+00:00",
+      "participants": 0,
+      "games": 12
+    },
+    {
+      "id": 25,
+      "kind": "upset",
+      "status": "published",
+      "state": "Upcoming",
+      "version": 2,
+      "lock_at": "2026-11-07 16:55:00+00:00",
+      "published_at": "2026-11-03 22:50:53.347173+00:00",
+      "participants": 0,
+      "games": 7
+    },
+    {
+      "id": 27,
+      "kind": "lock",
+      "status": "published",
+      "state": "Upcoming",
+      "version": 2,
+      "lock_at": "2026-11-07 16:55:00+00:00",
+      "published_at": "2026-11-03 22:50:53.482212+00:00",
+      "participants": 0,
+      "games": 12
+    },
+    {
+      "id": 28,
+      "kind": "duels",
+      "status": "published",
+      "state": "Upcoming",
+      "version": 2,
+      "lock_at": "2026-11-07 16:55:00+00:00",
+      "published_at": "2026-11-03 22:50:53.495171+00:00",
+      "participants": 0,
+      "games": 5
+    },
+    {
+      "id": 30,
+      "kind": "millionaire",
+      "status": "published",
+      "state": "Upcoming",
+      "version": 2,
+      "lock_at": "2026-11-07 17:00:00+00:00",
+      "published_at": "2026-11-03 22:50:53.612929+00:00",
+      "participants": 0,
+      "games": 12
+    },
+    {
+      "id": 31,
+      "kind": "survivor",
+      "status": "published",
+      "state": "Upcoming",
+      "version": 2,
+      "lock_at": "2026-11-07 17:00:00+00:00",
+      "published_at": "2026-11-03 22:50:53.648584+00:00",
+      "participants": 0,
+      "games": 12
+    },
+    {
+      "id": 26,
+      "kind": "fantasy5",
+      "status": "published",
+      "state": "Upcoming",
+      "version": 2,
+      "lock_at": "2026-11-07 16:55:00+00:00",
+      "published_at": "2026-11-03 22:50:53.441116+00:00",
+      "participants": 0,
+      "games": 12
+    },
+    {
+      "id": 29,
+      "kind": "fanwars",
+      "status": "processing",
+      "state": "Upcoming",
+      "version": 2,
+      "lock_at": "2026-11-08 00:45:00+00:00",
+      "published_at": "2026-11-03 22:50:53.513014+00:00",
+      "participants": 0,
+      "games": 12
+    }
+  ],
+  "survivor_gap": {
+    "summary": {
+      "challenge_id": 32,
+      "week": 9,
+      "status": "canceled",
+      "void_advanced": 1,
+      "championship_awards_unchanged": true,
+      "enrollments_unchanged": true,
+      "actual_predictions_created": 0
+    },
+    "reason": "Week 9 Survivor was never published or opened. Owner-requested weekly refresh: record this missing operating week as canceled and void-advance existing series enrollments. No user prediction, win, championship points, or new enrollment is invented.",
+    "at": "2026-11-03 22:52:16.842763+00:00"
+  }
+}
