@@ -8,7 +8,8 @@ endpoints belonging to the embedded report vendor.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 import os
 import re
 from collections.abc import Callable
@@ -178,6 +179,7 @@ def _parse_grouped_report_cards(soup: BeautifulSoup, *, conference: str, source_
     statuses = {"OUT", "DOUBTFUL", "QUESTIONABLE", "PROBABLE", "AVAILABLE", "FULL", "TBD", "OUT FOR SEASON", "SUSPENDED", "INACTIVE", "NOT AVAILABLE"}
     rows = []
     ignored_logos = {"", "team logo", "conference logo", "conference", "sec logo", "acc football", "b1g football", "network", "football"}
+    short_game_day = re.compile(r"^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\.?\s+(\d{1,2})/(\d{1,2})(?:\s*\||$)", re.I)
 
     def players_in(element):
         # Vendors split position, jersey and name into separate elements. Only
@@ -208,8 +210,31 @@ def _parse_grouped_report_cards(soup: BeautifulSoup, *, conference: str, source_
                         return datetime.strptime(f"{footer.group(1)}, {year.group(1)}", "%B %d, %Y").date().isoformat()
                     except ValueError:
                         return None
+                short = short_game_day.search(parent.get_text(" ", strip=True))
+                if short and year:
+                    try:
+                        return datetime(int(year.group(1)), int(short.group(1)), int(short.group(2))).date().isoformat()
+                    except ValueError:
+                        return None
                 parent = parent.parent
             return None
+
+    def publication_time(element):
+        heading = element.find_previous("h1")
+        year = re.search(r", (\d{4})$", heading.get_text(" ", strip=True) if heading else "")
+        if not year:
+            return None
+        parent = element
+        while parent and parent.name not in {"html", "body"}:
+            stamps = set()
+            for label in parent.find_all(string=re.compile(r"posted", re.I)):
+                stamp = _parse_publication_label(str(label), int(year.group(1)))
+                if stamp:
+                    stamps.add(stamp)
+            if stamps:
+                return stamps.pop() if len(stamps) == 1 else None
+            parent = parent.parent
+        return None
 
     def team_marker(element):
         if element.name == "h3":
@@ -217,6 +242,7 @@ def _parse_grouped_report_cards(soup: BeautifulSoup, *, conference: str, source_
         return element.name == "img" and element.get("alt", "").strip().lower() not in ignored_logos
 
     def append_groups(card, team_name, game_date):
+        published_at = publication_time(card)
         for label in card.find_all(string=lambda text: text.strip().upper() in statuses):
             status = label.strip().upper()
             group = label.parent
@@ -227,10 +253,13 @@ def _parse_grouped_report_cards(soup: BeautifulSoup, *, conference: str, source_
                 players = players_in(group)
                 if players:
                     for player in players:
-                        rows.append({"player_name": player.group(2), "team_name": team_name,
+                        row = {"player_name": player.group(2), "team_name": team_name,
                             "position": player.group(1), "status": status, "injury": None, "return_timeline": None,
                             "practice_level": None, "notes": None, "conference": conference,
-                            "source_url": source_url, "game_date": game_date})
+                            "source_url": source_url, "game_date": game_date}
+                        if published_at:
+                            row["published_at"] = published_at
+                        rows.append(row)
                     break
                 group = group.parent
 
@@ -251,12 +280,53 @@ def _parse_grouped_report_cards(soup: BeautifulSoup, *, conference: str, source_
         # Big 12 exposes generic team-logo labels, so there is no textual team
         # identity to parse. The importer must resolve a UNIQUE exact name +
         # position in this conference with a real game on this explicit date.
-        for heading in soup.find_all("h1"):
-            card = heading.parent
-            game_date = report_date(heading.find_next())
-            if game_date:
+        seen_cards = set()
+        for label in soup.find_all(string=lambda value: bool(value and short_game_day.match(value.strip()))):
+            card = label.parent
+            game_date = report_date(card)
+            while card and not players_in(card):
+                card = card.parent
+            if card and game_date and id(card) not in seen_cards:
+                seen_cards.add(id(card))
                 append_groups(card, None, game_date)
+        if not rows:
+            # A single-date heading is sufficient; a range must have a date
+            # for each game, never the first footer's date for the entire page.
+            for heading in soup.find_all("h1"):
+                text = heading.get_text(" ", strip=True)
+                match = re.fullmatch(r"Games (?:on|of) ([A-Z][a-z]+ \d{1,2}, \d{4})", text)
+                if match:
+                    try:
+                        game_date = datetime.strptime(match.group(1), "%B %d, %Y").date().isoformat()
+                    except ValueError:
+                        continue
+                    append_groups(heading.parent, None, game_date)
     return rows
+
+
+def _parse_publication_label(text: str, year: int) -> str | None:
+    """Interpret explicit public posting times, never the fetch time."""
+    patterns = (
+        r"posted\s+(?P<hour>\d{1,2}):(?P<minute>\d{2})(?P<ampm>[ap])m?\s+(?P<zone>[EC]T)\s+on\s+\w+,\s+(?P<month>[A-Za-z]+)\.?\s+(?P<day>\d{1,2})",
+        r"posted\s+on\s+\w+,\s+(?P<month>[A-Za-z]+)\s+(?P<day>\d{1,2})\s+at\s+(?P<hour>\d{1,2}):(?P<minute>\d{2})(?P<ampm>[ap])m?\s+(?P<zone>[EC]T)",
+        r"posted\s+\w+\.?\s+(?P<month>\d{1,2})/(?P<day>\d{1,2})\s+at\s+(?P<hour>\d{1,2}):(?P<minute>\d{2})(?P<ampm>[ap])m?\s+(?P<zone>[EC]T)",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, text, re.I)
+        if not match:
+            continue
+        try:
+            month = match['month']
+            month_number = int(month) if month.isdigit() else datetime.strptime(month[:3], "%b").month
+            hour = int(match['hour'])
+            if not 1 <= hour <= 12:
+                return None
+            hour = hour % 12 + (12 if match['ampm'].lower() == 'p' else 0)
+            zone = ZoneInfo("America/Chicago" if match['zone'].upper() == 'CT' else "America/New_York")
+            return datetime(year, month_number, int(match['day']), hour, int(match['minute']), tzinfo=zone).astimezone(timezone.utc).isoformat()
+        except ValueError:
+            return None
+    return None
 
 
 def parse_report_document(
