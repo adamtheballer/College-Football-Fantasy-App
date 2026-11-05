@@ -24,6 +24,7 @@ def ensure_models_registered() -> None:
         defense_vs_position,
         draft,
         draft_pick,
+        dynasty,
         game,
         game_odds,
         historical_stats,

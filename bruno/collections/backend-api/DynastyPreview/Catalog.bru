@@ -1,0 +1,32 @@
+meta {
+  name: Dynasty Catalog
+  type: http
+  seq: 2
+}
+post {
+  url: {{base_url}}/dynasty/catalog
+  body: json
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+body:json {
+{
+  "data": [
+    {
+      "player_id": {{dynasty_player_id}},
+      "season": 2027,
+      "entry_season": 2027,
+      "school": "Arizona State",
+      "academic_class": "FR",
+      "eligible": true,
+      "source_url": "https://example.edu/reviewed-roster",
+      "base_value": null
+    }
+  ]
+}
+}
+docs {
+  Local isolated preview only. See docs/operations/dynasty-preview.md.
+  Requires explicit server gate; use IDs from actual responses and the correct owner token.
+}

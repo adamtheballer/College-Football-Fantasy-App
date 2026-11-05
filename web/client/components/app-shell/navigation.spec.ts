@@ -33,6 +33,8 @@ describe("app shell navigation helpers", () => {
   it("detects routes that need draft-room chrome removed", () => {
     expect(isDraftRoomRoute("/draft/mock/single-player")).toBe(true);
     expect(isDraftRoomRoute("/league/abc-123/draft")).toBe(true);
+    expect(isDraftRoomRoute("/labs/dynasty/9/draft")).toBe(true);
+    expect(isDraftRoomRoute("/labs/dynasty")).toBe(false);
     expect(isDraftRoomRoute("/league/abc-123/lobby")).toBe(false);
   });
 

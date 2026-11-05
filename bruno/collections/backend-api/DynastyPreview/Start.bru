@@ -1,0 +1,19 @@
+meta {
+  name: Dynasty Start
+  type: http
+  seq: 8
+}
+post {
+  url: {{base_url}}/dynasty/leagues/{{dynasty_league_id}}/start
+  body: json
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+body:json {
+{}
+}
+docs {
+  Local isolated preview only. See docs/operations/dynasty-preview.md.
+  Requires explicit server gate; use IDs from actual responses and the correct owner token.
+}

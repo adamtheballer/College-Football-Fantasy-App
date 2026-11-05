@@ -30,7 +30,7 @@ export const isShellNavItemActive = (pathname: string, item: Pick<ShellNavItem, 
     : pathname === item.path || pathname.startsWith(`${item.path}/`);
 
 export const isDraftRoomRoute = (pathname: string) =>
-  pathname === "/draft/mock/single-player" || /^\/league\/[^/]+\/draft$/.test(pathname);
+  pathname === "/draft/mock/single-player" || /^\/labs\/dynasty\/[^/]+\/draft$/.test(pathname) || /^\/league\/[^/]+\/draft$/.test(pathname);
 
 export const isCreateLeagueRoute = (pathname: string) => pathname === "/leagues/create";
 
