@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import pytest
 
 from collegefootballfantasy_api.app.integrations.conference_availability_reports import (
     ConferenceAvailabilityReportClient,
@@ -7,6 +8,7 @@ from collegefootballfantasy_api.app.integrations.conference_availability_reports
     _embedded_report_url,
     _rendered_report_frame,
     parse_report_document,
+    _parse_publication_label,
 )
 from collegefootballfantasy_api.app.models.injury import Injury
 from collegefootballfantasy_api.app.models.player import Player
@@ -38,6 +40,18 @@ class _FakeFrameLocator:
     def first(self):
         self.first_requested = True
         return self
+
+
+@pytest.fixture
+def publication_clock(monkeypatch):
+    from collegefootballfantasy_api.app.services import sportsdata_sync
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 11, 5, 12, tzinfo=timezone.utc).astimezone(tz)
+
+    monkeypatch.setattr(sportsdata_sync, 'datetime', Clock)
 
 
 class _FakeFramePage:
@@ -487,6 +501,154 @@ def test_big12_split_rows_keep_explicit_conference_date_without_guessing_logo_id
     assert [(r['player_name'],r['position'],r['status'],r['team_name']) for r in rows] == [
         ('Fletcher Fierro','WR','OUT',None), ('Jahiem White','RB','QUESTIONABLE',None)]
     assert all(r['game_date']=='2026-10-17' for r in rows)
+
+
+def test_big12_abbreviated_range_keeps_each_game_date_and_posting_time():
+    html = '''<main><h1>Games on November 6-7, 2026</h1>
+    <section><img alt="Team Logo"><img alt="Team Logo">
+      <p>posted Wed. 11/4 at 9:00p CT</p>
+      <div>QUESTIONABLE<div>RB #26 Jeremy Payne</div></div>
+      <footer><p>Fri. 11/6</p><p>|</p><p>Tucson, AZ</p></footer></section>
+    <section><img alt="Team Logo"><img alt="Team Logo">
+      <p>posted Wed. 11/4 at 9:00p CT</p>
+      <div>OUT<div>QB #2 Avery Johnson</div></div>
+      <footer><p>Sat. 11/7</p><p>|</p><p>Manhattan, KS</p></footer></section></main>'''
+    rows = parse_report_document(html, conference='BIG12', source_url='https://big12sports.com/report')
+    assert [(r['player_name'], r['team_name'], r['game_date']) for r in rows] == [
+        ('Jeremy Payne', None, '2026-11-06'), ('Avery Johnson', None, '2026-11-07')]
+    assert {r['published_at'] for r in rows} == {'2026-11-05T03:00:00+00:00'}
+
+
+def test_undated_big12_range_cannot_assign_the_first_games_date_to_every_player():
+    html = '<h1>Games on November 6-7, 2026</h1><div>OUT<div>QB #2 Avery Johnson</div></div>'
+    with pytest.raises(ConferenceReportUnavailable):
+        parse_report_document(html, conference='BIG12', source_url='https://big12sports.com/report')
+
+
+@pytest.mark.parametrize('label,expected', [
+    ('posted 7:10pm CT on Wednesday, Nov. 4', '2026-11-05T01:10:00+00:00'),
+    ('Report posted on Wednesday, November 4 at 9:00pm ET', '2026-11-05T02:00:00+00:00'),
+    ('posted Wed. 11/4 at 9:00p CT', '2026-11-05T03:00:00+00:00'),
+    ('posted 7:10pm CT on Wednesday, Oct. 14', '2026-10-15T00:10:00+00:00'),
+    ('posted Wed. 11/4 at 19:00p CT', None),
+    ('posted Wed. 2/30 at 9:00p CT', None),
+    ('updated recently', None),
+])
+def test_publication_labels_use_explicit_source_timezone(label, expected):
+    assert _parse_publication_label(label, 2026) == expected
+
+
+@pytest.mark.parametrize('publication,expected', [
+    ('2026-11-05T01:10:00+00:00', 'OUT'),
+    ('2026-11-02T01:10:00+00:00', 'DOUBTFUL'),
+    (None, 'DOUBTFUL'),
+])
+def test_same_week_manual_note_only_yields_to_a_proven_newer_official_report(db_session, publication_clock, publication, expected):
+    player = Player(name='Freshness RB', school='Ole Miss', position='RB')
+    db_session.add(player); db_session.flush()
+    db_session.add_all([
+        Injury(player_id=player.id, season=2026, week=10, status='DOUBTFUL'),
+        PlayerAvailabilityEvent(player_id=player.id, season=2026, week=10, status='DOUBTFUL',
+            source=MANUAL_CORROBORATED_SOURCE, source_url='https://example.test/coach',
+            published_at=datetime(2026,11,3,tzinfo=timezone.utc), effective_from_week=10,
+            effective_until_week=10, reviewed=True),
+        WeeklyProjection(player_id=player.id,season=2026,week=10,projection_version='MIDWEEK',fantasy_points=22,is_published=True),
+    ])
+    db_session.commit()
+    row = dict(player_name=player.name, team_name=player.school, position='RB', status='OUT',
+        conference='SEC', source_url='https://www.secsports.com/fbreports', published_at=publication)
+    result = _upsert_official_availability_rows(db_session, season=2026, week=10, rows=[row])
+    db_session.commit()
+    assert db_session.query(Injury).one().status == expected
+    assert result['overrides_preserved'] == (expected == 'DOUBTFUL')
+    if expected == 'OUT':
+        event = db_session.query(PlayerAvailabilityEvent).filter_by(source='official_sec_availability_report').one()
+        assert event.published_at.replace(tzinfo=timezone.utc).isoformat() == publication
+        assert db_session.scalar(current_published_projections_query(season=2026,week=10,player_ids=[player.id])).fantasy_points == 0
+        assert _upsert_official_availability_rows(db_session,season=2026,week=10,rows=[row])['events_created'] == 0
+
+
+@pytest.mark.parametrize('status', ['OUT', 'AVAILABLE'])
+def test_new_report_preserves_season_absence_until_an_explicit_return(db_session, publication_clock, status):
+    player = Player(name='Season QB',school='Ole Miss',position='QB')
+    db_session.add(player); db_session.flush()
+    db_session.add_all([
+        Injury(player_id=player.id,season=2026,week=10,status='OUT_FOR_SEASON'),
+        PlayerAvailabilityEvent(player_id=player.id,season=2026,week=10,status='OUT_FOR_SEASON',
+            source=MANUAL_CORROBORATED_SOURCE,source_url='https://example.test/team',
+            published_at=datetime(2026,11,3,tzinfo=timezone.utc),effective_from_week=10,effective_until_week=15,reviewed=True),
+    ])
+    db_session.commit()
+    _upsert_official_availability_rows(db_session,season=2026,week=10,rows=[dict(player_name=player.name,
+        team_name=player.school,position='QB',conference='SEC',status=status,
+        published_at='2026-11-05T01:10:00+00:00',source_url='https://www.secsports.com/fbreports')])
+    assert db_session.query(Injury).one().status == ('OUT_FOR_SEASON' if status=='OUT' else 'FULL')
+
+
+@pytest.mark.parametrize('stale_time', ['2026-11-04T01:10:00+00:00', None, '2026-11-06T01:10:00+00:00'])
+def test_stale_unknown_or_future_source_cannot_replace_current_dated_report(db_session, publication_clock, stale_time):
+    player=Player(name='Dated RB',school='Ole Miss',position='RB')
+    db_session.add(player);db_session.flush()
+    current=dict(player_name=player.name,team_name=player.school,position='RB',status='QUESTIONABLE',
+        conference='SEC',source_url='https://www.secsports.com/fbreports',published_at='2026-11-05T01:10:00+00:00')
+    _upsert_official_availability_rows(db_session,season=2026,week=10,rows=[current])
+    count=db_session.query(PlayerAvailabilityEvent).count()
+    result=_upsert_official_availability_rows(db_session,season=2026,week=10,rows=[{**current,'status':'OUT','published_at':stale_time}])
+    assert result['skipped']==1
+    assert db_session.query(Injury).one().status=='QUESTIONABLE'
+    assert db_session.query(PlayerAvailabilityEvent).count()==count
+
+
+def test_unchanged_newer_report_refreshes_source_time_without_duplicate_news(db_session, publication_clock):
+    player=Player(name='Unchanged RB',school='Ole Miss',position='RB')
+    db_session.add(player);db_session.flush()
+    row=dict(player_name=player.name,team_name=player.school,position='RB',status='QUESTIONABLE',
+        conference='SEC',source_url='https://www.secsports.com/fbreports',published_at='2026-11-05T01:10:00+00:00')
+    _upsert_official_availability_rows(db_session,season=2026,week=10,rows=[row])
+    newer={**row,'published_at':'2026-11-05T02:10:00+00:00'}
+    _upsert_official_availability_rows(db_session,season=2026,week=10,rows=[newer])
+    db_session.flush()
+    assert db_session.query(PlayerNewsEvent).count()==1
+    assert db_session.query(PlayerAvailabilityEvent).count()==1
+    assert db_session.query(PlayerAvailabilityEvent).one().published_at.isoformat().startswith('2026-11-05T02:10:00')
+    stale={**row,'published_at':'2026-11-05T01:30:00+00:00','status':'OUT'}
+    assert _upsert_official_availability_rows(db_session,season=2026,week=10,rows=[stale])['skipped']==1
+    assert db_session.query(Injury).one().status=='QUESTIONABLE'
+
+
+def test_unchanged_uncertain_report_repairs_a_legacy_published_zero(db_session, publication_clock):
+    player=Player(name='Legacy Zero RB',school='Ole Miss',position='RB')
+    db_session.add(player);db_session.flush()
+    db_session.add_all([
+        Injury(player_id=player.id,season=2026,week=10,status='QUESTIONABLE'),
+        WeeklyProjection(player_id=player.id,season=2026,week=10,projection_version='MIDWEEK',fantasy_points=18,is_published=True),
+        WeeklyProjection(player_id=player.id,season=2026,week=10,projection_version='CORRECTED_INJURY',fantasy_points=0,is_published=True),
+    ])
+    db_session.flush()
+    row=dict(player_name=player.name,team_name=player.school,position='RB',status='QUESTIONABLE',
+        conference='SEC',source_url='https://www.secsports.com/fbreports',published_at='2026-11-05T01:10:00+00:00')
+    result=_upsert_official_availability_rows(db_session,season=2026,week=10,rows=[row])
+    db_session.flush()
+    assert result['unchanged']==1
+    assert db_session.scalar(current_published_projections_query(season=2026,week=10,player_ids=[player.id])).fantasy_points==18
+    assert db_session.query(PlayerNewsEvent).count()==0
+
+
+@pytest.mark.parametrize('status', ['QUESTIONABLE', 'DOUBTFUL', 'PROBABLE', 'TBD', 'FULL'])
+def test_improved_designation_retires_only_unlocked_zero_projection(db_session, status):
+    from collegefootballfantasy_api.app.services.availability_corrections import publish_zero_projection_for_unavailable_player
+    player=Player(name='Improved RB',school='Ole Miss',position='RB')
+    db_session.add(player); db_session.flush()
+    db_session.add(WeeklyProjection(player_id=player.id,season=2026,week=10,projection_version='MIDWEEK',fantasy_points=18,is_published=True))
+    db_session.flush()
+    correction=publish_zero_projection_for_unavailable_player(db_session,player=player,season=2026,week=10,status='OUT',note='Original absence')
+    db_session.flush()
+    publish_zero_projection_for_unavailable_player(db_session,player=player,season=2026,week=10,status=status,note='New designation')
+    db_session.flush()
+    assert db_session.scalar(current_published_projections_query(season=2026,week=10,player_ids=[player.id])).fantasy_points == 18
+    correction.is_published=True;correction.locked_at=datetime(2026,11,1,tzinfo=timezone.utc);db_session.flush()
+    publish_zero_projection_for_unavailable_player(db_session,player=player,season=2026,week=10,status=status,note='Later report')
+    assert correction.is_published is True
 
 
 def test_big12_unlabelled_team_requires_unique_exact_conference_position_and_game_date(db_session):

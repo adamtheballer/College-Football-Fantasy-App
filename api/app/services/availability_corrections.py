@@ -9,6 +9,8 @@ state.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -37,10 +39,11 @@ _ZERO_COLUMNS = (
 )
 
 
-def has_active_manual_override(db: Session, *, player_id: int, season: int, week: int, dated_report: bool = False) -> bool:
+def has_active_manual_override(db: Session, *, player_id: int, season: int, week: int, dated_report: bool = False,
+                               report_published_at: datetime | None = None, report_status: str | None = None) -> bool:
     """Whether a reviewed, bounded team-report correction controls this week."""
-    return db.scalar(
-        select(PlayerAvailabilityEvent.id).where(
+    events = db.scalars(
+        select(PlayerAvailabilityEvent).where(
             PlayerAvailabilityEvent.player_id == player_id,
             PlayerAvailabilityEvent.season == season,
             PlayerAvailabilityEvent.source.in_(MANUAL_VERIFIED_SOURCES),
@@ -50,8 +53,19 @@ def has_active_manual_override(db: Session, *, player_id: int, season: int, week
             *([PlayerAvailabilityEvent.week == week] if dated_report else []),
             (PlayerAvailabilityEvent.effective_until_week.is_(None))
             | (PlayerAvailabilityEvent.effective_until_week >= week),
-        ).limit(1)
-    ) is not None
+        )
+    )
+    for event in events:
+        # An ordinary weekly OUT repeats a season absence; it cannot erase
+        # the more specific season-ending designation and its future window.
+        if event.status == "OUT_FOR_SEASON" and report_status in {"OUT", "IR"}:
+            return True
+        if not report_published_at or not event.published_at:
+            return True
+        published = event.published_at.replace(tzinfo=timezone.utc) if event.published_at.tzinfo is None else event.published_at
+        if published >= report_published_at:
+            return True
+    return False
 
 
 def publish_zero_projection_for_unavailable_player(
@@ -70,8 +84,8 @@ def publish_zero_projection_for_unavailable_player(
     receives the same zero result.
     """
     if status not in {"OUT", "IR", "OUT_FOR_SEASON"}:
-        if status == "FULL":
-            # A verified return must also retire the unlocked zero override;
+        if status in {"FULL", "TBD", "QUESTIONABLE", "DOUBTFUL", "PROBABLE", "DAY_TO_DAY"}:
+            # An improved designation must retire the unlocked zero override;
             # the preserved provider forecast becomes authoritative again.
             correction = db.scalar(select(WeeklyProjection).where(
                 WeeklyProjection.player_id == player.id,

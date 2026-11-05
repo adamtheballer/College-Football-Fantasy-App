@@ -137,6 +137,7 @@ def _availability_hash(row: dict[str, str | None], status: str) -> str:
         row.get("player_name"), row.get("team_name"), row.get("position"), status,
         row.get("injury"), row.get("return_timeline"), row.get("practice_level"),
         row.get("notes"), row.get("source_url"),
+        row.get("published_at"),
     )
     return sha256("\x1f".join(value or "" for value in values).encode()).hexdigest()
 
@@ -606,7 +607,32 @@ def _upsert_official_availability_rows(
         # older or incomplete conference report, but only for the weeks it
         # explicitly covers.  Once the window ends, normal official sync
         # resumes automatically.
-        if has_active_manual_override(db, player_id=player.id, season=season, week=week, dated_report=bool(row.get("game_date"))):
+        report_published_at = _parse_datetime(row.get("published_at"))
+        if report_published_at is not None and report_published_at.tzinfo is None:
+            report_published_at = None  # Unknown source timezone cannot prove freshness.
+        if report_published_at is not None and report_published_at > datetime.now(timezone.utc):
+            skipped += 1
+            continue
+        official_source = f"official_{row.get('conference', 'conference').lower()}_availability_report"
+        # Older imports used ingestion time as published_at. Only compare
+        # source times recorded explicitly as the assertion's effective time.
+        latest_dated = db.scalar(select(PlayerAvailabilityEvent).where(
+            PlayerAvailabilityEvent.player_id == player.id,
+            PlayerAvailabilityEvent.season == season,
+            PlayerAvailabilityEvent.week == week,
+            PlayerAvailabilityEvent.source == official_source,
+            PlayerAvailabilityEvent.effective_from.is_not(None),
+            PlayerAvailabilityEvent.effective_from == PlayerAvailabilityEvent.published_at,
+        ).order_by(PlayerAvailabilityEvent.published_at.desc(), PlayerAvailabilityEvent.id.desc()).limit(1))
+        if latest_dated is not None:
+            latest_time = latest_dated.published_at
+            if latest_time.tzinfo is None:
+                latest_time = latest_time.replace(tzinfo=timezone.utc)
+            if report_published_at is None or report_published_at < latest_time:
+                skipped += 1
+                continue
+        if has_active_manual_override(db, player_id=player.id, season=season, week=week, dated_report=bool(row.get("game_date")),
+                                      report_published_at=report_published_at, report_status=status):
             overrides_preserved += 1
             continue
         semantic_change = (
@@ -651,14 +677,26 @@ def _upsert_official_availability_rows(
                     PlayerAvailabilityEvent.player_id == player.id,
                     PlayerAvailabilityEvent.season == season,
                     PlayerAvailabilityEvent.week == week,
-                    PlayerAvailabilityEvent.content_hash == content_hash,
+                    PlayerAvailabilityEvent.source == official_source,
+                    PlayerAvailabilityEvent.status == status,
                 )
                 .order_by(PlayerAvailabilityEvent.id.desc())
                 .first()
             )
+            if availability_event is None and report_published_at is not None:
+                availability_event = PlayerAvailabilityEvent(
+                    player_id=player.id, season=season, week=week, status=status,
+                    source=official_source, source_url=row.get("source_url"),
+                    source_reliability=1.0, effective_from_week=week, reviewed=True,
+                )
+                events_created += 1
             if availability_event is not None:
                 availability_event.probability_active = probability_active
                 availability_event.availability_multiplier = multiplier
+                if report_published_at is not None:
+                    availability_event.published_at = report_published_at
+                    availability_event.effective_from = report_published_at
+                    availability_event.content_hash = content_hash
                 db.add(availability_event)
             context = db.query(PlayerWeeklyContext).filter(
                 PlayerWeeklyContext.player_id == player.id,
@@ -668,6 +706,11 @@ def _upsert_official_availability_rows(
             if context is not None:
                 context.availability_multiplier = multiplier
                 db.add(context)
+            if status not in {"OUT", "IR", "OUT_FOR_SEASON"}:
+                publish_zero_projection_for_unavailable_player(
+                    db, player=player, season=season, week=week, status=status,
+                    note=row.get("notes") or f"Official status: {status}",
+                )
             unchanged += 1
             continue
 
@@ -679,9 +722,10 @@ def _upsert_official_availability_rows(
         event = PlayerAvailabilityEvent(
             player_id=player.id, season=season, week=week, status=status,
             probability_active=probability_active, availability_multiplier=multiplier,
-            source=f"official_{row.get('conference', 'conference').lower()}_availability_report",
+            source=official_source,
             source_url=row.get("source_url"), content_hash=content_hash,
-            source_reliability=1.0, published_at=datetime.now(timezone.utc),
+            source_reliability=1.0, published_at=report_published_at or datetime.now(timezone.utc),
+            effective_from=report_published_at,
             effective_from_week=week, reviewed=True, notes=notes,
         )
         db.add(event)
