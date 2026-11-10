@@ -1,0 +1,34 @@
+meta {
+  name: Dynasty Trade
+  type: http
+  seq: 10
+}
+post {
+  url: {{base_url}}/dynasty/leagues/{{dynasty_league_id}}/trades
+  body: json
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+body:json {
+{
+  "from_team_id": {{dynasty_from_team_id}},
+  "to_team_id": {{dynasty_to_team_id}},
+  "give": [
+    {
+      "kind": "pick",
+      "id": {{dynasty_give_pick_id}}
+    }
+  ],
+  "receive": [
+    {
+      "kind": "pick",
+      "id": {{dynasty_receive_pick_id}}
+    }
+  ]
+}
+}
+docs {
+  Local isolated preview only. See docs/operations/dynasty-preview.md.
+  Requires explicit server gate; use IDs from actual responses and the correct owner token.
+}

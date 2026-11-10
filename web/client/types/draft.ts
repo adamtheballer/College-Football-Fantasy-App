@@ -24,6 +24,10 @@ export interface DraftRoomPick {
 }
 
 export interface DraftRoom {
+  // Optional dynasty read model: the current roster includes retained players.
+  roster_entries?: DraftRoomPick[];
+  pick_owners?: Record<number, number>;
+  roster_capacity?: Record<string, number>;
   league_id: number;
   draft_id: number;
   status: string;

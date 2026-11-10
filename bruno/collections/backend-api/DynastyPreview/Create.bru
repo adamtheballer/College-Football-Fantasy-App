@@ -1,0 +1,33 @@
+meta {
+  name: Dynasty Create
+  type: http
+  seq: 3
+}
+post {
+  url: {{base_url}}/dynasty/leagues
+  body: json
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+body:json {
+{
+  "name": "Dynasty preview",
+  "season": 2027,
+  "team_count": 2,
+  "roster_limit": 8,
+  "startup_rounds": 2,
+  "freshman_rounds": 1,
+  "future_pick_years": 2
+}
+}
+docs {
+  Local isolated preview only. See docs/operations/dynasty-preview.md.
+  Requires explicit server gate; use IDs from actual responses and the correct owner token.
+}
+script:post-response {
+  if (res.getStatus() === 201) {
+    bru.setVar("dynasty_league_id", res.getBody().league_id);
+    bru.setVar("dynasty_invite_code", res.getBody().invite_code);
+  }
+}

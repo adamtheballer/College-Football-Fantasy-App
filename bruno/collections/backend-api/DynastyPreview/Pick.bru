@@ -1,0 +1,21 @@
+meta {
+  name: Dynasty Pick
+  type: http
+  seq: 9
+}
+post {
+  url: {{base_url}}/dynasty/leagues/{{dynasty_league_id}}/picks/{{dynasty_pick_id}}
+  body: json
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+body:json {
+{
+  "player_id": {{dynasty_player_id}}
+}
+}
+docs {
+  Local isolated preview only. See docs/operations/dynasty-preview.md.
+  Requires explicit server gate; use IDs from actual responses and the correct owner token.
+}
