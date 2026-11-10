@@ -13,7 +13,7 @@ from statistics import mean, stdev
 from pathlib import Path
 from collegefootballfantasy_api.app.services import cfb27_player_sync
 
-POLICY_VERSION = "positional-value-master-v2-valid-ranks"
+POLICY_VERSION = "positional-value-master-v3-reviewed-rb-order"
 POSITIONS = ("QB", "RB", "WR", "TE", "K")
 DEFAULT_SLOTS = {"QB":1,"RB":2,"WR":2,"TE":1,"K":1,"BE":6,"IR":0}
 
@@ -82,7 +82,37 @@ def talent(player, source_revision):
         rating=matches[0]
     return (rating.overall,percentile(rating.overall,ranges[rating.position])) if rating else (None,.5)
 
-def build_master_draft_board(players: list[dict], config: dict) -> list[dict]:
+def _apply_reviewed_rb_order(board: list[dict], *, season: int | None) -> list[dict]:
+    """Apply the requested 2026 Missouri role review to the shared board only.
+
+    Keep the model's RB slots and every other position in place. These are
+    editorial rank bounds, not observed ADP, injury assertions or forecasts.
+    Only uniquely matched, source-ranked players may move, and the review
+    must not follow a player into a different school or season.
+    """
+    if season != 2026:
+        return board
+    indexes = [i for i, entry in enumerate(board) if entry['player']['pos'] == 'RB']
+    running_backs = [board[i] for i in indexes]
+    for name, bound, promote in (('ahmad hardy', 60, False), ('jamal roberts', 15, True)):
+        matches = [entry for entry in running_backs
+                   if identity(entry['player'].get('name')) == name
+                   and identity(entry['player'].get('school')) == 'missouri']
+        if len(matches) != 1:
+            continue
+        entry = matches[0]
+        old = running_backs.index(entry)
+        target = min(bound - 1, len(running_backs) - 1)
+        new = min(old, target) if promote else max(old, target)
+        running_backs.pop(old)
+        running_backs.insert(new, entry)
+    result = list(board)
+    for index, entry in zip(indexes, running_backs):
+        result[index] = entry
+    return result
+
+
+def build_master_draft_board(players: list[dict], config: dict, *, season: int | None = None) -> list[dict]:
     size=int(config.get('leagueSize',12));slots={**DEFAULT_SLOTS,**config.get('rosterSlots',{})}
     eligible={int(p['id']):{**p,'id':int(p['id'])} for p in players if p.get('pos') in POSITIONS and rank(p.get('id')) is not None and float(p['id']).is_integer()}
     entries=[]
@@ -168,7 +198,7 @@ def build_master_draft_board(players: list[dict], config: dict) -> list[dict]:
     # A positional/ROS-only rank cannot make an unranked source a top draft pick.
     ranked=[e for e in board if e['sourceBoardRank'] is not None]
     unranked=sorted((e for e in board if e['sourceBoardRank'] is None),key=lambda e:(e['projectionMissing'],-e['projectedPoints'],identity(e['player'].get('name')),e['player']['id']))
-    board=ranked+unranked
+    board=_apply_reviewed_rb_order(ranked, season=season)+unranked
     tier=1;start=0;result=[]
     for index,e in enumerate(board):
         if index and index-start>=4 and board[index-1]['projectedPoints']>0 and (board[index-1]['projectedPoints']-e['projectedPoints'])/board[index-1]['projectedPoints']>=.12:
@@ -178,12 +208,12 @@ def build_master_draft_board(players: list[dict], config: dict) -> list[dict]:
 
 
 @lru_cache(maxsize=16)
-def _cached_board(serialized_inputs: str, serialized_config: str, source_revision: str):
+def _cached_board(serialized_inputs: str, serialized_config: str, source_revision: str, season: int):
     # Only pure values are cached. Each request fingerprints every authoritative
     # input and the ratings file; no ORM rows, league availability or old DB
     # context can survive a source change.
     import json
-    return build_master_draft_board(json.loads(serialized_inputs), json.loads(serialized_config))
+    return build_master_draft_board(json.loads(serialized_inputs), json.loads(serialized_config), season=season)
 
 
 def build_draft_ranking_snapshot(db, *, season: int, league_id: int | None = None, config: dict | None = None, conference_codes: list[str] | None = None) -> dict:
@@ -231,7 +261,7 @@ def build_draft_ranking_snapshot(db, *, season: int, league_id: int | None = Non
     serialized_inputs=json.dumps(rows,sort_keys=True,default=str)
     version=hashlib.sha256(json.dumps(payload,sort_keys=True,default=str).encode()).hexdigest()
     from copy import deepcopy
-    board=deepcopy(_cached_board(serialized_inputs,json.dumps(config,sort_keys=True),payload['ratings_hash']))
+    board=deepcopy(_cached_board(serialized_inputs,json.dumps(config,sort_keys=True),payload['ratings_hash'],season))
     dates={row['id']:row['restOfSeasonUpdatedAt'] for row in rows}
     for row in board:
         row['restOfSeasonUpdatedAt']=dates[row['id']]
