@@ -13,7 +13,7 @@ from statistics import mean, stdev
 from pathlib import Path
 from collegefootballfantasy_api.app.services import cfb27_player_sync
 
-POLICY_VERSION = "positional-value-master-v3-reviewed-rb-order"
+POLICY_VERSION = "positional-value-master-v5-current-production"
 POSITIONS = ("QB", "RB", "WR", "TE", "K")
 DEFAULT_SLOTS = {"QB":1,"RB":2,"WR":2,"TE":1,"K":1,"BE":6,"IR":0}
 
@@ -112,6 +112,40 @@ def _apply_reviewed_rb_order(board: list[dict], *, season: int | None) -> list[d
     return result
 
 
+
+def _apply_current_availability_order(board: list[dict]) -> list[dict]:
+    """Keep confirmed absences behind playable players and injury risk out of the top ten."""
+    unavailable_statuses = {"OUT", "IR", "OUT_FOR_SEASON", "INACTIVE", "SUSPENDED"}
+    injury_risk_statuses = {"QUESTIONABLE", "DOUBTFUL", "PROBABLE", "DAY_TO_DAY"}
+    available = [entry for entry in board if entry["player"].get("status") not in unavailable_statuses]
+    unavailable = [entry for entry in board if entry["player"].get("status") in unavailable_statuses]
+    opening_picks = [entry for entry in available if entry["player"].get("status") not in injury_risk_statuses][:10]
+    opening_ids = {entry["player"]["id"] for entry in opening_picks}
+    return opening_picks + [entry for entry in available if entry["player"]["id"] not in opening_ids] + unavailable
+
+
+def _apply_reviewed_top_order(board: list[dict], *, season: int | None) -> list[dict]:
+    """Apply the owner's current 2026 opening picks to uniquely matched available players."""
+    if season != 2026:
+        return board
+    leaders = []
+    for name, school, position in (
+        ("jeremiah smith", "ohio state", "WR"),
+        ("nate sheppard", "duke", "RB"),
+    ):
+        matches = [
+            entry for entry in board
+            if identity(entry["player"].get("name")) == name
+            and identity(entry["player"].get("school")) == school
+            and entry["player"]["pos"] == position
+            and entry["player"].get("status") in {"HEALTHY", "FULL", "UNREPORTED", "TBD"}
+        ]
+        if len(matches) == 1:
+            leaders.append(matches[0])
+    leader_ids = {entry["player"]["id"] for entry in leaders}
+    return leaders + [entry for entry in board if entry["player"]["id"] not in leader_ids]
+
+
 def build_master_draft_board(players: list[dict], config: dict, *, season: int | None = None) -> list[dict]:
     size=int(config.get('leagueSize',12));slots={**DEFAULT_SLOTS,**config.get('rosterSlots',{})}
     eligible={int(p['id']):{**p,'id':int(p['id'])} for p in players if p.get('pos') in POSITIONS and rank(p.get('id')) is not None and float(p['id']).is_integer()}
@@ -151,16 +185,40 @@ def build_master_draft_board(players: list[dict], config: dict, *, season: int |
         e.update(roleCertainty=role,penalty=penalty,tprScore=tpr,cfb27Overall=ovr,cfb27TalentScore=talent_score,sourceBoardRank=source_rank(p))
     computed={e['player']['id']:index+1 for index,e in enumerate(sorted(entries,key=lambda e:(-e['tprScore'],e['player']['id'])))}
     qb_replacement=replacements.get('QB',0)
+
+    def season_fraction(entry):
+        completed = number(entry["player"].get("restOfSeasonAsOfWeek"))
+        return max(0.0, min(1.0, (13 - completed) / 12)) if completed is not None else 1.0
+
     def low_qb(e):
-        return e['player']['pos']=='QB' and e['projectedPoints']<max(60,qb_replacement*.4)
+        return e['player']['pos']=='QB' and e['projectedPoints']<max(60 * season_fraction(e),qb_replacement*.4)
     for e in entries:
         p=e['player'];provided=e['sourceBoardRank'];cr=computed[p['id']]
         aware=provided
-        if p['pos']=='QB' and not low_qb(e) and provided is not None and provided-cr>=24 and e['projectedPoints']>=max(180,qb_replacement*.85):
+        if p['pos']=='QB' and not low_qb(e) and provided is not None and provided-cr>=24 and e['projectedPoints']>=max(180 * season_fraction(e),qb_replacement*.85):
             aware=min(provided,cr+12)
         fantasy=.65*percentile(e['scarcity'],scarcity)+.35*percentile(e['projectedPoints'],projections)
         market=.6*rank_percentile(cr,len(entries))+.4*rank_percentile(aware,len(entries))
         e['finalDraftScore']=.6*fantasy+.2*market+.12*e['cfb27TalentScore']+.08*e['roleCertainty']-e['penalty']
+    from collegefootballfantasy_api.app.services.player_trade_value import weekly_value_weights
+
+    season_actuals = [
+        value for entry in entries
+        if (value := number(entry["player"].get("seasonFantasyPoints"))) is not None
+    ]
+    for entry in entries:
+        player = entry["player"]
+        actual_points = number(player.get("seasonFantasyPoints"))
+        through_week = number(player.get("seasonRankThroughWeek"))
+        if actual_points is None or through_week is None or through_week < 1:
+            continue
+        _, performance_weight, _ = weekly_value_weights(int(through_week))
+        production_score = percentile(actual_points, season_actuals)
+        entry["finalDraftScore"] = (
+            performance_weight * production_score
+            + (1.0 - performance_weight) * entry["finalDraftScore"]
+        )
+
     board=sorted(entries,key=lambda e:(low_qb(e),-e['projectedPoints'] if low_qb(e) else 0,-e['finalDraftScore'],computed[e['player']['id']],e['player']['id']))
     shallow=[e for e in board if not low_qb(e)];deep=[e for e in board if low_qb(e)]
     rounds=config.get('totalRosterSpots') or sum(slots.values())
@@ -180,7 +238,13 @@ def build_master_draft_board(players: list[dict], config: dict, *, season: int |
         board=accepted+promoted+deferred+[e for e in later if e['player']['id'] not in promoted_ids]
     for pos in POSITIONS:
         indexes=[i for i,e in enumerate(board) if e['player']['pos']==pos]
-        ordered=sorted((board[i] for i in indexes),key=lambda e:(-e['projectedPoints'],board.index(e)))
+        ordered=sorted(
+            (board[i] for i in indexes),
+            key=lambda e: (
+                -e['finalDraftScore'] if number(e['player'].get('seasonRankThroughWeek')) else -e['projectedPoints'],
+                board.index(e),
+            ),
+        )
         for index,e in zip(indexes,ordered):
             board[index]=e
     protected=sorted((e for e in board if e['player'].get('restOfSeasonAsOfWeek')==1 and e['player'].get('status')=='HEALTHY' and e['sourceBoardRank'] is not None and e['sourceBoardRank']<=6),key=lambda e:e['sourceBoardRank'])
@@ -198,7 +262,10 @@ def build_master_draft_board(players: list[dict], config: dict, *, season: int |
     # A positional/ROS-only rank cannot make an unranked source a top draft pick.
     ranked=[e for e in board if e['sourceBoardRank'] is not None]
     unranked=sorted((e for e in board if e['sourceBoardRank'] is None),key=lambda e:(e['projectionMissing'],-e['projectedPoints'],identity(e['player'].get('name')),e['player']['id']))
-    board=_apply_reviewed_rb_order(ranked, season=season)+unranked
+    ranked = _apply_reviewed_rb_order(ranked, season=season)
+    ranked = _apply_current_availability_order(ranked)
+    ranked = _apply_reviewed_top_order(ranked, season=season)
+    board = ranked + unranked
     tier=1;start=0;result=[]
     for index,e in enumerate(board):
         if index and index-start>=4 and board[index-1]['projectedPoints']>0 and (board[index-1]['projectedPoints']-e['projectedPoints'])/board[index-1]['projectedPoints']>=.12:
@@ -250,13 +317,20 @@ def build_draft_ranking_snapshot(db, *, season: int, league_id: int | None = Non
     week=calendar_cfb_week(season)
     projections={row.player_id:row for row in db.scalars(current_published_projections_query(season=season,week=week,player_ids=tuple(p.id for p in players))).all()}
     injuries=reviewed_injuries_for_week(db,season=season,week=week,player_ids={p.id for p in players})
+    from collegefootballfantasy_api.app.services.player_season_rank import season_positional_ranks
+    season_ranks = {}
+    for position in {player.position for player in players}:
+        season_ranks.update(season_positional_ranks(
+            db, season=season, position=position, conference_codes=conference_codes,
+        ))
     rows=[]
     for p in players:
         projection=projections.get(p.id);future=outlook.get(p.id)
         season_points = points_from_verified_stats(p.sheet_projection_stats or {},position=p.position,rules=scoring_rules) if scoring_rules else p.sheet_projected_season_points
         source=p.sheet_adp if rank(p.sheet_adp) is not None else p.cfb27_rank
         # The source rank is distinct from the raw ROS projection-total rank.
-        rows.append({'id':p.id,'name':p.name,'school':p.school,'pos':p.position,'boardRank':None,'adp':p.sheet_adp,'rank':source,'posRank':p.cfb27_position_rank,'status':('HEALTHY' if normalize_injury_status(injuries[p.id].status)=='FULL' else normalize_injury_status(injuries[p.id].status)) if p.id in injuries else 'UNREPORTED','sheetProjectedSeasonPoints':season_points,'sheetProjectionStats':{**(p.sheet_projection_stats or {}),'fpts':season_points},'restOfSeasonProjectedPoints':future.projected_points if future else None,'restOfSeasonRank':future.rank if future else None,'restOfSeasonAsOfWeek':future.completed_week if future else None,'restOfSeasonUpdatedAt':future.updated_at if future and future.updated_at else None,'history':[],'projection':{'floor':projection.floor if projection else 0,'ceiling':projection.ceiling if projection else 0,'expectedPlays':projection.expected_plays if projection else 0}})
+        performance = season_ranks.get(p.id)
+        rows.append({'seasonFantasyPoints':performance.fantasy_points if performance else None,'seasonRankThroughWeek':performance.through_week if performance else None,'seasonPositionRank':performance.rank if performance else None,'id':p.id,'name':p.name,'school':p.school,'pos':p.position,'boardRank':None,'adp':p.sheet_adp,'rank':source,'posRank':p.cfb27_position_rank,'status':('HEALTHY' if normalize_injury_status(injuries[p.id].status)=='FULL' else normalize_injury_status(injuries[p.id].status)) if p.id in injuries else 'UNREPORTED','sheetProjectedSeasonPoints':season_points,'sheetProjectionStats':{**(p.sheet_projection_stats or {}),'fpts':season_points},'restOfSeasonProjectedPoints':future.projected_points if future else None,'restOfSeasonRank':future.rank if future else None,'restOfSeasonAsOfWeek':future.completed_week if future else None,'restOfSeasonUpdatedAt':future.updated_at if future and future.updated_at else None,'history':[],'projection':{'floor':projection.floor if projection else 0,'ceiling':projection.ceiling if projection else 0,'expectedPlays':projection.expected_plays if projection else 0}})
     payload={'conference_codes':conference_codes,'policy':POLICY_VERSION,'season':season,'week':week,'config':config,'scoring_rules':scoring_rules,'ratings_source':str(cfb27_player_sync.CFB27_SOURCE_PATH),'ratings_hash':hashlib.sha256(cfb27_player_sync.CFB27_SOURCE_PATH.read_bytes()).hexdigest(),'inputs':rows}
     serialized_inputs=json.dumps(rows,sort_keys=True,default=str)
     version=hashlib.sha256(json.dumps(payload,sort_keys=True,default=str).encode()).hexdigest()
