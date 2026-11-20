@@ -71,8 +71,11 @@ def test_missouri_review_moves_hardy_down_and_roberts_up_without_changing_foreca
     for row in reviewed:
         for field in ('projectedPoints','sourceBoardRank','adp','cfb27Overall','cfb27TalentScore','finalDraftScore'):
             assert row[field]==by_id[row['id']][field]
-    assert [(i,r['id']) for i,r in enumerate(reviewed) if r['pos']!='RB']==[(i,r['id']) for i,r in enumerate(baseline) if r['pos']!='RB']
-    moved={hardy['id'],roberts['id']}
+    # The opening-pick review can move Smith and Sheppard across positions.
+    # Every remaining player's within-position relative order stays stable.
+    leaders={r["id"] for r in reviewed if r["name"] in {"Jeremiah Smith", "Nate Sheppard"}}
+    assert [r['id'] for r in reviewed if r['pos']!='RB' and r["id"] not in leaders]==[r['id'] for r in baseline if r['pos']!='RB' and r["id"] not in leaders]
+    moved={hardy['id'],roberts['id']} | leaders
     assert [r['id'] for r in reviewed if r['pos']=='RB' and r['id'] not in moved]==[r['id'] for r in baseline if r['pos']=='RB' and r['id'] not in moved]
     assert [r['id'] for r in reviewed]==[r['id'] for r in build_master_draft_board(list(reversed(ref['players'])),ref['config'],season=2026)]
 
@@ -257,3 +260,32 @@ def test_mock_conference_input_never_silently_widens_the_pool(client, codes):
 def test_mock_conferences_cannot_override_real_league_settings(client, extra):
     r = client.get('/players', params={**extra, 'conference_codes': 'SEC'})
     assert r.status_code == 422
+
+
+def test_current_review_places_smith_and_sheppard_first_without_mutating_source_inputs():
+    from copy import deepcopy
+
+    rows = [p(i, points=300-i, source=i) for i in range(1,30)]
+    rows[0].update(name="Cam Coleman", school="Texas")
+    rows[12].update(name="Jeremiah Smith", school="Ohio State")
+    rows[18].update(name="Nate Sheppard", school="Duke", pos="RB")
+    rows[1].update(name="Malachi Toney", school="Miami", status="OUT", points=1000)
+    rows[2]["status"] = "QUESTIONABLE"
+    original = deepcopy(rows)
+    board = build_master_draft_board(rows, CONFIG, season=2026)
+    assert [row["name"] for row in board[:2]] == ["Jeremiah Smith", "Nate Sheppard"]
+    assert not any(row["status"] in {"OUT", "QUESTIONABLE"} for row in board[:10])
+    assert board[-1]["name"] == "Malachi Toney"
+    assert [row["masterDraftRank"] for row in board] == list(range(1,30))
+    assert rows == original
+    future = build_master_draft_board(rows, CONFIG, season=2027)
+    assert future[0]["name"] != "Jeremiah Smith"
+
+
+def test_opening_pick_review_does_not_promote_a_newly_unavailable_player():
+    rows = [p(i, points=300-i, source=i) for i in range(1,20)]
+    rows[0].update(name="Jeremiah Smith", school="Ohio State", status="OUT")
+    rows[1].update(name="Nate Sheppard", school="Duke", pos="RB")
+    board = build_master_draft_board(rows, CONFIG, season=2026)
+    assert board[0]["name"] == "Nate Sheppard"
+    assert board[-1]["name"] == "Jeremiah Smith"

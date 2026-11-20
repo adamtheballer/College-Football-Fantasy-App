@@ -43,14 +43,30 @@ def compute_usage_shares(
         # Aggregate team totals from stats (if available)
         team_rush_attempts = 0.0
         team_targets = 0.0
+        team_pass_attempts = 0.0
         for player in roster:
             stats = player_stats.get(player.id, {})
-            team_rush_attempts += _stat_value(stats, ["RushingAttempts", "RushAttempts"])
-            team_targets += _stat_value(stats, ["ReceivingTargets", "Targets"])
+            team_rush_attempts += _stat_value(stats, ["RushingAttempts", "RushAttempts", "rushing_attempts", "rush_attempts"])
+            team_targets += _stat_value(stats, ["ReceivingTargets", "Targets", "targets", "receiving_targets"])
+            team_pass_attempts += _stat_value(stats, ["PassingAttempts", "PassAttempts", "passing_attempts", "pass_attempts"])
 
-        rbs = sorted((player for player in roster if player.position.upper() == "RB"), key=lambda player: player.name)
-        wrs = sorted((player for player in roster if player.position.upper() == "WR"), key=lambda player: player.name)
-        tes = sorted((player for player in roster if player.position.upper() == "TE"), key=lambda player: player.name)
+        def role_order(player: Player) -> tuple:
+            stats = player_stats.get(player.id, {})
+            opportunity_keys = {
+                "RB": ["RushingAttempts", "RushAttempts", "rushing_attempts", "rush_attempts"],
+                "QB": ["PassingAttempts", "PassAttempts", "passing_attempts", "pass_attempts"],
+            }.get(player.position.upper(), [
+                "ReceivingTargets", "Targets", "targets", "receiving_targets", "Receptions", "receptions",
+            ])
+            opportunities = _stat_value(stats, opportunity_keys)
+            return (player.depth_order or 99, -opportunities, player.cfb27_position_rank or 9999, player.id)
+
+        rbs = sorted((player for player in roster if player.position.upper() == "RB"), key=role_order)
+        wrs = sorted((player for player in roster if player.position.upper() == "WR"), key=role_order)
+        tes = sorted((player for player in roster if player.position.upper() == "TE"), key=role_order)
+        qbs = sorted((player for player in roster if player.position.upper() == "QB"), key=role_order)
+        fallback_pass_share = {player.id: (1.0 if index == 0 else 0.18 if index == 1 else 0.06)
+                               for index, player in enumerate(qbs)}
         fallback_rush_share = {
             player.id: DEFAULT_RB_CARRY_SHARES[min(index, len(DEFAULT_RB_CARRY_SHARES) - 1)]
             for index, player in enumerate(rbs)
@@ -66,8 +82,8 @@ def compute_usage_shares(
 
         for player in roster:
             stats = player_stats.get(player.id, {})
-            rush_attempts = _stat_value(stats, ["RushingAttempts", "RushAttempts"])
-            targets = _stat_value(stats, ["ReceivingTargets", "Targets"])
+            rush_attempts = _stat_value(stats, ["RushingAttempts", "RushAttempts", "rushing_attempts", "rush_attempts"])
+            targets = _stat_value(stats, ["ReceivingTargets", "Targets", "targets", "receiving_targets"])
             default_rush = fallback_rush_share.get(player.id, 0.0)
             default_target = fallback_target_share.get(player.id, 0.0)
             observed_rush = rush_attempts / team_rush_attempts if team_rush_attempts > 0 else default_rush
@@ -80,12 +96,19 @@ def compute_usage_shares(
                 (1.0 - SINGLE_GAME_USAGE_OBSERVED_WEIGHT) * default_target
                 + SINGLE_GAME_USAGE_OBSERVED_WEIGHT * observed_target
             )
+            pass_attempts = _stat_value(stats, ["PassingAttempts", "PassAttempts", "passing_attempts", "pass_attempts"])
+            default_pass = fallback_pass_share.get(player.id, 0.0)
+            if player.position.upper() == "QB" and team_pass_attempts == 0:
+                default_pass = 1.0
+            observed_pass = pass_attempts / team_pass_attempts if team_pass_attempts > 0 else default_pass
+            pass_share = (1.0 - SINGLE_GAME_USAGE_OBSERVED_WEIGHT) * default_pass + SINGLE_GAME_USAGE_OBSERVED_WEIGHT * observed_pass
             shares.append(
                 UsageShare(
                     player_id=player.id,
                     season=season,
                     week=week,
                     rush_share=rush_share,
+                    pass_share=pass_share,
                     target_share=target_share,
                     red_zone_share=target_share,
                     inside_five_share=target_share,

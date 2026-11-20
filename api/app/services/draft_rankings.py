@@ -13,7 +13,7 @@ from statistics import mean, stdev
 from pathlib import Path
 from collegefootballfantasy_api.app.services import cfb27_player_sync
 
-POLICY_VERSION = "positional-value-master-v3-reviewed-rb-order"
+POLICY_VERSION = "positional-value-master-v4-current-availability"
 POSITIONS = ("QB", "RB", "WR", "TE", "K")
 DEFAULT_SLOTS = {"QB":1,"RB":2,"WR":2,"TE":1,"K":1,"BE":6,"IR":0}
 
@@ -112,6 +112,40 @@ def _apply_reviewed_rb_order(board: list[dict], *, season: int | None) -> list[d
     return result
 
 
+
+def _apply_current_availability_order(board: list[dict]) -> list[dict]:
+    """Keep confirmed absences behind playable players and injury risk out of the top ten."""
+    unavailable_statuses = {"OUT", "IR", "OUT_FOR_SEASON", "INACTIVE", "SUSPENDED"}
+    injury_risk_statuses = {"QUESTIONABLE", "DOUBTFUL", "PROBABLE", "DAY_TO_DAY"}
+    available = [entry for entry in board if entry["player"].get("status") not in unavailable_statuses]
+    unavailable = [entry for entry in board if entry["player"].get("status") in unavailable_statuses]
+    opening_picks = [entry for entry in available if entry["player"].get("status") not in injury_risk_statuses][:10]
+    opening_ids = {entry["player"]["id"] for entry in opening_picks}
+    return opening_picks + [entry for entry in available if entry["player"]["id"] not in opening_ids] + unavailable
+
+
+def _apply_reviewed_top_order(board: list[dict], *, season: int | None) -> list[dict]:
+    """Apply the owner's current 2026 opening picks to uniquely matched available players."""
+    if season != 2026:
+        return board
+    leaders = []
+    for name, school, position in (
+        ("jeremiah smith", "ohio state", "WR"),
+        ("nate sheppard", "duke", "RB"),
+    ):
+        matches = [
+            entry for entry in board
+            if identity(entry["player"].get("name")) == name
+            and identity(entry["player"].get("school")) == school
+            and entry["player"]["pos"] == position
+            and entry["player"].get("status") in {"HEALTHY", "FULL", "UNREPORTED", "TBD"}
+        ]
+        if len(matches) == 1:
+            leaders.append(matches[0])
+    leader_ids = {entry["player"]["id"] for entry in leaders}
+    return leaders + [entry for entry in board if entry["player"]["id"] not in leader_ids]
+
+
 def build_master_draft_board(players: list[dict], config: dict, *, season: int | None = None) -> list[dict]:
     size=int(config.get('leagueSize',12));slots={**DEFAULT_SLOTS,**config.get('rosterSlots',{})}
     eligible={int(p['id']):{**p,'id':int(p['id'])} for p in players if p.get('pos') in POSITIONS and rank(p.get('id')) is not None and float(p['id']).is_integer()}
@@ -198,7 +232,10 @@ def build_master_draft_board(players: list[dict], config: dict, *, season: int |
     # A positional/ROS-only rank cannot make an unranked source a top draft pick.
     ranked=[e for e in board if e['sourceBoardRank'] is not None]
     unranked=sorted((e for e in board if e['sourceBoardRank'] is None),key=lambda e:(e['projectionMissing'],-e['projectedPoints'],identity(e['player'].get('name')),e['player']['id']))
-    board=_apply_reviewed_rb_order(ranked, season=season)+unranked
+    ranked = _apply_reviewed_rb_order(ranked, season=season)
+    ranked = _apply_current_availability_order(ranked)
+    ranked = _apply_reviewed_top_order(ranked, season=season)
+    board = ranked + unranked
     tier=1;start=0;result=[]
     for index,e in enumerate(board):
         if index and index-start>=4 and board[index-1]['projectedPoints']>0 and (board[index-1]['projectedPoints']-e['projectedPoints'])/board[index-1]['projectedPoints']>=.12:

@@ -70,7 +70,7 @@ def test_post_final_refresh_updates_next_week_and_values_only_after_every_matchu
     assert qb_projection.is_published is True
     assert qb_projection.baseline_source == "verified_week_1_stats"
     assert qb_projection.baseline_games_played == 1
-    assert qb_projection.model_version == "postgame_espn_v3"
+    assert qb_projection.model_version == "postgame_espn_v4"
     assert qb_projection.fantasy_points >= 0
     value = (
         db_session.query(PlayerTradeValue)
@@ -409,3 +409,41 @@ def test_initial_postgame_outlook_does_not_restore_an_out_player(db_session):
     )
 
     assert candidate.fantasy_points == 0.0
+
+
+def test_later_week_refresh_does_not_reblend_the_initial_preseason_prior(db_session, monkeypatch):
+    from collegefootballfantasy_api.app.services import weekly_outlook_refresh as service
+
+    _league, players, matchup = _finalized_week_one_fixture(db_session)
+    matchup.week = 11
+    schedule = db_session.query(TeamSchedule).filter_by(season=2026, week=2).one()
+    schedule.week = 12
+    db_session.commit()
+    blend_calls = []
+    monkeypatch.setattr(service, "_blend_initial_postgame_outlooks", lambda **kwargs: blend_calls.append(kwargs))
+    result = service.refresh_post_final_outlook(db_session, season=2026, completed_week=11)
+    assert result["status"] == "refreshed"
+    assert result["projected_week"] == 12
+    assert not blend_calls
+
+
+def test_scheduler_recovers_current_forecast_after_late_previous_week_finality(db_session):
+    from collegefootballfantasy_api.app.services.weekly_outlook_refresh import refresh_missing_current_week_outlook
+
+    _league, _players, matchup = _finalized_week_one_fixture(db_session)
+    matchup.week = 11
+    db_session.query(TeamSchedule).filter_by(season=2026, week=2).one().week = 12
+    matchup.status = "live"
+    db_session.commit()
+    assert refresh_missing_current_week_outlook(db_session, season=2026, week=12)["status"] == "waiting_for_finality"
+    assert db_session.query(WeeklyProjection).filter_by(season=2026, week=12).count() == 0
+
+    matchup.status = "final"
+    db_session.commit()
+    assert refresh_missing_current_week_outlook(db_session, season=2026, week=12)["status"] == "refreshed"
+    db_session.commit()
+    rows = db_session.query(WeeklyProjection).filter_by(season=2026, week=12).all()
+    original = {row.id: row.updated_at for row in rows}
+    assert rows
+    assert refresh_missing_current_week_outlook(db_session, season=2026, week=12) is None
+    assert {row.id: row.updated_at for row in rows} == original
