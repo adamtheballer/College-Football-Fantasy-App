@@ -289,3 +289,29 @@ def test_opening_pick_review_does_not_promote_a_newly_unavailable_player():
     board = build_master_draft_board(rows, CONFIG, season=2026)
     assert board[0]["name"] == "Nate Sheppard"
     assert board[-1]["name"] == "Jeremiah Smith"
+
+
+def test_late_season_draft_prefers_verified_production_over_a_stale_elite_forecast():
+    rows = [p(i, points=35, source=i) for i in range(1,100)]
+    for i, row in enumerate(rows, start=1):
+        row.update(seasonFantasyPoints=310-i*3, seasonRankThroughWeek=11, restOfSeasonAsOfWeek=11)
+    rows[-1].update(name="Cam Coleman", school="Texas", sheetProjectedSeasonPoints=70, seasonFantasyPoints=103.5)
+    board = build_master_draft_board(rows, CONFIG, season=2026)
+    coleman = next(row for row in board if row["name"] == "Cam Coleman")
+    assert coleman["masterDraftRank"] > 40
+    assert coleman["projectedPoints"] == 70
+    assert all(row["seasonFantasyPoints"] > 103.5 for row in board[:10])
+
+
+def test_late_season_quarterback_cutoff_uses_the_remaining_projection_horizon():
+    rows = [p(i, "RB", points=30-i/10, source=i) for i in range(1,50)]
+    rows.append(p(100, "QB", points=50, source=10))
+    for row in rows:
+        row.update(restOfSeasonAsOfWeek=11, seasonRankThroughWeek=11, seasonFantasyPoints=300 if row["pos"]=="QB" else 100)
+    board = build_master_draft_board(rows, CONFIG)
+    quarterback = next(row for row in board if row["id"] == 100)
+    assert quarterback["masterDraftRank"] < len(board)
+    for row in rows:
+        row.pop("restOfSeasonAsOfWeek")
+    season_long = build_master_draft_board(rows, CONFIG)
+    assert season_long[-1]["id"] == 100

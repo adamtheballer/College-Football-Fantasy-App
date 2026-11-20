@@ -68,7 +68,7 @@ def _latest_completed_week(db: Session, *, season: int) -> int:
         select(func.max(WeeklyProjection.week)).where(
             WeeklyProjection.season == season,
             WeeklyProjection.projection_version == POSTGAME_PROJECTION_VERSION,
-            WeeklyProjection.model_version == POSTGAME_MODEL_VERSION,
+            WeeklyProjection.model_version.in_(("postgame_espn_v3", POSTGAME_MODEL_VERSION)),
             WeeklyProjection.is_published.is_(True),
         )
     )
