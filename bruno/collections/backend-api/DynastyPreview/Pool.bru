@@ -1,0 +1,15 @@
+meta {
+  name: Dynasty Pool
+  type: http
+  seq: 7
+}
+get {
+  url: {{base_url}}/dynasty/leagues/{{dynasty_league_id}}/pool?limit=50&offset=0
+}
+headers {
+  Authorization: Bearer {{access_token}}
+}
+docs {
+  Local isolated preview only. See docs/operations/dynasty-preview.md.
+  Requires explicit server gate; use IDs from actual responses and the correct owner token.
+}
