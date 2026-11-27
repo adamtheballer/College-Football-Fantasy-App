@@ -176,10 +176,15 @@ def _parse_grouped_report_cards(soup: BeautifulSoup, *, conference: str, source_
     status group and jersey-labelled athletes. Unrelated articles are not data.
     """
     athlete = re.compile(r"^([A-Z]{1,5})\s+#\d+\s+(.+)$")
-    statuses = {"OUT", "DOUBTFUL", "QUESTIONABLE", "PROBABLE", "AVAILABLE", "FULL", "TBD", "OUT FOR SEASON", "SUSPENDED", "INACTIVE", "NOT AVAILABLE"}
+    statuses = {"OUT", "DOUBTFUL", "QUESTIONABLE", "GAME TIME DECISION", "PROBABLE", "AVAILABLE", "FULL", "TBD", "OUT FOR SEASON", "SUSPENDED", "INACTIVE", "NOT AVAILABLE"}
     rows = []
     ignored_logos = {"", "team logo", "conference logo", "conference", "sec logo", "acc football", "b1g football", "network", "football"}
     short_game_day = re.compile(r"^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\.?\s+(\d{1,2})/(\d{1,2})(?:\s*\||$)", re.I)
+    sec_game_day = re.compile(
+        r"\b(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), "
+        r"([A-Za-z]+)\.? (\d{1,2})\s+\d{1,2}:\d{2}\s*[ap]m\s+(?:CT|ET)\b",
+        re.I,
+    )
 
     def players_in(element):
         # Vendors split position, jersey and name into separate elements. Only
@@ -204,13 +209,28 @@ def _parse_grouped_report_cards(soup: BeautifulSoup, *, conference: str, source_
             year = re.search(r", (\d{4})$", text)
             parent = element.parent
             while parent and parent.name not in {"body", "html"}:
-                footer = re.search(r"(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), ([A-Z][a-z]+ \d{1,2}) \|", parent.get_text(" ", strip=True), re.I)
+                parent_text = parent.get_text(" ", strip=True)
+                if conference == "SEC" and year:
+                    # SEC split slates use “Sunday, Nov. 15 12:00pm CT”.
+                    # Stop before the league-wide wrapper can lend another game's date.
+                    if parent.find("h1") or len(parent.find_all("h2", limit=2)) > 1:
+                        return None
+                    dates = set(sec_game_day.findall(parent_text))
+                    if len(dates) == 1:
+                        month, day = dates.pop()
+                        try:
+                            return datetime.strptime(f"{month[:3]} {day}, {year.group(1)}", "%b %d, %Y").date().isoformat()
+                        except ValueError:
+                            return None
+                    if dates:
+                        return None
+                footer = re.search(r"(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday), ([A-Z][a-z]+ \d{1,2}) \|", parent_text, re.I)
                 if footer and year:
                     try:
                         return datetime.strptime(f"{footer.group(1)}, {year.group(1)}", "%B %d, %Y").date().isoformat()
                     except ValueError:
                         return None
-                short = short_game_day.search(parent.get_text(" ", strip=True))
+                short = short_game_day.search(parent_text)
                 if short and year:
                     try:
                         return datetime(int(year.group(1)), int(short.group(1)), int(short.group(2))).date().isoformat()

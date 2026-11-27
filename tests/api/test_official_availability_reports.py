@@ -449,6 +449,23 @@ def test_unscoped_cards_are_not_mistaken_for_an_official_report():
         parse_report_document(html, conference='SEC', source_url='https://www.secsports.com/fbreports')
 
 
+def test_sec_split_weekend_uses_game_footers_and_reads_game_time_decision():
+    html = '''<main><h1>Games on November 14-15, 2026</h1>
+    <article><h2>Game Day Report</h2><p>posted 10:15am CT on Saturday, Nov. 14</p>
+      <div><h3>Alabama</h3><div>GAME TIME DECISION<div>QB #12 Keelon Russell</div></div></div>
+      <footer><span>Saturday, Nov. 14</span><span>11:45am CT</span><span>Nashville, TN</span></footer></article>
+    <article><h2>Game Day Report</h2><p>posted 10:30am CT on Sunday, Nov. 15</p>
+      <div><h3>Oklahoma</h3><div>OUT<div>WR #12 Trell Harris</div></div></div>
+      <footer><span>Sunday, Nov. 15</span><span>12:00pm CT</span><span>Norman, OK</span></footer></article>
+    <article><h2>Game Day Report</h2><p>posted 10:15am CT on Saturday, Nov. 14</p>
+      <div><h3>Missouri</h3><div>OUT<div>RB #21 Another Player</div></div></div></article></main>'''
+    rows = parse_report_document(html, conference="SEC", source_url="https://www.secsports.com/fbreports")
+    assert [(r["player_name"], r["team_name"], r["status"], r["game_date"], r["published_at"]) for r in rows] == [
+        ("Keelon Russell", "Alabama", "GAME TIME DECISION", "2026-11-14", "2026-11-14T16:15:00+00:00"),
+        ("Trell Harris", "Oklahoma", "OUT", "2026-11-15", "2026-11-15T16:30:00+00:00"),
+    ]
+
+
 def test_dated_report_only_updates_its_actual_game_week(db_session):
     from collegefootballfantasy_api.app.models.game import Game
     p = Player(name='Ahmad Hardy', school='Missouri', position='RB')
