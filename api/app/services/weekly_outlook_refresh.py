@@ -438,6 +438,13 @@ def refresh_post_final_outlook(
             preseason_by_player_id=preseason_by_player_id,
             players_by_id=players_by_id,
         )
+    # TE reception/yardage production remains informative when ESPN omits targets.
+    from collegefootballfantasy_api.app.services.projections.production import apply_verified_production_pace
+    apply_verified_production_pace(
+        db, players=[player for player in players if player.position.upper() == "TE"],
+        projections=projections, season=season, week=next_week,
+        defense_by_team=defense_by_team, opponent_by_team=opponent_by_team,
+    )
     existing = {
         row.player_id: row
         for row in db.query(WeeklyProjection).filter(
@@ -454,10 +461,12 @@ def refresh_post_final_outlook(
     ]
     for candidate in projections:
         candidate.projection_version = POSTGAME_PROJECTION_VERSION
-        candidate.model_version = POSTGAME_MODEL_VERSION
+        if candidate.baseline_source != "verified_production_pace":
+            candidate.model_version = POSTGAME_MODEL_VERSION
         candidate.is_published = True
-        candidate.baseline_source = f"verified_week_{completed_week}_stats"
-        candidate.baseline_games_played = max(1, completed_week)
+        if candidate.baseline_source != "verified_production_pace":
+            candidate.baseline_source = f"verified_week_{completed_week}_stats"
+            candidate.baseline_games_played = max(1, completed_week)
         current = existing.get(candidate.player_id)
         if current is None:
             db.add(candidate)

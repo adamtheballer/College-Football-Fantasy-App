@@ -77,7 +77,8 @@ def compute_usage_shares(
                 player.id: DEFAULT_WR_TARGET_SHARES[min(index, len(DEFAULT_WR_TARGET_SHARES) - 1)]
                 for index, player in enumerate(wrs)
             },
-            **{player.id: DEFAULT_TE_TARGET_SHARE / max(len(tes), 1) for player in tes},
+            **{player.id: DEFAULT_TE_TARGET_SHARE if index == 0 else DEFAULT_TE_TARGET_SHARE / 3
+               for index, player in enumerate(tes)},
         }
 
         for player in roster:
