@@ -141,6 +141,11 @@ def publish_role_corrected_week(
         season=season,
         week=week,
     )
+    from collegefootballfantasy_api.app.services.projections.production import apply_verified_production_pace
+    apply_verified_production_pace(
+        db, players=players, projections=projections, season=season, week=week,
+        defense_by_team=defense_by_team, opponent_by_team=opponent_by_team,
+    )
     generated_by_player = {row.player_id: row for row in projections}
 
     for player in players:
@@ -165,17 +170,21 @@ def publish_role_corrected_week(
         elif corrected.locked_at is not None:
             raise ValueError(f"Cannot change locked Week {week} role correction for {player.name}.")
         for column in _COPY_COLUMNS:
-            setattr(corrected, column, getattr(candidate, column))
+            value = getattr(candidate, column)
+            # Transient engine rows omit inapplicable non-null categories.
+            # Preserve defaults on repeat publication instead of writing NULL.
+            if value is not None or WeeklyProjection.__table__.columns[column].nullable:
+                setattr(corrected, column, value)
         # Preserve the canonical matchup linkage from the reviewed baseline.
         if source is not None:
             corrected.team_id = source.team_id
             corrected.opponent_team_id = source.opponent_team_id
         corrected.is_published = True
         corrected.locked_at = None
-        corrected.projection_status = "ACTIVE"
+        corrected.projection_status = candidate.projection_status or "ACTIVE"
         corrected.baseline_source = source_label
-        corrected.fallback_reason = f"{source_label}: {source_url}"[:500]
-        corrected.model_version = ROLE_CORRECTION_MODEL_VERSION
+        corrected.fallback_reason = f"{source_label}: {source_url}; {candidate.fallback_reason or ''}"[:500]
+        corrected.model_version = candidate.model_version if candidate.baseline_source == "verified_production_pace" else ROLE_CORRECTION_MODEL_VERSION
         corrected.confidence = 0.95
 
     return len(projections)
