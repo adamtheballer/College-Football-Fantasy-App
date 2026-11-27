@@ -28,7 +28,7 @@ from collegefootballfantasy_api.app.services.power4 import canonical_school_name
 
 
 POSTGAME_PROJECTION_VERSION = "MIDWEEK"
-POSTGAME_MODEL_VERSION = "postgame_espn_v3"
+POSTGAME_MODEL_VERSION = "postgame_espn_v4"
 # One certified performance miss informs the next projection, but Week 1 is
 # still a small sample. Limit a single performance to a conservative 12% of
 # its capped residual so it informs the next matchup without re-pricing a
@@ -420,11 +420,12 @@ def refresh_post_final_outlook(
         week=next_week,
     )
     players_by_id = {player.id: player for player in players}
-    _blend_initial_postgame_outlooks(
-        projections=projections,
-        preseason_by_player_id=preseason_by_player_id,
-        players_by_id=players_by_id,
-    )
+    if completed_week <= 1:
+        _blend_initial_postgame_outlooks(
+            projections=projections,
+            preseason_by_player_id=preseason_by_player_id,
+            players_by_id=players_by_id,
+        )
     _apply_performance_residuals(
         projections=projections,
         players_by_id=players_by_id,
@@ -486,3 +487,25 @@ def refresh_post_final_outlook(
         "values": int(value_result["calculated"]),
         "chart_publication":chart_publication,
     }
+
+
+def refresh_missing_current_week_outlook(
+    db: Session, *, season: int, week: int,
+) -> dict[str, object] | None:
+    """Recover a publication missed when prior-week finality arrived late.
+
+    The scheduler already resolves the upcoming slate from verified schedules.
+    Check its current week as well as the scoring cycle's completed week so
+    moving to the next slate cannot strand that slate without forecasts.
+    """
+    if not 2 <= week <= 13:
+        return None
+    existing = db.query(WeeklyProjection.id).filter(
+        WeeklyProjection.season == season,
+        WeeklyProjection.week == week,
+        WeeklyProjection.projection_version == POSTGAME_PROJECTION_VERSION,
+        WeeklyProjection.is_published.is_(True),
+    ).first()
+    if existing is not None:
+        return None
+    return refresh_post_final_outlook(db, season=season, completed_week=week - 1)

@@ -18,6 +18,31 @@ class _Response:
         return self._payload
 
 
+def test_onesignal_push_sets_the_ios_badge_count_with_the_supported_option(monkeypatch):
+    monkeypatch.setattr(settings, "onesignal_app_id", "app-id")
+    monkeypatch.setattr(settings, "onesignal_app_api_key", "secret-key")
+
+    def post(_url, *, headers, json, timeout):
+        assert json["ios_badgeType"] == "SetTo"
+        assert json["ios_badgeCount"] == 4
+        assert json["idempotency_key"] == "a093bb5c-42af-4a0b-82dd-bcfc3cb38c01"
+        return _Response(200, {"id": "accepted-notification"})
+
+    monkeypatch.setattr(notification_providers.httpx, "post", post)
+    result = OneSignalPushProvider().send(
+        external_user_id="cfb_user:1",
+        subscription_id="subscription-1",
+        badge_count=4,
+        title="Matchup final",
+        body="Your Week 11 matchup is final.",
+        data={},
+        idempotency_key="a093bb5c-42af-4a0b-82dd-bcfc3cb38c01",
+    )
+
+    assert result.accepted is True
+    assert result.provider_message_id == "accepted-notification"
+
+
 @pytest.mark.parametrize("status_code,retryable", [(400, False), (401, False), (429, True), (500, True)])
 def test_onesignal_provider_sanitizes_non_success_responses(monkeypatch, status_code, retryable):
     monkeypatch.setattr(settings, "onesignal_app_id", "app-id")

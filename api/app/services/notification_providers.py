@@ -107,7 +107,7 @@ class OneSignalPushProvider:
                     "app_id": settings.onesignal_app_id,
                     "target_channel": "push",
                     "include_subscription_ids": [subscription_id],
-                    "ttl": ttl, "mutable_content": True, "ios_badgeType": "Set", "ios_badgeCount": badge_count,
+                    "ttl": ttl, "mutable_content": True, "ios_badgeType": "SetTo", "ios_badgeCount": badge_count,
                     "ios_sound": "default",
                     # If iOS bypasses its service extension, only generic copy
                     # can be shown. Private league/roster text is promoted by

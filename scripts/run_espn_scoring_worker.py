@@ -29,6 +29,7 @@ from collegefootballfantasy_api.app.services.live_scoring_readiness import (
     scoring_operations_report,
 )
 from collegefootballfantasy_api.app.services.worker_health import record_worker_heartbeat
+from collegefootballfantasy_api.app.services.weekly_outlook_refresh import refresh_missing_current_week_outlook
 
 
 logger = logging.getLogger("collegefootballfantasy_api.espn_scoring_worker")
@@ -162,6 +163,15 @@ def run_iteration(*, now: datetime | None = None, client: ESPNClient | None = No
                 success=True,
                 details={"state": "running", "season": season, "week": week},
             )
+            if settings.scoring_mode == "enabled" and week > 1:
+                try:
+                    outlook = refresh_missing_current_week_outlook(db, season=season, week=week)
+                    db.commit()
+                    if outlook is not None:
+                        logger.info("current_week_outlook_recovery season=%s week=%s result=%s", season, week, outlook["status"])
+                except Exception:
+                    db.rollback()
+                    logger.exception("current_week_outlook_recovery_failed season=%s week=%s", season, week)
             result = run_espn_scoring_cycle(
                 db,
                 season=season,

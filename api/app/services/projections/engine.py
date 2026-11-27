@@ -74,7 +74,7 @@ def _health_multiplier(status: str | None) -> float:
     if not status:
         return 1.0
     status = status.upper()
-    if status == "OUT":
+    if status in {"OUT", "IR", "OUT_FOR_SEASON"}:
         return 0.0
     if status == "DOUBTFUL":
         return 0.2
@@ -162,6 +162,8 @@ def build_weekly_projections(
         target_share = usage.target_share if usage else fallback_target_share
         talent = _talent_multiplier(player)
         qb_role_multiplier = _quarterback_role_multiplier(player)
+        if position == "QB" and usage is not None and usage.pass_share is not None and usage.pass_share > 0:
+            qb_role_multiplier = min(qb_role_multiplier, usage.pass_share)
 
         injury = injuries_by_player.get(player.id)
         health = _health_multiplier(injury.status if injury else None)
@@ -365,5 +367,10 @@ def build_weekly_projections(
                     qb_rating=None,
                 )
             )
+
+    for projection in projections:
+        injury = injuries_by_player.get(projection.player_id)
+        projection.availability_multiplier = _health_multiplier(injury.status if injury else None)
+        projection.projection_status = "OUT" if projection.availability_multiplier == 0 else "ACTIVE"
 
     return projections
