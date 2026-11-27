@@ -39,6 +39,7 @@ import { isTerminalDraftStatus } from "@/lib/draftStatus";
 import { filterDraftablePlayers, getLegalPositionsForRoster } from "@/lib/rosterLegality";
 import { cn } from "@/lib/utils";
 import type { DraftRoom, DraftRoomPick, DraftRoomTeam } from "@/types/draft";
+import type { DraftDataSource } from "@/types/draft-data-source";
 
 const POSITIONS = ["ALL", "QB", "RB", "WR", "TE", "K"];
 const DRAFT_PLAYER_PAGE_SIZE = 200;
@@ -231,7 +232,13 @@ const toDraftAudioState = (
   userTeamId: room.user_team_id,
 });
 
-export default function Draft() {
+const regularDraftSource: DraftDataSource = {
+  useLeague: useLeagueDetail, useRoom: useDraftRoom, usePick: useDraftPick,
+  useStart: useStartDraft, usePool: useDraftPlayerPool,
+  paths: id => ({ home: `/league/${id}`, lobby: `/league/${id}/lobby`, roster: `/league/${id}/roster` }),
+};
+
+export default function Draft({ source = regularDraftSource }: { source?: DraftDataSource } = {}) {
   const { leagueId } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -260,7 +267,7 @@ export default function Draft() {
   const parsedLeagueId =
     leagueId && !Number.isNaN(Number(leagueId)) ? Number(leagueId) : undefined;
 
-  const { data: league } = useLeagueDetail(parsedLeagueId);
+  const { data: league } = source.useLeague(parsedLeagueId);
   const {
     data: draftRoom,
     isLoading: draftRoomLoading,
@@ -268,9 +275,9 @@ export default function Draft() {
     failureCount: draftRoomFailureCount,
     isPaused: draftRoomPaused,
     refetch: refetchDraftRoom,
-  } = useDraftRoom(parsedLeagueId);
-  const pickMutation = useDraftPick(parsedLeagueId);
-  const startDraftMutation = useStartDraft(parsedLeagueId);
+  } = source.useRoom(parsedLeagueId);
+  const pickMutation = source.usePick(parsedLeagueId);
+  const startDraftMutation = source.useStart(parsedLeagueId);
 
   const playDraftAudioCue = useCallback((cue: DraftAudioCue, state: DraftAudioState) => {
     const cueKey = getDraftAudioCueKey(cue, state);
@@ -328,13 +335,14 @@ export default function Draft() {
     setRosterExitPending(true);
     setLocalError(null);
     try {
-      await queryClient.invalidateQueries({ queryKey: ["league", parsedLeagueId], refetchType: "none" });
-      await queryClient.refetchQueries({ queryKey: ["league", parsedLeagueId], type: "active" }, { throwOnError: true });
-      navigate(`/league/${parsedLeagueId}/roster`);
+      const key = [source.isolated ? "dynasty" : "league", parsedLeagueId];
+      await queryClient.invalidateQueries({ queryKey: key, refetchType: "none" });
+      await queryClient.refetchQueries({ queryKey: key, type: "active" }, { throwOnError: true });
+      navigate(source.paths(parsedLeagueId).roster);
     } catch {
       setLocalError("Your draft is saved. We couldn't load your roster. Please try View Your Roster again.");
     } finally { setRosterExitPending(false); }
-  }, [navigate, parsedLeagueId, queryClient]);
+  }, [navigate, parsedLeagueId, queryClient, source]);
 
   useEffect(() => {
     const interval = window.setInterval(() => setNow(Date.now()), 250);
@@ -400,9 +408,9 @@ export default function Draft() {
   // The timer is rendered from the server-adjusted clock. Use that same
   // authoritative display state as a final guard so a 0:00 pick can never
   // remain actionable while a stale receipt timestamp is being reconciled.
-  const expired = Boolean(draftRoom && (isDraftPickExpired(draftRoom, now) || (isDraftActive && secondsRemaining === 0)));
+  const expired = Boolean(!source.untimed && draftRoom && (isDraftPickExpired(draftRoom, now) || (isDraftActive && secondsRemaining === 0)));
   useEffect(() => {
-    if (!draftRoom) return;
+    if (!draftRoom || source.untimed) return;
     const currentState = toDraftAudioState(draftRoom);
     if (shouldPlayUserCountdownCue({ current: currentState, secondsRemaining })) {
       playDraftAudioCue("userCountdown", currentState);
@@ -416,6 +424,7 @@ export default function Draft() {
     draftRoom?.user_team_id,
     playDraftAudioCue,
     secondsRemaining,
+    source.untimed,
   ]);
   useEffect(
     () => () => {
@@ -426,7 +435,7 @@ export default function Draft() {
     },
     [],
   );
-  const timerDanger = isDraftActive && secondsRemaining <= 10;
+  const timerDanger = !source.untimed && isDraftActive && secondsRemaining <= 10;
   const leagueSize = Math.max(league?.max_teams ?? draftRoom?.teams.length ?? 12, draftRoom?.teams.length ?? 0, 1);
 
   const draftConfig = useMemo(
@@ -446,20 +455,20 @@ export default function Draft() {
 
   const viewerTeamRoster = useMemo(() => {
     if (!viewerDraftBoardTeamId || !draftRoom?.picks) return [];
-    return draftRoom.picks
+    return (draftRoom.roster_entries ?? draftRoom.picks)
       .filter((pick) => pick.team_id === viewerDraftBoardTeamId)
       .map((pick) => ({
         id: pick.player_id,
         position: pick.player_position,
       }));
-  }, [draftRoom?.picks, viewerDraftBoardTeamId]);
+  }, [draftRoom?.picks, draftRoom?.roster_entries, viewerDraftBoardTeamId]);
 
   const superflexEnabled = getSlotCount(draftRoom?.roster_slots, "SUPERFLEX") > 0;
 
   const legalPositions = useMemo(
     () =>
       draftRoom
-        ? getLegalPositionsForRoster(viewerTeamRoster, draftRoom.roster_slots, {
+        ? getLegalPositionsForRoster(viewerTeamRoster, draftRoom.roster_capacity ?? draftRoom.roster_slots, {
             superflexEnabled,
           })
         : [],
@@ -471,7 +480,7 @@ export default function Draft() {
     isLoading: playersLoading,
     isError: playersError,
     error: playersErrorObject,
-  } = useDraftPlayerPool({
+  } = source.usePool({
     league_id: parsedLeagueId,
     // Keep the full board in memory and remove drafted players below.  Rebuilding
     // a dense board from the already-filtered API response renumbered every
@@ -506,7 +515,7 @@ export default function Draft() {
         ? filterDraftablePlayers(
             draftBoard,
             viewerTeamRoster,
-            draftRoom.roster_slots,
+            draftRoom.roster_capacity ?? draftRoom.roster_slots,
             draftedIds,
             { superflexEnabled }
           )
@@ -564,7 +573,7 @@ export default function Draft() {
   const playerCardQuery = usePlayerCard(
     selectedPlayer?.id,
     Boolean(selectedPlayer && selectedPlayer.id > 0),
-    parsedLeagueId,
+    source.isolated ? undefined : parsedLeagueId,
   );
 
   const previewTeams = useMemo(
@@ -582,17 +591,19 @@ export default function Draft() {
         const round = getRoundNumber(overallPick, previewTeams.length);
         const roundPick = getRoundPick(overallPick, previewTeams.length);
         const orderedTeams = round % 2 === 1 ? previewTeams : [...previewTeams].reverse();
-        const team = orderedTeams[roundPick - 1];
+        const ownerId = draftRoom?.pick_owners?.[overallPick];
+        const team = previewTeams.find(t => t.id === ownerId) ?? orderedTeams[roundPick - 1];
         const pick = draftRoom?.picks.find((row) => row.overall_pick === overallPick);
         return {
           overallPick,
           round,
           roundPick,
           team,
+          originTeam: orderedTeams[roundPick - 1],
           pick,
         };
       }),
-    [draftRoom?.picks, previewTeams, totalPicks]
+    [draftRoom?.picks, draftRoom?.pick_owners, previewTeams, totalPicks]
   );
 
   const completed = isTerminalDraftStatus(draftRoom?.status);
@@ -601,10 +612,10 @@ export default function Draft() {
   );
   useEffect(() => {
     if (completed && parsedLeagueId) {
-      void queryClient.invalidateQueries({ queryKey: ["league", parsedLeagueId] });
-      if (draftRoom?.user_team_id) void queryClient.invalidateQueries({ queryKey: ["team", draftRoom.user_team_id, "roster"] });
+      void queryClient.invalidateQueries({ queryKey: [source.isolated ? "dynasty" : "league", parsedLeagueId] });
+      if (!source.isolated && draftRoom?.user_team_id) void queryClient.invalidateQueries({ queryKey: ["team", draftRoom.user_team_id, "roster"] });
     }
-  }, [completed, parsedLeagueId, draftRoom?.user_team_id, queryClient]);
+  }, [completed, parsedLeagueId, draftRoom?.user_team_id, queryClient, source.isolated]);
   const currentPick = draftRoom?.current_pick ?? 1;
   const displayPick = completed
     ? Math.min(totalPicks, Math.max(1, draftRoom?.picks.length ?? currentPick))
@@ -665,8 +676,8 @@ export default function Draft() {
   }, [draftRoom?.teams, draftRoom?.user_team_id, selectedRosterTeamId]);
 
   const selectedRoster = useMemo(
-    () => buildRealRoster(draftRoom?.picks ?? [], selectedRosterTeam?.id, draftRoom?.roster_slots),
-    [draftRoom?.picks, draftRoom?.roster_slots, selectedRosterTeam?.id]
+    () => buildRealRoster(draftRoom?.roster_entries ?? draftRoom?.picks ?? [], selectedRosterTeam?.id, draftRoom?.roster_capacity ?? draftRoom?.roster_slots),
+    [draftRoom?.picks, draftRoom?.roster_entries, draftRoom?.roster_slots, draftRoom?.roster_capacity, selectedRosterTeam?.id]
   );
 
   const historyRounds = useMemo(
@@ -725,7 +736,7 @@ export default function Draft() {
       setLocalError("Reconnecting. Picks are disabled until the draft is up to date.");
       return;
     }
-    if (draftRoom && isDraftPickExpired(draftRoom)) {
+    if (!source.untimed && draftRoom && isDraftPickExpired(draftRoom)) {
       setLocalError("Time expired. Waiting for the confirmed auto-pick.");
       return;
     }
@@ -796,7 +807,7 @@ export default function Draft() {
           <Button
             variant="outline"
             className="rounded-2xl text-[10px] font-black uppercase tracking-[0.06em]"
-            onClick={() => navigate(`/league/${parsedLeagueId}/lobby`)}
+            onClick={() => navigate(source.paths(parsedLeagueId).lobby)}
           >
             Back to Draft Lobby
           </Button>
@@ -809,7 +820,7 @@ export default function Draft() {
   const latestPick = draftRoom.picks[draftRoom.picks.length - 1];
   const isUserTurn = isDraftActive && draftRoom.can_make_pick;
   const canPick = isUserTurn && !pickMutation.isPending && !expired && !reconnecting;
-  const exitPath = completed ? `/league/${parsedLeagueId}/roster` : `/league/${parsedLeagueId}/lobby`;
+  const exitPath = completed ? source.paths(parsedLeagueId).roster : source.paths(parsedLeagueId).lobby;
   const exitDraft = () => completed ? void viewFinalRoster() : navigate(exitPath);
   const backendPlayerCount = playersPayload?.total ?? 0;
   const masterBoardCount = draftBoard.length;
@@ -898,7 +909,7 @@ export default function Draft() {
             >
               <span className="block truncate text-sm font-bold text-foreground transition-colors hover:text-white sm:text-base">{slot.player.player_name}</span>
               <span className="block truncate text-[9px] font-semibold uppercase tracking-[0.08em] text-slate-400 sm:text-[10px]">
-                {slot.player.player_position} · {slot.player.player_school} · Pick {slot.player.overall_pick}
+                {slot.player.player_position} · {slot.player.player_school} · {slot.player.overall_pick > 0 ? `Pick ${slot.player.overall_pick}` : "Retained"}
               </span>
             </button>
           ) : (
@@ -981,8 +992,8 @@ export default function Draft() {
         overallPick: slot.overallPick,
         round: slot.round,
         roundPick: slot.roundPick,
-        teamId: slot.team.id,
-        teamName: slot.team.name,
+        teamId: slot.originTeam.id,
+        teamName: slot.originTeam.name,
         playerName: slot.pick?.player_name,
         playerPosition: slot.pick?.player_position,
         isCurrent: !completed && slot.overallPick === displayPick,
@@ -1020,7 +1031,7 @@ export default function Draft() {
           {(isPreDraft || isDraftActive || isTransition) && !completed ? (
             <div className={cn("shrink-0 text-right", timerDanger ? "text-red-300" : "text-cfb-brand")}>
               <p className="text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground">Timer</p>
-              <p className="text-2xl font-black leading-none tabular-nums">{formatTimer(secondsRemaining)}</p>
+              <p className="text-2xl font-black leading-none tabular-nums">{source.untimed ? "—" : formatTimer(secondsRemaining)}</p>
             </div>
           ) : null}
           {draftRoom.can_start_draft ? (
@@ -1071,7 +1082,7 @@ export default function Draft() {
                     timerDanger ? "text-red-300" : "text-cfb-brand"
                   )}
                 >
-                  {formatTimer(secondsRemaining)}
+                  {source.untimed ? "—" : formatTimer(secondsRemaining)}
                 </p>
               </div>
             </div>
@@ -1106,7 +1117,7 @@ export default function Draft() {
                 <p className="mt-1 text-[9px] font-black uppercase tracking-[0.06em] text-amber-100/90">{draftProgressLabel}</p>
               ) : null}
             </div>
-            <Button onClick={() => completed ? void viewFinalRoster() : navigate(`/league/${parsedLeagueId}`)} disabled={rosterExitPending} variant="outline" className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface-raised/90 px-5 text-[10px] font-black uppercase tracking-[0.06em] text-white hover:bg-cfb-surface-hover">
+            <Button onClick={() => completed ? void viewFinalRoster() : navigate(source.paths(parsedLeagueId).home)} disabled={rosterExitPending} variant="outline" className="h-12 rounded-2xl border-cfb-border-subtle bg-cfb-surface-raised/90 px-5 text-[10px] font-black uppercase tracking-[0.06em] text-white hover:bg-cfb-surface-hover">
               League Hub
             </Button>
           </div>
